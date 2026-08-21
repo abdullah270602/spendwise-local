@@ -199,6 +199,64 @@ class AccountsScreen extends StatelessWidget {
         .toSet();
     final formKey = GlobalKey<FormState>();
     var saving = false;
+    Future<void> deleteAccount(
+      BuildContext sheetContext,
+      StateSetter setState,
+    ) async {
+      final confirmed = await showDialog<bool>(
+        context: sheetContext,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Delete account?'),
+          content: Text(
+            '${account.name} will be removed from your accounts and disconnected from notification sources. Existing transactions stay safely in your ledger.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(dialogContext).colorScheme.error,
+                foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+              ),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Delete account'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !sheetContext.mounted) return;
+      setState(() => saving = true);
+      try {
+        await viewModel.uiArchiveAccount(account.id);
+        if (sheetContext.mounted) {
+          Navigator.pop(sheetContext);
+          messenger.showSnackBar(
+            SnackBar(
+              content: Text(
+                '${account.name} was removed. Existing transactions were kept.',
+              ),
+              action: SnackBarAction(
+                label: 'Undo',
+                onPressed: () => _restoreAccount(
+                  screenContext,
+                  DeletedAccountViewData(id: account.id, name: account.name),
+                ),
+              ),
+            ),
+          );
+        }
+      } catch (error) {
+        if (sheetContext.mounted) {
+          setState(() => saving = false);
+          messenger.showSnackBar(
+            SnackBar(content: Text('Could not remove account: $error')),
+          );
+        }
+      }
+    }
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -222,98 +280,54 @@ class AccountsScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      'Manage account',
-                      style: Theme.of(context).textTheme.titleLarge,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Manage account',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                        ),
+                        PopupMenuButton<_AccountAction>(
+                          enabled: !saving,
+                          tooltip: 'Account actions',
+                          icon: const Icon(Icons.more_vert_rounded),
+                          onSelected: (action) {
+                            if (action == _AccountAction.delete) {
+                              deleteAccount(sheetContext, setState);
+                            }
+                          },
+                          itemBuilder: (menuContext) => [
+                            PopupMenuItem(
+                              value: _AccountAction.delete,
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.delete_outline_rounded,
+                                    color: Theme.of(menuContext)
+                                        .colorScheme
+                                        .error,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    'Delete account',
+                                    style: TextStyle(
+                                      color: Theme.of(menuContext)
+                                          .colorScheme
+                                          .error,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 6),
                     Text(
                       formatMoney(account.balance),
                       style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton.icon(
-                        style: TextButton.styleFrom(
-                          foregroundColor: Theme.of(context).colorScheme.error,
-                          minimumSize: const Size(48, 44),
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                        ),
-                        onPressed: saving
-                            ? null
-                            : () async {
-                                final confirmed = await showDialog<bool>(
-                                  context: sheetContext,
-                                  builder: (dialogContext) => AlertDialog(
-                                    title: const Text('Delete account?'),
-                                    content: Text(
-                                      '${account.name} will be removed from your accounts and disconnected from notification sources. Existing transactions stay safely in your ledger.',
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(dialogContext, false),
-                                        child: const Text('Cancel'),
-                                      ),
-                                      FilledButton(
-                                        style: FilledButton.styleFrom(
-                                          backgroundColor: Theme.of(
-                                            dialogContext,
-                                          ).colorScheme.error,
-                                          foregroundColor: Theme.of(
-                                            dialogContext,
-                                          ).colorScheme.onError,
-                                        ),
-                                        onPressed: () =>
-                                            Navigator.pop(dialogContext, true),
-                                        child: const Text('Delete account'),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                                if (confirmed != true ||
-                                    !sheetContext.mounted) {
-                                  return;
-                                }
-                                setState(() => saving = true);
-                                try {
-                                  await viewModel.uiArchiveAccount(account.id);
-                                  if (sheetContext.mounted) {
-                                    Navigator.pop(sheetContext);
-                                    messenger.showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          '${account.name} was removed. Existing transactions were kept.',
-                                        ),
-                                        action: SnackBarAction(
-                                          label: 'Undo',
-                                          onPressed: () => _restoreAccount(
-                                            screenContext,
-                                            DeletedAccountViewData(
-                                              id: account.id,
-                                              name: account.name,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                } catch (error) {
-                                  if (sheetContext.mounted) {
-                                    setState(() => saving = false);
-                                    messenger.showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Could not remove account: $error',
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                }
-                              },
-                        icon: const Icon(Icons.delete_outline_rounded),
-                        label: const Text('Delete account'),
-                      ),
                     ),
                     const SizedBox(height: 18),
                     TextFormField(
@@ -655,6 +669,8 @@ class AccountsScreen extends StatelessWidget {
     );
   }
 }
+
+enum _AccountAction { delete }
 
 final class _ControllerDisposalScope extends StatefulWidget {
   const _ControllerDisposalScope({

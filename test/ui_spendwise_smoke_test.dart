@@ -200,9 +200,11 @@ void main() {
     );
     await tester.tap(find.text('Everyday'));
     await tester.pumpAndSettle();
-    expect(find.text('Delete account'), findsOneWidget);
     expect(find.text('Enabled Bank'), findsOneWidget);
     expect(find.text('Disabled Bank'), findsNothing);
+    await tester.tap(find.byTooltip('Account actions'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete account'), findsOneWidget);
   });
 }
 
