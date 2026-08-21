@@ -6,6 +6,7 @@ enum ReviewReason {
   possibleDuplicate,
   possibleTransfer,
   needsCategory,
+  lowConfidence,
   parseFailed,
 }
 
@@ -14,6 +15,10 @@ enum SourceHealth { healthy, idle, stale, permissionRequired, error }
 enum EvidenceState { accepted, duplicate, matched, unparsed, ignored }
 
 enum ExportFormat { csv, json }
+
+final class ExportCancelledException implements Exception {
+  const ExportCancelledException();
+}
 
 enum ImportField {
   date,
@@ -236,6 +241,42 @@ class CsvImportDraft {
 }
 
 @immutable
+class CsvPreviewRowViewData {
+  const CsvPreviewRowViewData({
+    required this.rowNumber,
+    required this.date,
+    required this.description,
+    required this.amount,
+    required this.valid,
+    required this.duplicate,
+    this.error,
+  });
+  final int rowNumber;
+  final String date;
+  final String description;
+  final String amount;
+  final bool valid;
+  final bool duplicate;
+  final String? error;
+}
+
+@immutable
+class CsvImportPreviewViewData {
+  const CsvImportPreviewViewData({
+    required this.rows,
+    required this.validCount,
+    required this.errorCount,
+    required this.duplicateCount,
+    required this.sameFileAlreadyImported,
+  });
+  final List<CsvPreviewRowViewData> rows;
+  final int validCount;
+  final int errorCount;
+  final int duplicateCount;
+  final bool sameFileAlreadyImported;
+}
+
+@immutable
 class AccountCreationDraft {
   const AccountCreationDraft({
     required this.name,
@@ -255,6 +296,20 @@ class AccountCreationDraft {
   final String suffix;
   final Set<String> sourcePackages;
   final String smsSenderPattern;
+}
+
+@immutable
+class AccountUpdateDraft {
+  const AccountUpdateDraft({
+    required this.name,
+    required this.institution,
+    required this.suffix,
+    required this.sourcePackages,
+  });
+  final String name;
+  final String institution;
+  final String suffix;
+  final Set<String> sourcePackages;
 }
 
 @immutable
@@ -330,10 +385,13 @@ abstract class SpendWiseAdvancedViewModel implements SpendWiseViewModel {
   String? get errorMessage;
   bool get demoDataEnabled;
   Future<void> correctTransaction(String id, TransactionCorrectionDraft draft);
+  Future<CsvImportPreviewViewData> previewCsvImport(CsvImportDraft draft);
   Future<void> commitCsvImport(CsvImportDraft draft);
   Future<void> exportLedger(ExportRequest request);
   Future<void> setDemoDataEnabled(bool enabled);
   Future<void> addDetailedAccount(AccountCreationDraft draft);
+  Future<void> updateDetailedAccount(String id, AccountUpdateDraft draft);
+  void dismissError();
 }
 
 extension SpendWiseAdvancedAccess on SpendWiseViewModel {
@@ -352,6 +410,9 @@ extension SpendWiseAdvancedAccess on SpendWiseViewModel {
       Future.error(UnsupportedError('Transaction correction is not available'));
   Future<void> uiCommitCsvImport(CsvImportDraft draft) =>
       _advanced?.commitCsvImport(draft) ?? importCsv(draft.csvText);
+  Future<CsvImportPreviewViewData> uiPreviewCsvImport(CsvImportDraft draft) =>
+      _advanced?.previewCsvImport(draft) ??
+      Future.error(UnsupportedError('CSV preview is not available'));
   Future<void> uiExportLedger(ExportRequest request) =>
       _advanced?.exportLedger(request) ?? exportData();
   Future<void> uiSetDemoDataEnabled(bool enabled) =>
@@ -359,4 +420,8 @@ extension SpendWiseAdvancedAccess on SpendWiseViewModel {
   Future<void> uiAddDetailedAccount(AccountCreationDraft draft) =>
       _advanced?.addDetailedAccount(draft) ??
       addAccount(draft.name, draft.type, draft.openingBalance);
+  Future<void> uiUpdateDetailedAccount(String id, AccountUpdateDraft draft) =>
+      _advanced?.updateDetailedAccount(id, draft) ??
+      Future.error(UnsupportedError('Account editing is not available'));
+  void uiDismissError() => _advanced?.dismissError();
 }

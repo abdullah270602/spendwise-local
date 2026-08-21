@@ -12,10 +12,17 @@ class LedgerScreen extends StatefulWidget {
 }
 
 class _LedgerScreenState extends State<LedgerScreen> {
+  final searchController = TextEditingController();
   String query = '';
   TransactionKind? kind;
   String? accountId;
   String? category;
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final filtered = widget.viewModel.transactions
@@ -47,7 +54,12 @@ class _LedgerScreenState extends State<LedgerScreen> {
         actions: [
           IconButton(
             onPressed: () => _showFilters(context),
-            icon: const Icon(Icons.filter_list_rounded),
+            tooltip: 'Filter ledger',
+            icon: Badge(
+              isLabelVisible: _activeFilterCount > 0,
+              label: Text('$_activeFilterCount'),
+              child: const Icon(Icons.filter_list_rounded),
+            ),
           ),
         ],
       ),
@@ -57,6 +69,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
             padding: const EdgeInsets.fromLTRB(18, 4, 18, 10),
             sliver: SliverToBoxAdapter(
               child: TextField(
+                controller: searchController,
                 onChanged: (v) => setState(() => query = v),
                 decoration: const InputDecoration(
                   prefixIcon: Icon(Icons.search_rounded),
@@ -93,12 +106,24 @@ class _LedgerScreenState extends State<LedgerScreen> {
             ),
           ),
           if (filtered.isEmpty)
-            const SliverFillRemaining(
+            SliverFillRemaining(
               hasScrollBody: false,
               child: EmptyState(
-                icon: Icons.manage_search_rounded,
-                title: 'No matching transactions',
-                message: 'Try another search or filter.',
+                icon: widget.viewModel.transactions.isEmpty
+                    ? Icons.receipt_long_outlined
+                    : Icons.manage_search_rounded,
+                title: widget.viewModel.transactions.isEmpty
+                    ? 'Your ledger is empty'
+                    : 'No matching transactions',
+                message: widget.viewModel.transactions.isEmpty
+                    ? 'Add an account, import a statement, or enable notification capture to begin.'
+                    : 'Try another search or filter.',
+                action: widget.viewModel.transactions.isEmpty
+                    ? null
+                    : 'Clear search and filters',
+                onAction: widget.viewModel.transactions.isEmpty
+                    ? null
+                    : _clearSearchAndFilters,
               ),
             )
           else
@@ -154,105 +179,129 @@ class _LedgerScreenState extends State<LedgerScreen> {
     return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
   }
 
-  void _showFilters(BuildContext context) => showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    builder: (context) => StatefulBuilder(
-      builder: (context, modalSetState) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Filter ledger',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 18),
-              const Text('Transaction type'),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: [
-                  for (final value in TransactionKind.values)
-                    ChoiceChip(
-                      label: Text(value.name),
-                      selected: kind == value,
-                      onSelected: (_) => modalSetState(() => kind = value),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              DropdownButtonFormField<String?>(
-                initialValue: accountId,
-                decoration: const InputDecoration(labelText: 'Account'),
-                items: [
-                  const DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text('All accounts'),
-                  ),
-                  ...widget.viewModel.accounts.map(
-                    (item) => DropdownMenuItem<String?>(
-                      value: item.id,
-                      child: Text(item.name),
-                    ),
-                  ),
-                ],
-                onChanged: (value) => modalSetState(() => accountId = value),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String?>(
-                initialValue: category,
-                decoration: const InputDecoration(labelText: 'Category'),
-                items: [
-                  const DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text('All categories'),
-                  ),
-                  ...widget.viewModel.transactions
-                      .map((item) => item.category)
-                      .toSet()
-                      .map(
-                        (item) => DropdownMenuItem<String?>(
-                          value: item,
-                          child: Text(item),
-                        ),
+  int get _activeFilterCount =>
+      [kind, accountId, category].where((value) => value != null).length;
+
+  void _clearSearchAndFilters() => setState(() {
+    query = '';
+    kind = null;
+    accountId = null;
+    category = null;
+    searchController.clear();
+  });
+
+  void _showFilters(BuildContext context) {
+    var draftKind = kind;
+    var draftAccountId = accountId;
+    var draftCategory = category;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, modalSetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Filter ledger',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 18),
+                const Text('Transaction type'),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final value in TransactionKind.values)
+                      ChoiceChip(
+                        label: Text(value.name),
+                        selected: draftKind == value,
+                        onSelected: (_) =>
+                            modalSetState(() => draftKind = value),
                       ),
-                ],
-                onChanged: (value) => modalSetState(() => category = value),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => modalSetState(() {
-                        kind = null;
-                        accountId = null;
-                        category = null;
-                      }),
-                      child: const Text('Clear filters'),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String?>(
+                  initialValue: draftAccountId,
+                  decoration: const InputDecoration(labelText: 'Account'),
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('All accounts'),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () {
-                        setState(() {});
-                        Navigator.pop(context);
-                      },
-                      child: const Text('Apply'),
+                    ...widget.viewModel.accounts.map(
+                      (item) => DropdownMenuItem<String?>(
+                        value: item.id,
+                        child: Text(item.name),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                  onChanged: (value) =>
+                      modalSetState(() => draftAccountId = value),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String?>(
+                  initialValue: draftCategory,
+                  decoration: const InputDecoration(labelText: 'Category'),
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('All categories'),
+                    ),
+                    ...widget.viewModel.transactions
+                        .map((item) => item.category)
+                        .toSet()
+                        .map(
+                          (item) => DropdownMenuItem<String?>(
+                            value: item,
+                            child: Text(item),
+                          ),
+                        ),
+                  ],
+                  onChanged: (value) =>
+                      modalSetState(() => draftCategory = value),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => modalSetState(() {
+                          draftKind = null;
+                          draftAccountId = null;
+                          draftCategory = null;
+                        }),
+                        child: const Text('Clear filters'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () {
+                          setState(() {
+                            kind = draftKind;
+                            accountId = draftAccountId;
+                            category = draftCategory;
+                          });
+                          Navigator.pop(context);
+                        },
+                        child: const Text('Apply'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 extension<T> on Iterable<T> {

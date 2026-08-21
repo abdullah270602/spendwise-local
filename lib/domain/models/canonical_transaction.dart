@@ -36,6 +36,7 @@ final class CanonicalTransaction {
     this.fromAccountId,
     this.toAccountId,
     this.description,
+    this.note,
     this.needsReview = false,
     this.locked = false,
     this.origin = TransactionOrigin.automatic,
@@ -52,6 +53,7 @@ final class CanonicalTransaction {
   final String? fromAccountId;
   final String? toAccountId;
   final String? description;
+  final String? note;
   final bool needsReview;
   final bool locked;
   final TransactionOrigin origin;
@@ -75,6 +77,7 @@ final class CanonicalTransaction {
         fromAccountId: fromAccountId,
         toAccountId: toAccountId,
         description: description,
+        note: note,
         needsReview: needsReview,
         locked: locked,
         origin: origin,

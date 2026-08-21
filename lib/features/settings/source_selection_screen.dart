@@ -239,6 +239,7 @@ class _SourceSelectionScreenState extends State<SourceSelectionScreen> {
       '${value.day}/${value.month}/${value.year}';
 
   static String _status(SourceViewData source) {
+    if (!source.enabled) return 'Disabled · Tap to allow capture';
     final health = switch (source.health) {
       SourceHealth.healthy => 'Active',
       SourceHealth.idle => 'Waiting for activity',
@@ -249,10 +250,10 @@ class _SourceSelectionScreenState extends State<SourceSelectionScreen> {
     final last = source.lastSeenAt == null
         ? ''
         : ' · Last seen ${_shortDate(source.lastSeenAt!)}';
-    final count = source.observationCount == 0
+    final detail = source.statusDetail.isEmpty
         ? ''
-        : ' · ${source.observationCount} captured';
-    return '$health$last$count';
+        : ' · ${source.statusDetail}';
+    return '$health$last$detail';
   }
 }
 

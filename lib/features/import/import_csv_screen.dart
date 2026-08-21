@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:csv/csv.dart';
 
 import '../../app/theme.dart';
 import '../../widgets/spendwise_components.dart';
@@ -20,82 +21,117 @@ class _ImportCsvScreenState extends State<ImportCsvScreen> {
   List<String> headers = const [];
   List<List<String>> rows = const [];
   final mapping = <ImportField, String>{};
+  CsvImportPreviewViewData? preview;
+  bool exitApproved = false;
   @override
   Widget build(BuildContext context) {
     accountId ??= widget.viewModel.accounts.firstOrNull?.id;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Import statement')),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
-            child: Row(
-              children: [
-                for (var i = 0; i < 4; i++)
-                  Expanded(
-                    child: Container(
-                      margin: EdgeInsets.only(right: i == 3 ? 0 : 6),
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: i <= step
-                            ? SpendWiseColors.accent
-                            : SpendWiseColors.border,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-              ],
+    return PopScope(
+      canPop: exitApproved || (step == 0 && csv == null),
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        if (step > 0) {
+          setState(() => step--);
+          return;
+        }
+        final discard = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Discard this import?'),
+            content: const Text(
+              'The selected file and column mapping will be cleared.',
             ),
-          ),
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 180),
-              child: ListView(
-                key: ValueKey(step),
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
-                children: [
-                  _header,
-                  const SizedBox(height: 22),
-                  if (step == 0) _selectFile(context),
-                  if (step == 1) _mapColumns(context),
-                  if (step == 2) _preview(context),
-                  if (step == 3) _commit(context),
-                ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Keep editing'),
               ),
-            ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Discard'),
+              ),
+            ],
           ),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+        );
+        if (discard == true && mounted) {
+          setState(() => exitApproved = true);
+          Navigator.pop(this.context);
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Import statement')),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
               child: Row(
                 children: [
-                  if (step > 0)
+                  for (var i = 0; i < 4; i++)
                     Expanded(
-                      child: OutlinedButton(
-                        onPressed: busy ? null : () => setState(() => step--),
-                        child: const Text('Back'),
+                      child: Container(
+                        margin: EdgeInsets.only(right: i == 3 ? 0 : 6),
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: i <= step
+                              ? SpendWiseColors.accent
+                              : SpendWiseColors.border,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
-                  if (step > 0) const SizedBox(width: 10),
-                  Expanded(
-                    flex: 2,
-                    child: FilledButton(
-                      onPressed: _canContinue ? _next : null,
-                      child: Text(
-                        busy
-                            ? 'Working…'
-                            : step == 3
-                            ? 'Import transactions'
-                            : 'Continue',
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
-          ),
-        ],
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                child: ListView(
+                  key: ValueKey(step),
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+                  children: [
+                    _header,
+                    const SizedBox(height: 22),
+                    if (step == 0) _selectFile(context),
+                    if (step == 1) _mapColumns(context),
+                    if (step == 2) _preview(context),
+                    if (step == 3) _commit(context),
+                  ],
+                ),
+              ),
+            ),
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                child: Row(
+                  children: [
+                    if (step > 0)
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: busy ? null : () => setState(() => step--),
+                          child: const Text('Back'),
+                        ),
+                      ),
+                    if (step > 0) const SizedBox(width: 10),
+                    Expanded(
+                      flex: 2,
+                      child: FilledButton(
+                        onPressed: _canContinue ? _next : null,
+                        child: Text(
+                          busy
+                              ? 'Working…'
+                              : step == 3
+                              ? 'Import transactions'
+                              : 'Continue',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -259,22 +295,27 @@ class _ImportCsvScreenState extends State<ImportCsvScreen> {
     ],
   );
   Widget _preview(BuildContext context) {
-    final parsed = _previewRows;
-    final valid = parsed.where((r) => r.error == null).length;
-    final errors = parsed.length - valid;
-    final duplicates = parsed.where((r) => r.duplicate).length;
+    final result = preview!;
     return Column(
       children: [
         Row(
           children: [
-            Expanded(child: _Count('Valid', valid, SpendWiseColors.income)),
+            Expanded(
+              child: _Count('Valid', result.validCount, SpendWiseColors.income),
+            ),
             const SizedBox(width: 8),
-            Expanded(child: _Count('Errors', errors, SpendWiseColors.expense)),
+            Expanded(
+              child: _Count(
+                'Errors',
+                result.errorCount,
+                SpendWiseColors.expense,
+              ),
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: _Count(
                 'Possible duplicates',
-                duplicates,
+                result.duplicateCount,
                 SpendWiseColors.warning,
               ),
             ),
@@ -293,10 +334,10 @@ class _ImportCsvScreenState extends State<ImportCsvScreen> {
                 DataColumn(label: Text('Status')),
               ],
               rows: [
-                for (final row in parsed.take(25))
+                for (final row in result.rows.take(25))
                   DataRow(
                     cells: [
-                      DataCell(Text('${row.index}')),
+                      DataCell(Text('${row.rowNumber}')),
                       DataCell(Text(row.date)),
                       DataCell(
                         SizedBox(
@@ -327,12 +368,24 @@ class _ImportCsvScreenState extends State<ImportCsvScreen> {
             ),
           ),
         ),
+        if (result.rows.length > 25)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Text('Showing 25 of ${result.rows.length} rows'),
+          ),
+        if (result.sameFileAlreadyImported)
+          const Padding(
+            padding: EdgeInsets.only(top: 10),
+            child: Text(
+              'This exact file was already imported. It will not be duplicated.',
+            ),
+          ),
       ],
     );
   }
 
   Widget _commit(BuildContext context) {
-    final valid = _previewRows.where((r) => r.error == null).length;
+    final valid = preview?.validCount ?? 0;
     return Column(
       children: [
         Card(
@@ -385,18 +438,36 @@ class _ImportCsvScreenState extends State<ImportCsvScreen> {
   Future<void> _pick() async {
     final value = await widget.viewModel.pickCsvFile();
     if (value == null) return;
-    final lines = value
+    final normalized = value.startsWith('\ufeff') ? value.substring(1) : value;
+    final firstLine = normalized
         .split(RegExp(r'\r?\n'))
-        .where((line) => line.trim().isNotEmpty)
+        .firstWhere((line) => line.trim().isNotEmpty, orElse: () => '');
+    if (firstLine.isEmpty) return;
+    final delimiters = [',', ';', '\t'];
+    delimiters.sort(
+      (a, b) => b
+          .allMatches(firstLine)
+          .length
+          .compareTo(a.allMatches(firstLine).length),
+    );
+    final decoded = Csv(
+      fieldDelimiter: delimiters.first,
+      autoDetect: false,
+    ).decode(normalized);
+    if (decoded.isEmpty) return;
+    final parsedHeaders = decoded.first
+        .map((value) => '$value'.trim())
         .toList();
-    if (lines.isEmpty) return;
-    final parsedHeaders = _csvLine(lines.first);
-    final parsedRows = lines.skip(1).map(_csvLine).toList();
+    final parsedRows = decoded
+        .skip(1)
+        .map((row) => row.map((value) => '$value').toList())
+        .toList();
     setState(() {
       csv = value;
       headers = parsedHeaders;
       rows = parsedRows;
       mapping.clear();
+      preview = null;
       for (final h in headers) {
         final key = h.toLowerCase();
         if (key.contains('date')) {
@@ -427,20 +498,32 @@ class _ImportCsvScreenState extends State<ImportCsvScreen> {
   }
 
   Future<void> _next() async {
+    if (step == 1) {
+      setState(() => busy = true);
+      try {
+        final result = await widget.viewModel.uiPreviewCsvImport(_draft);
+        if (!mounted) return;
+        setState(() {
+          preview = result;
+          busy = false;
+          step = 2;
+        });
+      } catch (error) {
+        if (!mounted) return;
+        setState(() => busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not preview file: $error')),
+        );
+      }
+      return;
+    }
     if (step < 3) {
       setState(() => step++);
       return;
     }
     setState(() => busy = true);
     try {
-      await widget.viewModel.uiCommitCsvImport(
-        CsvImportDraft(
-          csvText: csv!,
-          accountId: accountId!,
-          sourceLabel: sourceLabel.isEmpty ? 'Statement import' : sourceLabel,
-          mapping: Map.unmodifiable(mapping),
-        ),
-      );
+      await widget.viewModel.uiCommitCsvImport(_draft);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Statement imported and reconciled')),
@@ -456,77 +539,12 @@ class _ImportCsvScreenState extends State<ImportCsvScreen> {
     }
   }
 
-  List<_PreviewRow> get _previewRows {
-    final known = widget.viewModel.transactions
-        .map(
-          (t) =>
-              '${t.occurredAt.year}-${t.occurredAt.month}-${t.occurredAt.day}|${t.amount.minorUnits.abs()}|${t.title.toLowerCase()}',
-        )
-        .toSet();
-    String cell(List<String> row, ImportField field) {
-      final h = mapping[field];
-      if (h == null) return '';
-      final i = headers.indexOf(h);
-      return i >= 0 && i < row.length ? row[i].trim() : '';
-    }
-
-    return [
-      for (var i = 0; i < rows.length; i++)
-        (() {
-          final date = cell(rows[i], ImportField.date),
-              desc = cell(rows[i], ImportField.description);
-          final amount = cell(rows[i], ImportField.amount).isNotEmpty
-              ? cell(rows[i], ImportField.amount)
-              : '${cell(rows[i], ImportField.debit)}${cell(rows[i], ImportField.credit)}';
-          final numeric = double.tryParse(
-            amount.replaceAll(RegExp(r'[^0-9.-]'), ''),
-          );
-          final parsedDate = DateTime.tryParse(date);
-          final error = date.isEmpty
-              ? 'Missing date'
-              : desc.isEmpty
-              ? 'Missing description'
-              : numeric == null
-              ? 'Invalid amount'
-              : null;
-          final key = parsedDate == null || numeric == null
-              ? ''
-              : '${parsedDate.year}-${parsedDate.month}-${parsedDate.day}|${(numeric.abs() * 100).round()}|${desc.toLowerCase()}';
-          return _PreviewRow(
-            i + 2,
-            date,
-            desc,
-            amount,
-            error,
-            known.contains(key),
-          );
-        })(),
-    ];
-  }
-
-  static List<String> _csvLine(String line) {
-    final out = <String>[];
-    final value = StringBuffer();
-    var quoted = false;
-    for (var i = 0; i < line.length; i++) {
-      final char = line[i];
-      if (char == '"') {
-        if (quoted && i + 1 < line.length && line[i + 1] == '"') {
-          value.write('"');
-          i++;
-        } else {
-          quoted = !quoted;
-        }
-      } else if (char == ',' && !quoted) {
-        out.add(value.toString().trim());
-        value.clear();
-      } else {
-        value.write(char);
-      }
-    }
-    out.add(value.toString().trim());
-    return out;
-  }
+  CsvImportDraft get _draft => CsvImportDraft(
+    csvText: csv!,
+    accountId: accountId!,
+    sourceLabel: sourceLabel.isEmpty ? 'Statement import' : sourceLabel,
+    mapping: Map.unmodifiable(mapping),
+  );
 
   static String _fieldName(ImportField field) => switch (field) {
     ImportField.date => 'Date',
@@ -541,21 +559,6 @@ class _ImportCsvScreenState extends State<ImportCsvScreen> {
     ImportField.reference => 'Reference',
     ImportField.ignore => 'Ignore field',
   };
-}
-
-class _PreviewRow {
-  const _PreviewRow(
-    this.index,
-    this.date,
-    this.description,
-    this.amount,
-    this.error,
-    this.duplicate,
-  );
-  final int index;
-  final String date, description, amount;
-  final String? error;
-  final bool duplicate;
 }
 
 class _Count extends StatelessWidget {

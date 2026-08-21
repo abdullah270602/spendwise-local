@@ -164,6 +164,7 @@ final class SpendWiseController extends ChangeNotifier
               ? '${_accountName(item.fromAccountId)} → ${_accountName(item.toAccountId)}'
               : _accountName(item.accountId);
           final evidence = _ledger.evidenceForTransaction(item.id);
+          final transactionKind = item.kind;
           return TransactionViewData(
             id: item.id,
             title: item.description?.trim().isNotEmpty == true
@@ -171,7 +172,9 @@ final class SpendWiseController extends ChangeNotifier
                 : item.kind.name,
             subtitle: accountLabel,
             amount: MoneyViewData(
-              item.amount.minorUnits,
+              item.kind == domain.TransactionKind.expense
+                  ? -item.amount.minorUnits.abs()
+                  : item.amount.minorUnits.abs(),
               currency: item.amount.currency,
             ),
             kind: kind,
@@ -182,6 +185,7 @@ final class SpendWiseController extends ChangeNotifier
                     ? 'Transfer'
                     : 'Other'),
             accountName: accountLabel,
+            note: item.note ?? '',
             accountId: item.kind == domain.TransactionKind.transfer
                 ? item.fromAccountId
                 : item.accountId,
@@ -189,21 +193,29 @@ final class SpendWiseController extends ChangeNotifier
             evidenceCount: evidence.isEmpty
                 ? item.evidenceIds.length
                 : evidence.length,
-            evidence: evidence
-                .map(
-                  (item) => EvidenceViewData(
+            evidence: evidence.indexed
+                .map((entry) {
+                  final index = entry.$1;
+                  final item = entry.$2;
+                  return EvidenceViewData(
                     id: item.id,
                     sourceLabel: item.sourceName,
                     packageName: item.sourceKind,
                     observedAt: item.observedAt.toLocal(),
-                    state: EvidenceState.accepted,
+                    state: item.parserId.isEmpty
+                        ? EvidenceState.unparsed
+                        : transactionKind == domain.TransactionKind.transfer
+                        ? EvidenceState.matched
+                        : index == 0
+                        ? EvidenceState.accepted
+                        : EvidenceState.duplicate,
                     title: item.rawTitle ?? '',
                     body: item.rawBody,
                     parserId: item.parserId,
                     confidence: item.confidence / 100,
                     reasons: item.reasonCodes,
-                  ),
-                )
+                  );
+                })
                 .toList(growable: false),
             isReviewed: !item.needsReview,
           );
@@ -264,10 +276,9 @@ final class SpendWiseController extends ChangeNotifier
             id: item.id,
             reason: item.kind == TransactionKind.transfer
                 ? ReviewReason.possibleTransfer
-                : ReviewReason.possibleDuplicate,
-            title: 'Confirm this match',
-            description:
-                'SpendWise found related evidence but wants your confirmation.',
+                : ReviewReason.lowConfidence,
+            title: 'Review this transaction',
+            description: 'The evidence was parsed, but SpendWise needs your confirmation before locking this result.',
             transactions: [item],
           ),
         ),
@@ -293,14 +304,18 @@ final class SpendWiseController extends ChangeNotifier
           lastSeenAt: item.lastObservedAt?.toLocal(),
           observationCount: item.observationCount,
           iconPng: item.iconPng,
-          health: !_notificationAccess
+          health: !item.configured
+              ? SourceHealth.idle
+              : !_notificationAccess
               ? SourceHealth.permissionRequired
               : !item.installed || !item.enabled
               ? SourceHealth.error
               : item.listenerConnected
               ? SourceHealth.healthy
               : SourceHealth.idle,
-          statusDetail: !_notificationAccess
+          statusDetail: !item.configured
+              ? 'Disabled — no notifications captured'
+              : !_notificationAccess
               ? 'Notification access required'
               : !item.installed
               ? 'App is no longer installed'
@@ -348,6 +363,11 @@ final class SpendWiseController extends ChangeNotifier
   Future<void> addDetailedAccount(
     AccountCreationDraft draft,
   ) => _runBusy(() async {
+    if (draft.currency.toUpperCase() != 'PKR') {
+      throw const FormatException(
+        'This release supports PKR accounts only. Mixed-currency totals require explicit exchange rates.',
+      );
+    }
     final accountType = switch (draft.type.toLowerCase()) {
       String value when value.contains('wallet') => domain.AccountType.wallet,
       String value when value.contains('cash') => domain.AccountType.cash,
@@ -401,6 +421,36 @@ final class SpendWiseController extends ChangeNotifier
   });
 
   @override
+  Future<void> updateDetailedAccount(String id, AccountUpdateDraft draft) =>
+      _runBusy(() async {
+        if (draft.name.trim().isEmpty) {
+          throw const FormatException('Enter an account name.');
+        }
+        _ledger.updateAccount(
+          id: id,
+          name: draft.name,
+          institutionName: draft.institution.trim().isEmpty
+              ? null
+              : draft.institution,
+          accountSuffix: draft.suffix.trim().isEmpty ? null : draft.suffix,
+        );
+        final attached = _ledger.sources(accountId: id);
+        final all = _ledger.sources();
+        for (final source in attached) {
+          if (source.packageName != null &&
+              !draft.sourcePackages.contains(source.packageName)) {
+            _ledger.detachSource(accountId: id, sourceId: source.id);
+          }
+        }
+        for (final source in all) {
+          if (source.packageName != null &&
+              draft.sourcePackages.contains(source.packageName)) {
+            _ledger.attachSource(accountId: id, sourceId: source.id);
+          }
+        }
+      });
+
+  @override
   Future<void> saveManualTransaction(ManualTransactionDraft draft) async {
     final kind = switch (draft.kind) {
       TransactionKind.expense => domain.TransactionKind.expense,
@@ -421,6 +471,7 @@ final class SpendWiseController extends ChangeNotifier
           ? draft.toAccountId
           : null,
       description: draft.title,
+      note: draft.note,
       categoryId: _categoryId(draft.category),
     );
     _reload();
@@ -518,8 +569,12 @@ final class SpendWiseController extends ChangeNotifier
     );
   });
 
-  @override
-  Future<void> commitCsvImport(CsvImportDraft draft) => _runBusy(() async {
+  ({
+    CsvImportWizard wizard,
+    CsvImportPreview preview,
+    CsvMappingDefinition mapping,
+  })
+  _prepareCsvImport(CsvImportDraft draft) {
     final wizard = CsvImportWizard(_ledger);
     final inspection = wizard.inspect(
       fileName: draft.sourceLabel.endsWith('.csv')
@@ -562,12 +617,62 @@ final class SpendWiseController extends ChangeNotifier
       accountId: draft.accountId,
       mapping: mapping,
     );
+    return (wizard: wizard, preview: preview, mapping: mapping);
+  }
+
+  @override
+  Future<CsvImportPreviewViewData> previewCsvImport(
+    CsvImportDraft draft,
+  ) async {
+    final prepared = _prepareCsvImport(draft);
+    final preview = prepared.preview;
+    return CsvImportPreviewViewData(
+      validCount: preview.validCount,
+      errorCount: preview.errorCount,
+      duplicateCount: preview.duplicateCount,
+      sameFileAlreadyImported: preview.sameFileAlreadyImported,
+      rows: preview.rows
+          .map(
+            (row) => CsvPreviewRowViewData(
+              rowNumber: row.rowNumber,
+              date:
+                  row.occurredAt
+                      ?.toLocal()
+                      .toIso8601String()
+                      .split('T')
+                      .first ??
+                  (row.raw.values.firstOrNull ?? ''),
+              description: row.description ?? row.merchant ?? '',
+              amount: row.amount == null
+                  ? ''
+                  : '${row.direction?.name == 'debit' ? '-' : '+'}${row.amount!.currency} ${(row.amount!.minorUnits / 100).toStringAsFixed(2)}',
+              valid: row.valid,
+              duplicate: row.probableDuplicate,
+              error: row.error,
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+
+  @override
+  Future<void> commitCsvImport(CsvImportDraft draft) => _runBusy(() async {
+    final prepared = _prepareCsvImport(draft);
+    final wizard = prepared.wizard;
+    final preview = prepared.preview;
     wizard.commit(
       preview: preview,
       accountId: draft.accountId,
       mappingName: draft.sourceLabel,
     );
   });
+
+  @override
+  void dismissError() {
+    if (_errorMessage == null) return;
+    _errorMessage = null;
+    notifyListeners();
+  }
 
   CsvDateFormat _detectDateFormat(
     CsvInspection inspection,
@@ -608,20 +713,22 @@ final class SpendWiseController extends ChangeNotifier
         .toSet();
     final filter = LedgerExportFilter(
       from: request.from,
-      to: request.to,
+      to: request.to?.add(const Duration(days: 1)),
       accountIds: request.accountIds,
       kinds: kinds,
       categoryIds: categoryIds,
+      includeEvidence: request.includeEvidence,
     );
     final exporter = LedgerExporter(_ledger);
     final isJson = request.format == ExportFormat.json;
-    await FilePicker.platform.saveFile(
+    final result = await FilePicker.platform.saveFile(
       dialogTitle: 'Export plaintext SpendWise data',
       fileName: isJson ? 'spendwise-backup.json' : 'spendwise-ledger.csv',
       type: FileType.custom,
       allowedExtensions: [isJson ? 'json' : 'csv'],
       bytes: isJson ? exporter.jsonBackup(filter) : exporter.csv(filter),
     );
+    if (result == null) throw const ExportCancelledException();
   });
 
   @override

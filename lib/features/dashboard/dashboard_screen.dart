@@ -10,9 +10,13 @@ class DashboardScreen extends StatelessWidget {
     super.key,
     required this.viewModel,
     required this.onSeeLedger,
+    required this.onOpenSettings,
+    required this.onOpenAccounts,
   });
   final SpendWiseViewModel viewModel;
   final VoidCallback onSeeLedger;
+  final VoidCallback onOpenSettings;
+  final VoidCallback onOpenAccounts;
   @override
   Widget build(BuildContext context) {
     final data = viewModel.dashboard;
@@ -55,8 +59,9 @@ class DashboardScreen extends StatelessWidget {
           ),
           actions: [
             IconButton(
-              onPressed: () => Scaffold.of(context).openEndDrawer(),
-              icon: const Icon(Icons.tune_rounded),
+              onPressed: onOpenSettings,
+              tooltip: 'Open settings',
+              icon: const Icon(Icons.settings_outlined),
             ),
             const SizedBox(width: 8),
           ],
@@ -97,7 +102,9 @@ class DashboardScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        '${data.monthlyChangePercent >= 0 ? '+' : ''}${data.monthlyChangePercent.toStringAsFixed(1)}% this month',
+                        data.incomeThisMonth.minorUnits == 0
+                            ? 'No income recorded this month'
+                            : '${data.monthlyChangePercent.toStringAsFixed(1)}% of income retained',
                         style: TextStyle(
                           color: data.monthlyChangePercent >= 0
                               ? SpendWiseColors.income
@@ -142,6 +149,33 @@ class DashboardScreen extends StatelessWidget {
                 detail: 'THIS MONTH',
               ),
               const SizedBox(height: 20),
+              if (viewModel.accounts.isEmpty) ...[
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Finish setup',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Add your first account, then choose which financial apps SpendWise may observe.',
+                        ),
+                        const SizedBox(height: 12),
+                        FilledButton.icon(
+                          onPressed: onOpenAccounts,
+                          icon: const Icon(Icons.add_rounded),
+                          label: const Text('Add an account'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
               const SectionHeading('Spending by category'),
               const SizedBox(height: 8),
               Card(
@@ -352,36 +386,43 @@ class _CategoryBar extends StatelessWidget {
   const _CategoryBar(this.item);
   final CategorySpendViewData item;
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 13),
-    child: Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                item.category,
-                style: const TextStyle(fontWeight: FontWeight.w600),
+  Widget build(BuildContext context) => Semantics(
+    label: '${item.category} spending',
+    value:
+        '${formatMoney(item.amount)}, ${(item.fraction * 100).round()} percent of the largest category',
+    child: Padding(
+      padding: const EdgeInsets.only(bottom: 13),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  item.category,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              Text(
+                formatMoney(item.amount),
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: Theme.of(context).colorScheme.onSurface),
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          ExcludeSemantics(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(5),
+              child: LinearProgressIndicator(
+                value: item.fraction.clamp(0, 1),
+                minHeight: 6,
+                backgroundColor: SpendWiseColors.border,
+                color: SpendWiseColors.accent,
               ),
             ),
-            Text(
-              formatMoney(item.amount),
-              style: Theme.of(context).textTheme.bodySmall
-                  ?.copyWith(color: Theme.of(context).colorScheme.onSurface),
-            ),
-          ],
-        ),
-        const SizedBox(height: 7),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(5),
-          child: LinearProgressIndicator(
-            value: item.fraction.clamp(0, 1),
-            minHeight: 6,
-            backgroundColor: SpendWiseColors.border,
-            color: SpendWiseColors.accent,
           ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
 }

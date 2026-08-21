@@ -458,6 +458,7 @@ final class LocalLedger {
     );
     _addColumn('transactions', 'updated_at', 'INTEGER');
     _addColumn('transactions', 'category_rule_id', 'TEXT');
+    _addColumn('transactions', 'note', 'TEXT');
 
     _db.execute('''
       INSERT OR IGNORE INTO categories(id,name,icon_key,color_value,kind,is_system) VALUES
@@ -644,6 +645,7 @@ final class LocalLedger {
             'amountMinor': row['amount_minor'],
             'currency': row['currency'],
             'description': row['description'],
+            'note': row['note'],
             'categoryId': row['category_id'] ?? row['category'],
             'category': row['category_name'] ?? row['category'] ?? 'Other',
             'accountId': row['account_id'],
@@ -1116,6 +1118,18 @@ final class LocalLedger {
     if (packageName != null) _reparseSource(packageName, accountId);
   }
 
+  void updateAccount({
+    required String id,
+    required String name,
+    String? institutionName,
+    String? accountSuffix,
+  }) {
+    _db.execute(
+      'UPDATE accounts SET name=?, institution_name=?, account_suffix=?, updated_at=? WHERE id=?',
+      [name.trim(), institutionName?.trim(), accountSuffix?.trim(), _now, id],
+    );
+  }
+
   void archiveAccount(String id) {
     _db.execute(
       'UPDATE accounts SET archived = 1, source_package = NULL WHERE id = ?',
@@ -1427,13 +1441,14 @@ final class LocalLedger {
     String? fromAccountId,
     String? toAccountId,
     String? description,
+    String? note,
     String currency = 'PKR',
     String? categoryId,
   }) {
     if (amountMinor <= 0) throw ArgumentError.value(amountMinor, 'amountMinor');
     final id = _ids.v4();
     _db.execute(
-      'INSERT INTO transactions(id,kind,amount_minor,currency,occurred_at,account_id,from_account_id,to_account_id,description,needs_review,locked,origin,category_id,category,reconcile_state,confidence,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      'INSERT INTO transactions(id,kind,amount_minor,currency,occurred_at,account_id,from_account_id,to_account_id,description,note,needs_review,locked,origin,category_id,category,reconcile_state,confidence,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       [
         id,
         kind.name,
@@ -1444,6 +1459,7 @@ final class LocalLedger {
         fromAccountId,
         toAccountId,
         description,
+        note?.trim().isEmpty == true ? null : note?.trim(),
         0,
         1,
         TransactionOrigin.manual.name,
@@ -2004,6 +2020,7 @@ final class LocalLedger {
     fromAccountId: row['from_account_id'] as String?,
     toAccountId: row['to_account_id'] as String?,
     description: row['description'] as String?,
+    note: row['note'] as String?,
     needsReview: row['needs_review'] == 1,
     locked: row['locked'] == 1,
     origin: TransactionOrigin.values.byName(row['origin'] as String),
