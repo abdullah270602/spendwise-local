@@ -37,12 +37,18 @@ void main() {
     expect(ledger.transactionCategories()[transaction.id], 'Entertainment');
   });
 
-  test('system categories include entertainment and subscriptions', () {
+  test('system categories include expanded deterministic taxonomy', () {
     final ledger = LocalLedger.openInMemoryForTests();
     addTearDown(ledger.close);
     final names = ledger.categories().map((category) => category.name).toSet();
     expect(names, contains('Entertainment'));
     expect(names, contains('Subscriptions & digital services'));
+    expect(names, contains('Groceries'));
+    expect(names, contains('Health & medical'));
+    expect(names, contains('Education'));
+    expect(names, contains('Travel'));
+    expect(names, contains('Insurance'));
+    expect(names, contains('Government & taxes'));
     expect(names, contains('Bills & utilities'));
     expect(names, contains('Income'));
   });
@@ -130,5 +136,37 @@ void main() {
     expect(ledger.showSavingsOnHome, isTrue);
     ledger.setShowSavingsOnHome(false);
     expect(ledger.showSavingsOnHome, isFalse);
+  });
+
+  test('category expansion migration preserves existing ledger data', () {
+    final ledger = LocalLedger.openInMemoryForTests();
+    addTearDown(ledger.close);
+    final account = ledger.addAccount(
+      name: 'Existing account',
+      type: AccountType.bank,
+      openingBalanceMinor: 100000,
+    );
+    ledger.addManualTransaction(
+      kind: TransactionKind.expense,
+      amountMinor: 25000,
+      occurredAt: DateTime.utc(2026, 8, 20),
+      accountId: account,
+      description: 'Existing purchase',
+      categoryId: 'shopping',
+    );
+    final before = ledger.snapshot();
+    final categoriesBefore = ledger.transactionCategories();
+
+    ledger.rerunMigrationsForTests();
+
+    final after = ledger.snapshot();
+    expect(after.accounts.length, before.accounts.length);
+    expect(after.transactions.length, before.transactions.length);
+    expect(after.netWorthMinor, before.netWorthMinor);
+    expect(ledger.transactionCategories(), categoriesBefore);
+    expect(
+      ledger.categories().map((category) => category.name),
+      contains('Health & medical'),
+    );
   });
 }

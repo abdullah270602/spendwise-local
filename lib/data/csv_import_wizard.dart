@@ -140,6 +140,20 @@ final class CsvPreviewRow {
       occurredAt != null &&
       direction != null &&
       amount != null;
+
+  CsvPreviewRow copyWith({bool? probableDuplicate}) => CsvPreviewRow(
+    rowNumber: rowNumber,
+    raw: raw,
+    occurredAt: occurredAt,
+    description: description,
+    direction: direction,
+    amount: amount,
+    reference: reference,
+    merchant: merchant,
+    balanceMinor: balanceMinor,
+    probableDuplicate: probableDuplicate ?? this.probableDuplicate,
+    error: error,
+  );
 }
 
 final class CsvImportPreview {
@@ -157,6 +171,13 @@ final class CsvImportPreview {
   int get validCount => rows.where((row) => row.valid).length;
   int get errorCount => rows.where((row) => !row.valid).length;
   int get duplicateCount => rows.where((row) => row.probableDuplicate).length;
+
+  CsvImportPreview copyWith({List<CsvPreviewRow>? rows}) => CsvImportPreview(
+    inspection: inspection,
+    mapping: mapping,
+    rows: rows ?? this.rows,
+    sameFileAlreadyImported: sameFileAlreadyImported,
+  );
 }
 
 final class CsvCommitResult {

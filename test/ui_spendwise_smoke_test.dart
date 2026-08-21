@@ -169,6 +169,28 @@ void main() {
     );
   });
 
+  testWidgets('statement import selects every valid worksheet at once', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: ImportCsvScreen(viewModel: _BatchImportViewModel()),
+      ),
+    );
+
+    await tester.tap(find.text('Choose CSV or Excel file'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('2 of 3 sheets'), findsOneWidget);
+    expect(find.text('2 selected'), findsOneWidget);
+    expect(find.text('Current account'), findsOneWidget);
+    expect(find.text('Wallet'), findsWidgets);
+    expect(find.text('Summary'), findsOneWidget);
+    expect(find.textContaining('No transaction table'), findsOneWidget);
+    expect(find.text('Suggested from statement details'), findsNWidgets(2));
+  });
+
   testWidgets('first account accepts grouped balance and closes cleanly', (
     tester,
   ) async {
@@ -398,6 +420,102 @@ class _AccountSourcesViewModel extends _FakeViewModel {
       enabled: false,
     ),
   ];
+}
+
+class _BatchImportViewModel extends _FakeViewModel
+    implements SpendWiseAdvancedViewModel {
+  @override
+  List<AccountViewData> get accounts => const [
+    AccountViewData(
+      id: 'bank',
+      name: 'Meezan Current',
+      type: 'Bank',
+      balance: MoneyViewData(0),
+    ),
+    AccountViewData(
+      id: 'wallet',
+      name: 'NayaPay',
+      type: 'Wallet',
+      balance: MoneyViewData(0),
+    ),
+  ];
+
+  @override
+  bool get busy => false;
+  @override
+  bool get demoDataEnabled => false;
+  @override
+  String? get errorMessage => null;
+  @override
+  DeletedAccountViewData? get lastDeletedAccount => null;
+  @override
+  bool get showSavingsOnHome => false;
+
+  @override
+  Future<StatementFileViewData?> pickStatementFile() async =>
+      const StatementFileViewData(
+        fileName: 'accounts.xlsx',
+        sheets: [
+          StatementSheetViewData(
+            name: 'Current account',
+            csvText: 'Date,Description,Debit,Credit\n2026-08-20,Food,100,\n',
+            suggestedAccountId: 'bank',
+            accountInferenceReason: 'Matched account name',
+            accountInferenceConfidence: .9,
+          ),
+          StatementSheetViewData(
+            name: 'Wallet',
+            csvText:
+                'Date,Description,Debit,Credit\n2026-08-20,Transfer,,100\n',
+            suggestedAccountId: 'wallet',
+            accountInferenceReason: 'Matched NayaPay',
+            accountInferenceConfidence: .9,
+          ),
+          StatementSheetViewData(
+            name: 'Summary',
+            csvText: 'Monthly summary',
+            importable: false,
+            detectionError: 'No transaction table found',
+          ),
+        ],
+      );
+
+  @override
+  Future<void> addDetailedAccount(AccountCreationDraft draft) async {}
+  @override
+  Future<void> archiveAccount(String id) async {}
+  @override
+  Future<void> commitCsvImport(CsvImportDraft draft) async {}
+  @override
+  Future<void> correctTransaction(
+    String id,
+    TransactionCorrectionDraft draft,
+  ) async {}
+  @override
+  void dismissError() {}
+  @override
+  Future<void> exportLedger(ExportRequest request) async {}
+  @override
+  Future<CsvImportPreviewViewData> previewCsvImport(
+    CsvImportDraft draft,
+  ) async => const CsvImportPreviewViewData(
+    rows: [],
+    validCount: 0,
+    errorCount: 0,
+    duplicateCount: 0,
+    sameFileAlreadyImported: false,
+  );
+  @override
+  Future<void> restoreAccount(String id) async {}
+  @override
+  Future<void> setDemoDataEnabled(bool enabled) async {}
+  @override
+  Future<void> setShowSavingsOnHome(bool enabled) async {}
+  @override
+  Future<void> updateDetailedAccount(
+    String id,
+    AccountUpdateDraft draft,
+  ) async {}
 }
 
 class _FakeViewModel extends ChangeNotifier implements SpendWiseViewModel {

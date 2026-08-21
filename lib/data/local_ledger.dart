@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -195,6 +195,9 @@ final class LocalLedger {
     ledger._migrate();
     return ledger;
   }
+
+  @visibleForTesting
+  void rerunMigrationsForTests() => _migrate();
 
   static Future<String> _loadOrCreateKey() async {
     final existing = await _secureStorage.read(key: _keyName);
@@ -483,11 +486,20 @@ final class LocalLedger {
     _db.execute('''
       INSERT OR IGNORE INTO categories(id,name,icon_key,color_value,kind,is_system) VALUES
         ('food','Food & dining','restaurant',4283215696,'expense',1),
+        ('groceries','Groceries','shopping_cart',4283215696,'expense',1),
         ('shopping','Shopping','shopping_bag',4294198070,'expense',1),
         ('transport','Transport','directions_car',4280391411,'expense',1),
         ('bills','Bills & utilities','receipt',4294940672,'expense',1),
         ('entertainment','Entertainment','movie',4286208615,'expense',1),
         ('subscriptions','Subscriptions & digital services','subscriptions',4288585374,'expense',1),
+        ('health','Health & medical','medical_services',4283215696,'expense',1),
+        ('education','Education','school',4280391411,'expense',1),
+        ('travel','Travel','flight',4286208615,'expense',1),
+        ('personal-care','Personal care','self_care',4294198070,'expense',1),
+        ('home','Home','home',4288585374,'expense',1),
+        ('insurance','Insurance','verified_user',4280391411,'expense',1),
+        ('gifts-charity','Gifts & charity','volunteer_activism',4286208615,'expense',1),
+        ('government-tax','Government & taxes','account_balance',4294940672,'expense',1),
         ('cash','Cash withdrawal','payments',4286141768,'expense',1),
         ('fees','Fees','account_balance',4294198070,'expense',1),
         ('income','Income','trending_up',4283215696,'income',1),
@@ -595,6 +607,36 @@ final class LocalLedger {
         ),
       )
       .toList(growable: false);
+
+  CategoryClassification classifyDescription({
+    required String text,
+    required TransactionKind kind,
+    Iterable<CandidateType> candidateTypes = const [],
+  }) {
+    final normalized = CategoryClassifier.normalize(text);
+    for (final row in _db.select(
+      'SELECT normalized_match,category_id,id FROM category_rules ORDER BY priority DESC,updated_at DESC',
+    )) {
+      final matcher = row['normalized_match'] as String;
+      if (matcher.isNotEmpty && ' $normalized '.contains(' $matcher ')) {
+        return CategoryClassification(
+          categoryId: row['category_id'] as String,
+          ruleId: row['id'] as String,
+          confidence: 1,
+        );
+      }
+    }
+    return const CategoryClassifier().classify(
+      text: text,
+      kind: kind,
+      candidateTypes: candidateTypes,
+    );
+  }
+
+  String categoryName(String categoryId) {
+    final matches = categories().where((category) => category.id == categoryId);
+    return matches.isEmpty ? 'Other' : matches.first.name;
+  }
 
   Map<String, String> transactionCategories() => {
     for (final row in _db.select('''
@@ -2054,20 +2096,7 @@ final class LocalLedger {
         if (type != null) types.add(CandidateType.values.byName(type));
       }
     }
-    final normalized = CategoryClassifier.normalize(text.join(' '));
-    for (final row in _db.select(
-      'SELECT normalized_match,category_id,id FROM category_rules ORDER BY priority DESC,updated_at DESC',
-    )) {
-      final matcher = row['normalized_match'] as String;
-      if (matcher.isNotEmpty && ' $normalized '.contains(' $matcher ')) {
-        return CategoryClassification(
-          categoryId: row['category_id'] as String,
-          ruleId: row['id'] as String,
-          confidence: 1,
-        );
-      }
-    }
-    return const CategoryClassifier().classify(
+    return classifyDescription(
       text: text.join(' '),
       kind: item.kind,
       candidateTypes: types,
