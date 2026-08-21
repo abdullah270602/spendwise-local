@@ -17,9 +17,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Total balance'), findsOneWidget);
     expect(find.text('Net cash flow'), findsOneWidget);
-    expect(find.text('Spending by category'), findsOneWidget);
     expect(find.text('12.0% of income retained'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Account balances'), 300);
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
+    await tester.pumpAndSettle();
+    expect(find.text('Spending by category'), findsOneWidget);
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
+    await tester.pumpAndSettle();
     expect(find.text('Account balances'), findsOneWidget);
   });
 
@@ -34,10 +37,12 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.byType(FloatingActionButton), findsNothing);
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
+      await tester.pumpAndSettle();
       expect(find.text('Finish setup'), findsOneWidget);
       await tester.tap(find.text('Settings'));
       await tester.pumpAndSettle();
-    expect(find.text('Settings & privacy'), findsOneWidget);
+      expect(find.text('Settings & privacy'), findsOneWidget);
     },
   );
 }
