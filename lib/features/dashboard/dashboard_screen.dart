@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../widgets/spendwise_components.dart';
 import '../shell/spendwise_view_model.dart';
+import '../insights/insights_screen.dart';
+import '../insights/spending_analytics.dart';
 import '../transactions/transaction_details_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -39,6 +41,10 @@ class DashboardScreen extends StatelessWidget {
               .where((item) => item.kind == TransactionKind.transfer)
               .take(3)
               .toList();
+    final monthlyAnalytics = SpendingAnalytics.calculate(
+      transactions: viewModel.transactions,
+      resolution: AnalyticsResolution.months,
+    );
     return CustomScrollView(
       slivers: [
         SliverAppBar(
@@ -58,6 +64,11 @@ class DashboardScreen extends StatelessWidget {
             ],
           ),
           actions: [
+            IconButton(
+              onPressed: () => _openInsights(context),
+              tooltip: 'Open spending insights',
+              icon: const Icon(Icons.insights_rounded),
+            ),
             IconButton(
               onPressed: onOpenSettings,
               tooltip: 'Open settings',
@@ -147,6 +158,17 @@ class DashboardScreen extends StatelessWidget {
                     ? SpendWiseColors.income
                     : SpendWiseColors.expense,
                 detail: 'THIS MONTH',
+              ),
+              const SizedBox(height: 20),
+              SectionHeading(
+                'Spending trend',
+                action: 'Explore',
+                onAction: () => _openInsights(context),
+              ),
+              const SizedBox(height: 8),
+              _TrendPreview(
+                analytics: monthlyAnalytics,
+                onTap: () => _openInsights(context),
               ),
               const SizedBox(height: 20),
               if (viewModel.accounts.isEmpty) ...[
@@ -351,6 +373,89 @@ class DashboardScreen extends StatelessWidget {
             .toList()
           ..sort((a, b) => b.amount.minorUnits.compareTo(a.amount.minorUnits));
     return result;
+  }
+
+  void _openInsights(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => InsightsScreen(viewModel: viewModel)),
+  );
+}
+
+class _TrendPreview extends StatelessWidget {
+  const _TrendPreview({required this.analytics, required this.onTap});
+
+  final SpendingAnalytics analytics;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final buckets = analytics.buckets.skip(6).toList();
+    final maxValue = buckets.fold<int>(1, (maximum, bucket) {
+      return bucket.spendingMinor > maximum ? bucket.spendingMinor : maximum;
+    });
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      formatMoney(
+                        MoneyViewData(
+                          analytics.totalSpendingMinor,
+                          currency: analytics.currency,
+                        ),
+                      ),
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Last 12 months · tap for days, months, and years',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 14),
+              SizedBox(
+                width: 92,
+                height: 52,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    for (final bucket in buckets)
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 3),
+                          child: Container(
+                            height: bucket.spendingMinor == 0
+                                ? 3
+                                : 48 * bucket.spendingMinor / maxValue,
+                            decoration: BoxDecoration(
+                              color: SpendWiseColors.expense.withValues(
+                                alpha: .72,
+                              ),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right_rounded),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
