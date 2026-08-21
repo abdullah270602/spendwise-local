@@ -10,135 +10,159 @@ class AccountsScreen extends StatelessWidget {
   const AccountsScreen({super.key, required this.viewModel});
   final SpendWiseViewModel viewModel;
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text('Accounts'),
-      actions: [
-        IconButton(
-          onPressed: () => _addAccount(context),
-          tooltip: 'Add account',
-          icon: const Icon(Icons.add_rounded),
-        ),
-      ],
-    ),
-    body: viewModel.accounts.isEmpty
-        ? Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 90),
-              child: EmptyState(
-                icon: Icons.account_balance_wallet_outlined,
-                title: 'Add your first account',
-                message: 'Accounts keep balances and transfers accurate.',
-                action: 'Add account',
-                onAction: () => _addAccount(context),
+  Widget build(BuildContext context) {
+    final deleted = viewModel.uiLastDeletedAccount;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Accounts'),
+        actions: [
+          IconButton(
+            onPressed: () => _addAccount(context),
+            tooltip: 'Add account',
+            icon: const Icon(Icons.add_rounded),
+          ),
+        ],
+      ),
+      body: viewModel.accounts.isEmpty && deleted == null
+          ? Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 90),
+                child: EmptyState(
+                  icon: Icons.account_balance_wallet_outlined,
+                  title: 'Add your first account',
+                  message: 'Accounts keep balances and transfers accurate.',
+                  action: 'Add account',
+                  onAction: () => _addAccount(context),
+                ),
               ),
-            ),
-          )
-        : ListView(
-            padding: const EdgeInsets.fromLTRB(18, 8, 18, 100),
-            children: [
-              const PrivacyBanner(compact: true),
-              const SizedBox(height: 20),
-              const SectionHeading('Your accounts'),
-              const SizedBox(height: 8),
-              for (final account in viewModel.accounts)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Card(
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: () => _editAccount(context, account),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    color: SpendWiseColors.accentMuted,
-                                    borderRadius: BorderRadius.circular(13),
+            )
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(18, 8, 18, 100),
+              children: [
+                const PrivacyBanner(compact: true),
+                if (deleted != null) ...[
+                  const SizedBox(height: 14),
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.restore_rounded),
+                      title: Text('${deleted.name} was deleted'),
+                      subtitle: const Text(
+                        'Its transactions are still safely in your ledger.',
+                      ),
+                      trailing: TextButton(
+                        onPressed: () => _restoreAccount(context, deleted),
+                        child: const Text('Restore'),
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 20),
+                if (viewModel.accounts.isNotEmpty) ...[
+                  const SectionHeading('Your accounts'),
+                  const SizedBox(height: 8),
+                ],
+                for (final account in viewModel.accounts)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Card(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () => _editAccount(context, account),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: SpendWiseColors.accentMuted,
+                                      borderRadius: BorderRadius.circular(13),
+                                    ),
+                                    child: Icon(
+                                      account.type.toLowerCase().contains(
+                                            'cash',
+                                          )
+                                          ? Icons.payments_outlined
+                                          : Icons.account_balance_outlined,
+                                      color: SpendWiseColors.accent,
+                                    ),
                                   ),
-                                  child: Icon(
-                                    account.type.toLowerCase().contains('cash')
-                                        ? Icons.payments_outlined
-                                        : Icons.account_balance_outlined,
-                                    color: SpendWiseColors.accent,
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          account.name,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        Text(
+                                          titleCase(account.type),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall,
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
                                     children: [
                                       Text(
-                                        account.name,
+                                        formatMoney(account.balance),
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w700,
                                         ),
                                       ),
                                       Text(
-                                        titleCase(account.type),
+                                        [
+                                          if (account.suffix.isNotEmpty)
+                                            '••${account.suffix}',
+                                          account.currency,
+                                        ].join(' · '),
                                         style: Theme.of(context)
                                             .textTheme
                                             .bodySmall,
                                       ),
                                     ],
                                   ),
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                ],
+                              ),
+                              if (account.sources.isNotEmpty) ...[
+                                const SizedBox(height: 12),
+                                Wrap(
+                                  spacing: 7,
+                                  runSpacing: 7,
                                   children: [
-                                    Text(
-                                      formatMoney(account.balance),
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
+                                    for (final source in account.sources)
+                                      Chip(
+                                        avatar: Icon(
+                                          _sourceIcon(source.kind),
+                                          size: 15,
+                                        ),
+                                        label: Text(source.label),
                                       ),
-                                    ),
-                                    Text(
-                                      [
-                                        if (account.suffix.isNotEmpty)
-                                          '••${account.suffix}',
-                                        account.currency,
-                                      ].join(' · '),
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall,
-                                    ),
                                   ],
                                 ),
                               ],
-                            ),
-                            if (account.sources.isNotEmpty) ...[
-                              const SizedBox(height: 12),
-                              Wrap(
-                                spacing: 7,
-                                runSpacing: 7,
-                                children: [
-                                  for (final source in account.sources)
-                                    Chip(
-                                      avatar: Icon(
-                                        _sourceIcon(source.kind),
-                                        size: 15,
-                                      ),
-                                      label: Text(source.label),
-                                    ),
-                                ],
-                              ),
                             ],
-                          ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-            ],
-          ),
-  );
+              ],
+            ),
+    );
+  }
+
   static IconData _sourceIcon(String kind) => switch (kind.toLowerCase()) {
     'sms' || 'messages' => Icons.sms_outlined,
     'statement' || 'csv' => Icons.table_view_outlined,
@@ -146,7 +170,26 @@ class AccountsScreen extends StatelessWidget {
     _ => Icons.notifications_outlined,
   };
 
+  Future<void> _restoreAccount(
+    BuildContext context,
+    DeletedAccountViewData account,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await viewModel.uiRestoreAccount(account.id);
+      messenger.showSnackBar(
+        SnackBar(content: Text('${account.name} was restored.')),
+      );
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not restore account: $error')),
+      );
+    }
+  }
+
   void _editAccount(BuildContext context, AccountViewData account) {
+    final screenContext = context;
+    final messenger = ScaffoldMessenger.of(context);
     final name = TextEditingController(text: account.name);
     final institution = TextEditingController(text: account.institution);
     final suffix = TextEditingController(text: account.suffix);
@@ -187,6 +230,90 @@ class AccountsScreen extends StatelessWidget {
                     Text(
                       formatMoney(account.balance),
                       style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        style: TextButton.styleFrom(
+                          foregroundColor: Theme.of(context).colorScheme.error,
+                          minimumSize: const Size(48, 44),
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                        ),
+                        onPressed: saving
+                            ? null
+                            : () async {
+                                final confirmed = await showDialog<bool>(
+                                  context: sheetContext,
+                                  builder: (dialogContext) => AlertDialog(
+                                    title: const Text('Delete account?'),
+                                    content: Text(
+                                      '${account.name} will be removed from your accounts and disconnected from notification sources. Existing transactions stay safely in your ledger.',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(dialogContext, false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      FilledButton(
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: Theme.of(
+                                            dialogContext,
+                                          ).colorScheme.error,
+                                          foregroundColor: Theme.of(
+                                            dialogContext,
+                                          ).colorScheme.onError,
+                                        ),
+                                        onPressed: () =>
+                                            Navigator.pop(dialogContext, true),
+                                        child: const Text('Delete account'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirmed != true ||
+                                    !sheetContext.mounted) {
+                                  return;
+                                }
+                                setState(() => saving = true);
+                                try {
+                                  await viewModel.uiArchiveAccount(account.id);
+                                  if (sheetContext.mounted) {
+                                    Navigator.pop(sheetContext);
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          '${account.name} was removed. Existing transactions were kept.',
+                                        ),
+                                        action: SnackBarAction(
+                                          label: 'Undo',
+                                          onPressed: () => _restoreAccount(
+                                            screenContext,
+                                            DeletedAccountViewData(
+                                              id: account.id,
+                                              name: account.name,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                } catch (error) {
+                                  if (sheetContext.mounted) {
+                                    setState(() => saving = false);
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Could not remove account: $error',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                        icon: const Icon(Icons.delete_outline_rounded),
+                        label: const Text('Delete account'),
+                      ),
                     ),
                     const SizedBox(height: 18),
                     TextFormField(
@@ -230,16 +357,14 @@ class AccountsScreen extends StatelessWidget {
                       'Attach apps whose transactions belong to this account.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
-                    for (final source in viewModel.sources)
+                    for (final source in viewModel.sources.where(
+                      (item) => item.enabled,
+                    ))
                       CheckboxListTile(
                         contentPadding: EdgeInsets.zero,
                         value: selected.contains(source.packageName),
                         title: Text(source.label),
-                        subtitle: Text(
-                          source.enabled
-                              ? source.packageName
-                              : '${source.packageName} · capture disabled',
-                        ),
+                        subtitle: Text(source.packageName),
                         onChanged: (value) => setState(
                           () => value == true
                               ? selected.add(source.packageName)

@@ -1131,10 +1131,51 @@ final class LocalLedger {
   }
 
   void archiveAccount(String id) {
-    _db.execute(
-      'UPDATE accounts SET archived = 1, source_package = NULL WHERE id = ?',
-      [id],
+    _db.execute('BEGIN IMMEDIATE');
+    try {
+      _db.execute(
+        'UPDATE accounts SET archived = 1, source_package = NULL, updated_at = ? WHERE id = ?',
+        [_now, id],
+      );
+      _db.execute('COMMIT');
+    } catch (_) {
+      _db.execute('ROLLBACK');
+      rethrow;
+    }
+  }
+
+  Account? latestArchivedAccount() {
+    final rows = _db.select(
+      'SELECT * FROM accounts WHERE archived = 1 ORDER BY updated_at DESC, created_at DESC LIMIT 1',
     );
+    return rows.isEmpty ? null : _accountFromRow(rows.first);
+  }
+
+  void restoreAccount(String id) {
+    _db.execute('BEGIN IMMEDIATE');
+    try {
+      _db.execute(
+        'UPDATE accounts SET archived = 0, updated_at = ? WHERE id = ? AND archived = 1',
+        [_now, id],
+      );
+      // Older builds detached sources while archiving. Recover every package
+      // already observed for this account without inventing new mappings.
+      _db.execute(
+        '''
+        INSERT OR IGNORE INTO account_sources(account_id,source_id,created_at)
+        SELECT ?, source.id, ? FROM sources source
+        WHERE source.package_name IN (
+          SELECT DISTINCT source_package FROM raw_observations
+          WHERE account_id = ? AND source_package IS NOT NULL
+        )
+        ''',
+        [id, _now, id],
+      );
+      _db.execute('COMMIT');
+    } catch (_) {
+      _db.execute('ROLLBACK');
+      rethrow;
+    }
   }
 
   bool ingestNotification(Map<String, Object?> envelope) {
