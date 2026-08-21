@@ -63,21 +63,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             children: [
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(9),
-                    decoration: BoxDecoration(
-                      color: SpendWiseColors.accent,
-                      borderRadius: BorderRadius.circular(13),
-                    ),
-                    child: const Icon(
-                      Icons.account_balance_wallet_rounded,
-                      color: SpendWiseColors.background,
-                    ),
-                  ),
+                  const SpendWiseMark(size: 42),
                   const SizedBox(width: 12),
-                  const Text(
-                    'SpendWise',
-                    style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'SpendWise',
+                        style: TextStyle(
+                          fontSize: 21,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        'Private. Local. Yours.',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: SpendWiseColors.accent,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

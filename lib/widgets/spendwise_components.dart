@@ -24,6 +24,50 @@ String titleCase(String value) {
   return '${value[0].toUpperCase()}${value.substring(1)}';
 }
 
+class SpendWiseMark extends StatelessWidget {
+  const SpendWiseMark({super.key, this.size = 36});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: 'SpendWise',
+    image: true,
+    child: ExcludeSemantics(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: SpendWiseColors.accent,
+          borderRadius: BorderRadius.circular(size * .3),
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Icon(
+              Icons.account_balance_wallet_rounded,
+              size: size * .58,
+              color: SpendWiseColors.background,
+            ),
+            Positioned(
+              right: size * .18,
+              top: size * .16,
+              child: Container(
+                width: size * .16,
+                height: size * .16,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFEAF2EE),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 class SectionHeading extends StatelessWidget {
   const SectionHeading(this.title, {super.key, this.action, this.onAction});
   final String title;
