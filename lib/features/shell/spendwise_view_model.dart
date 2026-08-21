@@ -245,11 +245,29 @@ class CsvImportDraft {
     required this.accountId,
     required this.mapping,
     this.sourceLabel = 'Statement import',
+    this.fileName = 'statement.csv',
   });
   final String csvText;
   final String accountId;
   final String sourceLabel;
+  final String fileName;
   final Map<ImportField, String> mapping;
+}
+
+@immutable
+class StatementSheetViewData {
+  const StatementSheetViewData({required this.name, required this.csvText});
+
+  final String name;
+  final String csvText;
+}
+
+@immutable
+class StatementFileViewData {
+  const StatementFileViewData({required this.fileName, required this.sheets});
+
+  final String fileName;
+  final List<StatementSheetViewData> sheets;
 }
 
 @immutable
@@ -400,6 +418,7 @@ abstract class SpendWiseAdvancedViewModel implements SpendWiseViewModel {
   bool get demoDataEnabled;
   DeletedAccountViewData? get lastDeletedAccount;
   Future<void> correctTransaction(String id, TransactionCorrectionDraft draft);
+  Future<StatementFileViewData?> pickStatementFile();
   Future<CsvImportPreviewViewData> previewCsvImport(CsvImportDraft draft);
   Future<void> commitCsvImport(CsvImportDraft draft);
   Future<void> exportLedger(ExportRequest request);
@@ -427,6 +446,17 @@ extension SpendWiseAdvancedAccess on SpendWiseViewModel {
   ) =>
       _advanced?.correctTransaction(id, draft) ??
       Future.error(UnsupportedError('Transaction correction is not available'));
+  Future<StatementFileViewData?> uiPickStatementFile() async {
+    final advanced = _advanced;
+    if (advanced != null) return advanced.pickStatementFile();
+    final csv = await pickCsvFile();
+    if (csv == null) return null;
+    return StatementFileViewData(
+      fileName: 'statement.csv',
+      sheets: [StatementSheetViewData(name: 'Statement', csvText: csv)],
+    );
+  }
+
   Future<void> uiCommitCsvImport(CsvImportDraft draft) =>
       _advanced?.commitCsvImport(draft) ?? importCsv(draft.csvText);
   Future<CsvImportPreviewViewData> uiPreviewCsvImport(CsvImportDraft draft) =>

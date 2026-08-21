@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spendwise/app/theme.dart';
 import 'package:spendwise/features/accounts/accounts_screen.dart';
+import 'package:spendwise/features/import/import_csv_screen.dart';
 import 'package:spendwise/features/shell/spendwise_shell.dart';
 import 'package:spendwise/features/shell/spendwise_view_model.dart';
 import 'package:spendwise/features/onboarding/onboarding_screen.dart';
@@ -148,6 +149,23 @@ void main() {
     expect(find.text('Income'), findsOneWidget);
     expect(find.text('Transfer'), findsOneWidget);
     expect(find.text('expense'), findsNothing);
+  });
+
+  testWidgets('statement import advertises CSV and Excel support', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: ImportCsvScreen(viewModel: _FakeViewModel()),
+      ),
+    );
+
+    expect(find.text('Choose CSV or Excel file'), findsOneWidget);
+    expect(
+      find.text('CSV, XLSX, or XLS · read only on this device'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('first account accepts grouped balance and closes cleanly', (

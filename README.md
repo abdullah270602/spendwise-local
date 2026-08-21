@@ -8,7 +8,7 @@
 
 [**Download the latest Android APK**](https://github.com/abdullah270602/spendwise-local/releases/latest/download/spendwise-local.apk)
 
-SpendWise is an Android-first, privacy-first personal finance ledger built with Flutter. It turns financial notification evidence, CSV statement rows, and manual entries into canonical local transactions.
+SpendWise is an Android-first, privacy-first personal finance ledger built with Flutter. It turns financial notification evidence, CSV/Excel statement rows, and manual entries into canonical local transactions.
 
 > Raw event ≠ financial transaction.
 
@@ -25,7 +25,7 @@ A bank-app debit, an SMS alert for the same debit, and a wallet credit can descr
 - Review inbox for ambiguous or unsupported observations
 - Everyday and savings accounts with separate available/saved totals
 - Manual income/expense/transfer entry, ledger search, and filters
-- Conservative CSV statement import and local CSV export
+- Conservative CSV, XLSX, and XLS statement import with local CSV export
 - Editable CSV mappings, remembered statement formats, duplicate previews, and import batches
 - Evidence timelines, source health, category analytics, filtered CSV/JSON export, and removable demo data
 - One-action local data erasure

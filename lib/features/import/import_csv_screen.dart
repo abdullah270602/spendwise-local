@@ -14,6 +14,8 @@ class ImportCsvScreen extends StatefulWidget {
 
 class _ImportCsvScreenState extends State<ImportCsvScreen> {
   String? csv;
+  StatementFileViewData? selectedFile;
+  String? selectedSheetName;
   int step = 0;
   bool busy = false;
   String? accountId;
@@ -184,7 +186,7 @@ class _ImportCsvScreenState extends State<ImportCsvScreen> {
       ),
       const SizedBox(height: 16),
       InkWell(
-        onTap: _pick,
+        onTap: busy ? null : _pick,
         borderRadius: BorderRadius.circular(18),
         child: Container(
           height: 156,
@@ -210,19 +212,46 @@ class _ImportCsvScreenState extends State<ImportCsvScreen> {
               const SizedBox(height: 11),
               Text(
                 csv == null
-                    ? 'Choose CSV file'
-                    : '${rows.length} data rows found',
+                    ? 'Choose CSV or Excel file'
+                    : selectedFile!.fileName,
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 4),
               Text(
-                'Read locally on this device',
+                csv == null
+                    ? 'CSV, XLSX, or XLS · read only on this device'
+                    : '${selectedSheetName ?? 'Statement'} · ${rows.length} data rows',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
           ),
         ),
       ),
+      if ((selectedFile?.sheets.length ?? 0) > 1) ...[
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          key: ObjectKey(selectedFile),
+          initialValue: selectedSheetName,
+          decoration: const InputDecoration(labelText: 'Worksheet'),
+          items: selectedFile!.sheets
+              .map(
+                (sheet) => DropdownMenuItem(
+                  value: sheet.name,
+                  child: Text(sheet.name),
+                ),
+              )
+              .toList(),
+          onChanged: busy
+              ? null
+              : (name) {
+                  if (name == null) return;
+                  final sheet = selectedFile!.sheets.firstWhere(
+                    (sheet) => sheet.name == name,
+                  );
+                  _loadSheet(selectedFile!, sheet);
+                },
+        ),
+      ],
       const SizedBox(height: 16),
       const PrivacyBanner(compact: true),
     ],
@@ -436,13 +465,33 @@ class _ImportCsvScreenState extends State<ImportCsvScreen> {
         _ => true,
       };
   Future<void> _pick() async {
-    final value = await widget.viewModel.pickCsvFile();
-    if (value == null) return;
+    setState(() => busy = true);
+    try {
+      final file = await widget.viewModel.uiPickStatementFile();
+      if (!mounted) return;
+      if (file == null) {
+        setState(() => busy = false);
+        return;
+      }
+      _loadSheet(file, file.sheets.first);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => busy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not read statement: $error')),
+      );
+    }
+  }
+
+  void _loadSheet(StatementFileViewData file, StatementSheetViewData sheet) {
+    final value = sheet.csvText;
     final normalized = value.startsWith('\ufeff') ? value.substring(1) : value;
     final firstLine = normalized
         .split(RegExp(r'\r?\n'))
         .firstWhere((line) => line.trim().isNotEmpty, orElse: () => '');
-    if (firstLine.isEmpty) return;
+    if (firstLine.isEmpty) {
+      throw const FormatException('The selected worksheet is empty.');
+    }
     final delimiters = [',', ';', '\t'];
     delimiters.sort(
       (a, b) => b
@@ -454,7 +503,9 @@ class _ImportCsvScreenState extends State<ImportCsvScreen> {
       fieldDelimiter: delimiters.first,
       autoDetect: false,
     ).decode(normalized);
-    if (decoded.isEmpty) return;
+    if (decoded.isEmpty) {
+      throw const FormatException('The selected worksheet is empty.');
+    }
     final parsedHeaders = decoded.first
         .map((value) => '$value'.trim())
         .toList();
@@ -463,11 +514,14 @@ class _ImportCsvScreenState extends State<ImportCsvScreen> {
         .map((row) => row.map((value) => '$value').toList())
         .toList();
     setState(() {
+      selectedFile = file;
+      selectedSheetName = sheet.name;
       csv = value;
       headers = parsedHeaders;
       rows = parsedRows;
       mapping.clear();
       preview = null;
+      busy = false;
       for (final h in headers) {
         final key = h.toLowerCase();
         if (key.contains('date')) {
@@ -543,6 +597,8 @@ class _ImportCsvScreenState extends State<ImportCsvScreen> {
     csvText: csv!,
     accountId: accountId!,
     sourceLabel: sourceLabel.isEmpty ? 'Statement import' : sourceLabel,
+    fileName:
+        '${selectedFile?.fileName ?? 'statement.csv'}${selectedSheetName == null ? '' : ' · $selectedSheetName'}',
     mapping: Map.unmodifiable(mapping),
   );
 

@@ -10,6 +10,7 @@ import '../data/csv_importer.dart';
 import '../data/csv_import_wizard.dart';
 import '../data/ledger_exporter.dart';
 import '../data/local_ledger.dart';
+import '../data/statement_file_decoder.dart';
 import '../domain/domain.dart' as domain;
 import '../features/shell/spendwise_view_model.dart';
 import '../platform/notification_bridge.dart';
@@ -543,6 +544,33 @@ final class SpendWiseController extends ChangeNotifier
   }
 
   @override
+  Future<StatementFileViewData?> pickStatementFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['csv', 'xlsx', 'xls'],
+      withData: true,
+    );
+    final file = result?.files.single;
+    final bytes = file?.bytes;
+    if (file == null || bytes == null) return null;
+    final decoded = await const StatementFileDecoder().decode(
+      fileName: file.name,
+      bytes: bytes,
+    );
+    return StatementFileViewData(
+      fileName: decoded.fileName,
+      sheets: decoded.sheets
+          .map(
+            (sheet) => StatementSheetViewData(
+              name: sheet.name,
+              csvText: sheet.csvText,
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+
+  @override
   Future<void> importCsv(String csvText) async {
     if (_snapshot.accounts.isEmpty) {
       throw StateError('Add an account before importing a statement.');
@@ -612,9 +640,7 @@ final class SpendWiseController extends ChangeNotifier
   _prepareCsvImport(CsvImportDraft draft) {
     final wizard = CsvImportWizard(_ledger);
     final inspection = wizard.inspect(
-      fileName: draft.sourceLabel.endsWith('.csv')
-          ? draft.sourceLabel
-          : '${draft.sourceLabel}.csv',
+      fileName: draft.fileName,
       text: draft.csvText,
       accountId: draft.accountId,
     );

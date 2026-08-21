@@ -73,9 +73,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               ListTile(
                 leading: const Icon(Icons.upload_file_outlined),
-                title: const Text('Import CSV statement'),
+                title: const Text('Import statement'),
                 subtitle: const Text(
-                  'Add and reconcile historical transactions',
+                  'CSV or Excel · preview before anything is saved',
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.push(
