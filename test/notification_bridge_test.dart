@@ -64,4 +64,42 @@ void main() {
       expect(configured, contains('pk.example.bank'));
     },
   );
+
+  test('returns completed notification tray recovery counts', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          expect(call.method, 'scanCurrentNotificationTray');
+          return {
+            'status': 'completed',
+            'activeCount': 7,
+            'eligibleCount': 3,
+            'queuedCount': 1,
+            'duplicateCount': 2,
+            'failedCount': 0,
+          };
+        });
+
+    final result = await const NotificationBridge().scanCurrentTray();
+    expect(result.status, NotificationTrayScanStatus.completed);
+    expect(result.activeCount, 7);
+    expect(result.eligibleCount, 3);
+    expect(result.queuedCount, 1);
+    expect(result.duplicateCount, 2);
+  });
+
+  test(
+    'surfaces missing notification access without guessing counts',
+    () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            expect(call.method, 'scanCurrentNotificationTray');
+            return {'status': 'accessRequired'};
+          });
+
+      final result = await const NotificationBridge().scanCurrentTray();
+      expect(result.status, NotificationTrayScanStatus.accessRequired);
+      expect(result.activeCount, 0);
+      expect(result.queuedCount, 0);
+    },
+  );
 }

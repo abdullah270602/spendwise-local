@@ -486,7 +486,32 @@ abstract class SpendWiseAdvancedViewModel implements SpendWiseViewModel {
   Future<void> updateDetailedAccount(String id, AccountUpdateDraft draft);
   Future<void> archiveAccount(String id);
   Future<void> restoreAccount(String id);
+  Future<NotificationTrayScanViewData> scanNotificationTray();
   void dismissError();
+}
+
+enum NotificationTrayScanViewStatus {
+  completed,
+  accessRequired,
+  listenerUnavailable,
+}
+
+final class NotificationTrayScanViewData {
+  const NotificationTrayScanViewData({
+    required this.status,
+    this.activeCount = 0,
+    this.eligibleCount = 0,
+    this.queuedCount = 0,
+    this.duplicateCount = 0,
+    this.failedCount = 0,
+  });
+
+  final NotificationTrayScanViewStatus status;
+  final int activeCount;
+  final int eligibleCount;
+  final int queuedCount;
+  final int duplicateCount;
+  final int failedCount;
 }
 
 extension SpendWiseAdvancedAccess on SpendWiseViewModel {
@@ -540,5 +565,10 @@ extension SpendWiseAdvancedAccess on SpendWiseViewModel {
   Future<void> uiRestoreAccount(String id) =>
       _advanced?.restoreAccount(id) ??
       Future.error(UnsupportedError('Account restore is not available'));
+  Future<NotificationTrayScanViewData> uiScanNotificationTray() =>
+      _advanced?.scanNotificationTray() ??
+      Future.error(
+        UnsupportedError('Notification tray recovery is not available'),
+      );
   void uiDismissError() => _advanced?.dismissError();
 }

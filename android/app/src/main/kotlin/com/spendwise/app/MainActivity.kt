@@ -7,6 +7,7 @@ import android.graphics.Canvas
 import android.graphics.Rect
 import android.graphics.drawable.Drawable
 import android.provider.Settings
+import android.service.notification.NotificationListenerService
 import java.io.ByteArrayOutputStream
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -47,6 +48,7 @@ class MainActivity : FlutterActivity() {
                 }
                 "listNotificationSources" -> result.success(listNotificationSources())
                 "getNotificationIngestionHealth" -> result.success(notificationIngestionHealth())
+                "scanCurrentNotificationTray" -> result.success(scanCurrentNotificationTray())
                 "setNotificationSources" -> {
                     val packages = call.argument<List<String>>("packageNames").orEmpty()
                     NotificationSourceStore(applicationContext).replaceConfiguredPackages(packages)
@@ -160,6 +162,31 @@ class MainActivity : FlutterActivity() {
             "queueCapacity" to queue.capacity,
             "evictedEvidenceCount" to queue.evictedCount,
             "payloadSchemaVersion" to NotificationEventStore.PAYLOAD_SCHEMA_VERSION,
+        )
+    }
+
+    private fun scanCurrentNotificationTray(): Map<String, Any?> {
+        if (!isNotificationAccessGranted()) {
+            return mapOf("status" to "accessRequired")
+        }
+        val scan = SpendWiseNotificationListenerService.requestManualRecoveryScan()
+        if (scan == null) {
+            requestNotificationListenerRebind()
+            return mapOf("status" to "listenerUnavailable")
+        }
+        return mapOf(
+            "status" to "completed",
+            "activeCount" to scan.activeCount,
+            "eligibleCount" to scan.eligibleCount,
+            "queuedCount" to scan.queuedCount,
+            "duplicateCount" to scan.duplicateCount,
+            "failedCount" to scan.failedCount,
+        )
+    }
+
+    private fun requestNotificationListenerRebind() {
+        NotificationListenerService.requestRebind(
+            ComponentName(this, SpendWiseNotificationListenerService::class.java),
         )
     }
 

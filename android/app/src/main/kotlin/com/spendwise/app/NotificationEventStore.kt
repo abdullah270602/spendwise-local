@@ -31,9 +31,9 @@ internal class NotificationEventStore(context: Context) :
         if (oldVersion < 2) migrateVersionOne(db)
     }
 
-    fun enqueue(snapshot: CapturedNotificationSnapshot): Boolean {
+    fun enqueue(snapshot: CapturedNotificationSnapshot): NotificationEnqueueResult {
         val encryptedPayload = NotificationFieldCipher.encrypt(JsonCodec.encode(snapshot.payload))
-            ?: return false
+            ?: return NotificationEnqueueResult.ENCRYPTION_FAILED
         val database = writableDatabase
         database.beginTransaction()
         return try {
@@ -55,7 +55,7 @@ internal class NotificationEventStore(context: Context) :
             updateObservedSource(database, snapshot, inserted)
             trimQueue(database)
             database.setTransactionSuccessful()
-            inserted
+            if (inserted) NotificationEnqueueResult.INSERTED else NotificationEnqueueResult.DUPLICATE
         } finally {
             database.endTransaction()
         }
@@ -306,6 +306,8 @@ internal class NotificationEventStore(context: Context) :
         )
     }
 }
+
+internal enum class NotificationEnqueueResult { INSERTED, DUPLICATE, ENCRYPTION_FAILED }
 
 internal data class CapturedNotificationSnapshot(
     val notificationKey: String,

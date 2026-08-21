@@ -80,21 +80,25 @@ final class SpendWiseController extends ChangeNotifier
           },
         ),
       );
-      final queued = await _bridge.peek();
-      final acknowledged = <int>[];
-      for (final event in queued) {
-        if (_ledger.ingestNotification(event)) {
-          final id = (event['id'] as num?)?.toInt();
-          if (id != null) acknowledged.add(id);
-        }
-      }
-      if (acknowledged.isNotEmpty) await _bridge.acknowledge(acknowledged);
+      await _drainNotificationQueue();
       _reload();
     } on MissingPluginException {
       // Tests and non-Android hosts intentionally have no native listener.
     } on PlatformException {
       // Android can briefly reject package queries while settings changes.
     }
+  }
+
+  Future<void> _drainNotificationQueue() async {
+    final queued = await _bridge.peek();
+    final acknowledged = <int>[];
+    for (final event in queued) {
+      if (_ledger.ingestNotification(event)) {
+        final id = (event['id'] as num?)?.toInt();
+        if (id != null) acknowledged.add(id);
+      }
+    }
+    if (acknowledged.isNotEmpty) await _bridge.acknowledge(acknowledged);
   }
 
   void _reload() {
@@ -364,6 +368,43 @@ final class SpendWiseController extends ChangeNotifier
   Future<void> setSourceEnabled(String packageName, bool enabled) async {
     await _bridge.setSourceEnabled(packageName, enabled);
     await _refreshPlatform();
+  }
+
+  @override
+  Future<NotificationTrayScanViewData> scanNotificationTray() async {
+    _busy = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      final result = await _bridge.scanCurrentTray();
+      if (result.status == NotificationTrayScanStatus.completed) {
+        await _drainNotificationQueue();
+        _ingestionHealth = await _bridge.health();
+        _nativeSources = await _bridge.listSources();
+      }
+      _notificationAccess = await _bridge.hasAccess();
+      return NotificationTrayScanViewData(
+        status: switch (result.status) {
+          NotificationTrayScanStatus.completed =>
+            NotificationTrayScanViewStatus.completed,
+          NotificationTrayScanStatus.accessRequired =>
+            NotificationTrayScanViewStatus.accessRequired,
+          NotificationTrayScanStatus.listenerUnavailable =>
+            NotificationTrayScanViewStatus.listenerUnavailable,
+        },
+        activeCount: result.activeCount,
+        eligibleCount: result.eligibleCount,
+        queuedCount: result.queuedCount,
+        duplicateCount: result.duplicateCount,
+        failedCount: result.failedCount,
+      );
+    } catch (error) {
+      _errorMessage = error.toString().replaceFirst('PlatformException: ', '');
+      rethrow;
+    } finally {
+      _busy = false;
+      _reload();
+    }
   }
 
   @override
