@@ -1,0 +1,317 @@
+import '../models/canonical_transaction.dart';
+import '../models/event_candidate.dart';
+import '../models/raw_observation.dart';
+
+final class ReconciliationResult {
+  const ReconciliationResult({
+    required this.transactions,
+    this.decisions = const [],
+  });
+  final List<CanonicalTransaction> transactions;
+  final List<ReconciliationDecision> decisions;
+  int get reviewCount => transactions.where((item) => item.needsReview).length;
+}
+
+/// Deterministically reduces interpreted evidence into ledger transactions.
+/// Input ordering has no effect on the output.
+final class Reconciler {
+  const Reconciler({
+    this.duplicateWindow = const Duration(minutes: 3),
+    this.transferWindow = const Duration(minutes: 10),
+  });
+
+  final Duration duplicateWindow;
+  final Duration transferWindow;
+
+  ReconciliationResult reconcile(
+    Iterable<EventCandidate> candidates, {
+    Iterable<CanonicalTransaction> existing = const [],
+  }) {
+    final sorted = candidates.toList()
+      ..sort((a, b) => _candidateKey(a).compareTo(_candidateKey(b)));
+    final legs = <_Leg>[];
+    for (final candidate in sorted) {
+      final duplicate = legs
+          .where((leg) => _isDuplicate(leg, candidate))
+          .toList();
+      if (duplicate.length == 1) {
+        duplicate.single.candidates.add(candidate);
+      } else {
+        legs.add(_Leg([candidate]));
+      }
+    }
+
+    final transferOptions = <_Leg, List<_Leg>>{
+      for (final leg in legs)
+        leg: legs
+            .where(
+              (other) =>
+                  other != leg && _isTransferPair(leg.primary, other.primary),
+            )
+            .toList(),
+    };
+
+    final transactions = <CanonicalTransaction>[];
+    final decisions = <ReconciliationDecision>[];
+    final consumed = <_Leg>{};
+    for (final leg in legs) {
+      if (consumed.contains(leg)) continue;
+      final opposites = transferOptions[leg]!;
+      if (opposites.length == 1) {
+        final other = opposites.single;
+        if (!consumed.contains(other) && transferOptions[other]!.length == 1) {
+          transactions.add(_transfer(leg, other));
+          decisions.add(
+            _decision(
+              ReconciliationDecisionType.pairTransfer,
+              [leg, other],
+              _transferScore(leg.primary, other.primary),
+              [
+                'Opposing account legs matched by amount, time, reference, and counterparty signals.',
+              ],
+            ),
+          );
+          consumed.addAll([leg, other]);
+          continue;
+        }
+      }
+      final ambiguous = opposites.isNotEmpty;
+      transactions.add(_single(leg, needsReview: ambiguous));
+      if (leg.candidates.length > 1) {
+        decisions.add(
+          _decision(
+            ReconciliationDecisionType.mergeEvidence,
+            [leg],
+            1,
+            ['Evidence shares a strong duplicate identity.'],
+          ),
+        );
+      }
+      if (ambiguous) {
+        decisions.add(
+          _decision(
+            ReconciliationDecisionType.keepSeparate,
+            [leg, ...opposites],
+            0.5,
+            ['Multiple plausible matches; preserved separately for review.'],
+          ),
+        );
+      }
+      consumed.add(leg);
+    }
+
+    // User-created and locked records are immutable. Evidence may only attach
+    // to an editable automatic transaction with the same stable identity.
+    for (final old in existing) {
+      final index = transactions.indexWhere((fresh) => fresh.id == old.id);
+      if (index < 0) {
+        transactions.add(old);
+      } else if (old.locked || old.origin == TransactionOrigin.manual) {
+        transactions[index] = old;
+      } else {
+        transactions[index] = transactions[index].copyWith(
+          evidenceIds: {...old.evidenceIds, ...transactions[index].evidenceIds},
+        );
+      }
+    }
+    transactions.sort((a, b) {
+      final time = b.occurredAt.compareTo(a.occurredAt);
+      return time != 0 ? time : a.id.compareTo(b.id);
+    });
+    return ReconciliationResult(
+      transactions: List.unmodifiable(transactions),
+      decisions: List.unmodifiable(decisions),
+    );
+  }
+
+  bool _isDuplicate(_Leg leg, EventCandidate candidate) {
+    final first = leg.primary;
+    if (first.accountId != candidate.accountId ||
+        first.direction != candidate.direction ||
+        first.amount != candidate.amount ||
+        _difference(first.occurredAt, candidate.occurredAt) >
+            _duplicateWindow(first, candidate)) {
+      return false;
+    }
+    if (first.reference != null || candidate.reference != null) {
+      return first.reference != null && first.reference == candidate.reference;
+    }
+    if (first.observation.evidenceFingerprint ==
+        candidate.observation.evidenceFingerprint) {
+      return true;
+    }
+    final distinctChannels =
+        first.observation.sourcePackage !=
+            candidate.observation.sourcePackage ||
+        first.observation.kind != candidate.observation.kind;
+    final sameCounterparty =
+        _normalized(first.counterparty).isNotEmpty &&
+        _normalized(first.counterparty) == _normalized(candidate.counterparty);
+    final sameDescription =
+        _normalized(first.description).isNotEmpty &&
+        _normalized(first.description) == _normalized(candidate.description);
+    return distinctChannels &&
+        (sameCounterparty || sameDescription) &&
+        _difference(first.occurredAt, candidate.occurredAt) <=
+            const Duration(seconds: 90);
+  }
+
+  Duration _duplicateWindow(EventCandidate a, EventCandidate b) =>
+      (a.observation.kind == ObservationKind.csvImport ||
+              b.observation.kind == ObservationKind.csvImport) &&
+          a.reference != null &&
+          a.reference == b.reference
+      ? const Duration(hours: 36)
+      : duplicateWindow;
+
+  bool _isTransferPair(EventCandidate a, EventCandidate b) =>
+      _transferScore(a, b) >= 0.7;
+
+  double _transferScore(EventCandidate a, EventCandidate b) {
+    if (a.accountId == b.accountId ||
+        a.direction == b.direction ||
+        a.amount != b.amount) {
+      return 0;
+    }
+    final age = _difference(a.occurredAt, b.occurredAt);
+    final lateCsv =
+        a.observation.kind == ObservationKind.csvImport ||
+        b.observation.kind == ObservationKind.csvImport;
+    if (age > (lateCsv ? const Duration(hours: 36) : transferWindow)) {
+      return 0;
+    }
+    var score = age <= const Duration(minutes: 3)
+        ? 0.7
+        : (lateCsv ? 0.55 : 0.6);
+    if (a.reference != null && a.reference == b.reference) score += 0.3;
+    final ac = _normalized(a.counterparty), bc = _normalized(b.counterparty);
+    if (ac.isNotEmpty &&
+        bc.isNotEmpty &&
+        (ac.contains(bc) || bc.contains(ac))) {
+      score += 0.15;
+    }
+    return score.clamp(0, 1);
+  }
+
+  CanonicalTransaction _single(_Leg leg, {required bool needsReview}) {
+    final item = leg.primary;
+    return CanonicalTransaction(
+      id: _stableId('single', [
+        item.accountId,
+        item.direction.name,
+        '${item.amount.minorUnits}',
+        _identity(leg),
+      ]),
+      kind: item.direction == EntryDirection.debit
+          ? TransactionKind.expense
+          : TransactionKind.income,
+      amount: item.amount,
+      occurredAt: _earliest(leg.candidates),
+      evidenceIds: leg.evidenceIds,
+      accountId: item.accountId,
+      description: item.description,
+      needsReview: needsReview || item.confidence < 0.8,
+      reconciliationState: needsReview || item.confidence < 0.8
+          ? ReconciliationState.needsReview
+          : (leg.candidates.length > 1
+                ? ReconciliationState.confirmed
+                : ReconciliationState.probable),
+    );
+  }
+
+  CanonicalTransaction _transfer(_Leg first, _Leg second) {
+    final debit = first.primary.direction == EntryDirection.debit
+        ? first
+        : second;
+    final credit = identical(debit, first) ? second : first;
+    return CanonicalTransaction(
+      id: _stableId('transfer', [
+        debit.primary.accountId,
+        credit.primary.accountId,
+        '${debit.primary.amount.minorUnits}',
+        _identity(debit),
+        _identity(credit),
+      ]),
+      kind: TransactionKind.transfer,
+      amount: debit.primary.amount,
+      occurredAt: _earliest([...debit.candidates, ...credit.candidates]),
+      evidenceIds: {...debit.evidenceIds, ...credit.evidenceIds},
+      fromAccountId: debit.primary.accountId,
+      toAccountId: credit.primary.accountId,
+      description: '${debit.primary.accountId} → ${credit.primary.accountId}',
+      needsReview:
+          debit.primary.confidence < 0.8 || credit.primary.confidence < 0.8,
+      reconciliationState:
+          debit.primary.confidence >= 0.8 && credit.primary.confidence >= 0.8
+          ? ReconciliationState.confirmed
+          : ReconciliationState.probable,
+    );
+  }
+
+  String _identity(_Leg leg) {
+    final identities =
+        leg.candidates
+            .map(
+              (item) =>
+                  item.reference ??
+                  item.observation.externalId ??
+                  item.observation.id,
+            )
+            .toList()
+          ..sort();
+    return identities.join(',');
+  }
+
+  String _candidateKey(EventCandidate item) => [
+    item.occurredAt.toUtc().microsecondsSinceEpoch.toString().padLeft(20, '0'),
+    item.accountId,
+    item.direction.name,
+    item.amount.minorUnits,
+    item.observation.id,
+  ].join('|');
+
+  Duration _difference(DateTime a, DateTime b) =>
+      Duration(microseconds: (a.difference(b).inMicroseconds).abs());
+
+  DateTime _earliest(Iterable<EventCandidate> values) => values
+      .map((item) => item.occurredAt)
+      .reduce((a, b) => a.isBefore(b) ? a : b);
+
+  String _normalized(String? value) =>
+      (value ?? '').toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
+
+  String _stableId(String prefix, List<Object> values) {
+    var hash = 0xcbf29ce484222325;
+    for (final unit in values.join('|').codeUnits) {
+      hash ^= unit;
+      hash = (hash * 0x100000001b3) & 0x7fffffffffffffff;
+    }
+    return '$prefix:${hash.toRadixString(16).padLeft(16, '0')}';
+  }
+
+  ReconciliationDecision _decision(
+    ReconciliationDecisionType type,
+    List<_Leg> legs,
+    double score,
+    List<String> reasons,
+  ) {
+    final ids = legs
+        .expand((leg) => leg.candidates.map((item) => item.id))
+        .toSet();
+    return ReconciliationDecision(
+      id: _stableId('decision', [type.name, ...(ids.toList()..sort())]),
+      type: type,
+      candidateIds: ids,
+      score: score,
+      reasons: reasons,
+    );
+  }
+}
+
+final class _Leg {
+  _Leg(this.candidates);
+  final List<EventCandidate> candidates;
+  EventCandidate get primary => candidates.first;
+  Set<String> get evidenceIds =>
+      candidates.map((item) => item.observation.id).toSet();
+}
