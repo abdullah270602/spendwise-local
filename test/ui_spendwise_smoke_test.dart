@@ -103,6 +103,38 @@ void main() {
     expect(find.text('Expense'), findsOneWidget);
   });
 
+  testWidgets('transaction edit recovers from a stale account assignment', (
+    tester,
+  ) async {
+    final transaction = TransactionViewData(
+      id: 'notification-entry',
+      title: 'Card purchase',
+      subtitle: 'Deleted account',
+      amount: const MoneyViewData(-2500),
+      kind: TransactionKind.expense,
+      occurredAt: DateTime(2026, 8, 22),
+      category: 'Shopping',
+      accountId: 'no-longer-active',
+      evidenceCount: 1,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: TransactionDetailsScreen(
+          viewModel: _FakeViewModel(),
+          transaction: transaction,
+        ),
+      ),
+    );
+
+    await tester.tap(find.byTooltip('Edit classification'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Edit classification'), findsOneWidget);
+    expect(find.text('Everyday'), findsOneWidget);
+  });
+
   testWidgets('export labels transaction types for people, not enums', (
     tester,
   ) async {

@@ -190,9 +190,17 @@ class TransactionDetailsScreen extends StatelessWidget {
   Future<void> _showCorrection(BuildContext context) async {
     var kind = transaction.kind;
     var category = transaction.category;
-    String? accountId =
-        transaction.accountId ?? viewModel.accounts.firstOrNull?.id;
-    String? toAccountId = transaction.toAccountId;
+    final accounts = viewModel.accounts;
+    final accountIds = accounts.map((item) => item.id).toSet();
+    String? accountId = accountIds.contains(transaction.accountId)
+        ? transaction.accountId
+        : accounts.firstOrNull?.id;
+    String? toAccountId =
+        accountIds.contains(transaction.toAccountId) &&
+            transaction.toAccountId != accountId
+        ? transaction.toAccountId
+        : accounts.where((item) => item.id != accountId).firstOrNull?.id;
+    var saving = false;
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -238,8 +246,19 @@ class TransactionDetailsScreen extends StatelessWidget {
                     ),
                   ],
                   selected: {kind},
-                  onSelectionChanged: (value) =>
-                      setModalState(() => kind = value.first),
+                  onSelectionChanged: saving
+                      ? null
+                      : (value) => setModalState(() {
+                          kind = value.first;
+                          if (kind == TransactionKind.transfer &&
+                              (toAccountId == null ||
+                                  toAccountId == accountId)) {
+                            toAccountId = accounts
+                                .where((item) => item.id != accountId)
+                                .firstOrNull
+                                ?.id;
+                          }
+                        }),
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
@@ -267,13 +286,15 @@ class TransactionDetailsScreen extends StatelessWidget {
                             ),
                           )
                           .toList(),
-                  onChanged: (value) => category = value ?? category,
+                  onChanged: saving
+                      ? null
+                      : (value) => category = value ?? category,
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: accountId,
                   decoration: const InputDecoration(labelText: 'Account'),
-                  items: viewModel.accounts
+                  items: accounts
                       .map(
                         (value) => DropdownMenuItem(
                           value: value.id,
@@ -281,16 +302,27 @@ class TransactionDetailsScreen extends StatelessWidget {
                         ),
                       )
                       .toList(),
-                  onChanged: (value) => accountId = value,
+                  onChanged: saving
+                      ? null
+                      : (value) => setModalState(() {
+                          accountId = value;
+                          if (toAccountId == accountId) {
+                            toAccountId = accounts
+                                .where((item) => item.id != accountId)
+                                .firstOrNull
+                                ?.id;
+                          }
+                        }),
                 ),
                 if (kind == TransactionKind.transfer) ...[
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
+                    key: ValueKey('destination-$accountId-$toAccountId'),
                     initialValue: toAccountId,
                     decoration: const InputDecoration(
                       labelText: 'Destination account',
                     ),
-                    items: viewModel.accounts
+                    items: accounts
                         .where((value) => value.id != accountId)
                         .map(
                           (value) => DropdownMenuItem(
@@ -299,40 +331,86 @@ class TransactionDetailsScreen extends StatelessWidget {
                           ),
                         )
                         .toList(),
-                    onChanged: (value) => toAccountId = value,
+                    onChanged: saving
+                        ? null
+                        : (value) => setModalState(() => toAccountId = value),
                   ),
+                  if (accounts.length < 2) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Add another account before classifying this as a transfer.',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
                 ],
                 const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: () async {
-                      try {
-                        await viewModel.uiCorrectTransaction(
-                          transaction.id,
-                          TransactionCorrectionDraft(
-                            kind: kind,
-                            category: category,
-                            accountId: accountId,
-                            toAccountId: toAccountId,
-                          ),
-                        );
-                        if (sheetContext.mounted) {
-                          Navigator.pop(sheetContext, true);
-                        }
-                      } on UnsupportedError {
-                        if (sheetContext.mounted) {
-                          ScaffoldMessenger.of(sheetContext).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'This ledger build cannot edit imported records yet.',
-                              ),
-                            ),
-                          );
-                        }
-                      }
-                    },
-                    child: const Text('Save classification'),
+                    onPressed: saving || accounts.isEmpty
+                        ? null
+                        : () async {
+                            if (accountId == null) {
+                              ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Choose an account first.'),
+                                ),
+                              );
+                              return;
+                            }
+                            if (kind == TransactionKind.transfer &&
+                                (toAccountId == null ||
+                                    toAccountId == accountId)) {
+                              ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Choose a different destination account.',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+                            setModalState(() => saving = true);
+                            try {
+                              await viewModel.uiCorrectTransaction(
+                                transaction.id,
+                                TransactionCorrectionDraft(
+                                  kind: kind,
+                                  category: category,
+                                  accountId: accountId,
+                                  toAccountId: toAccountId,
+                                ),
+                              );
+                              if (sheetContext.mounted) {
+                                Navigator.pop(sheetContext, true);
+                              }
+                            } on UnsupportedError {
+                              if (sheetContext.mounted) {
+                                setModalState(() => saving = false);
+                                ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'This ledger build cannot edit imported records yet.',
+                                    ),
+                                  ),
+                                );
+                              }
+                            } catch (error) {
+                              if (sheetContext.mounted) {
+                                setModalState(() => saving = false);
+                                ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Could not save changes: ${error.toString().replaceFirst('StateError: ', '').replaceFirst('ArgumentError: ', '')}',
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                    child: Text(saving ? 'Saving…' : 'Save classification'),
                   ),
                 ),
               ],
