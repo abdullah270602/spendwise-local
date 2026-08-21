@@ -5,6 +5,7 @@ import 'package:csv/csv.dart';
 
 import '../domain/domain.dart';
 import 'local_ledger.dart';
+import 'statement_table_detector.dart';
 
 enum CsvColumnRole {
   date,
@@ -92,6 +93,7 @@ final class CsvInspection {
     required this.headers,
     required this.sampleRows,
     required this.headerFingerprint,
+    required this.headerRowIndex,
     required this.suggestedMapping,
     required this.mappingWasRemembered,
   });
@@ -102,6 +104,7 @@ final class CsvInspection {
   final List<String> headers;
   final List<List<String>> sampleRows;
   final String headerFingerprint;
+  final int headerRowIndex;
   final CsvMappingDefinition suggestedMapping;
   final bool mappingWasRemembered;
 }
@@ -181,18 +184,8 @@ final class CsvImportWizard {
     required String accountId,
   }) {
     final normalized = text.startsWith('\ufeff') ? text.substring(1) : text;
-    final delimiter = _detectDelimiter(normalized);
-    final decoded = Csv(
-      fieldDelimiter: delimiter,
-      autoDetect: false,
-    ).decode(normalized);
-    if (decoded.isEmpty) throw const FormatException('The CSV is empty.');
-    final headers = decoded.first
-        .map((value) => '$value'.trim())
-        .toList(growable: false);
-    if (headers.every((header) => header.isEmpty)) {
-      throw const FormatException('The CSV has no header row.');
-    }
+    final detected = const StatementTableDetector().detect(normalized);
+    final headers = detected.headers;
     final fingerprint = sha256
         .convert(utf8.encode(headers.map(_normalizeHeader).join('|')))
         .toString();
@@ -208,14 +201,14 @@ final class CsvImportWizard {
     return CsvInspection(
       fileName: fileName,
       fileSha256: sha256.convert(utf8.encode(normalized)).toString(),
-      delimiter: delimiter,
+      delimiter: detected.delimiter,
       headers: headers,
-      sampleRows: decoded
-          .skip(1)
+      sampleRows: detected.dataRows
           .take(20)
           .map((row) => row.map((value) => '$value').toList(growable: false))
           .toList(growable: false),
       headerFingerprint: fingerprint,
+      headerRowIndex: detected.headerRowIndex,
       suggestedMapping: suggested,
       mappingWasRemembered: remembered != null,
     );
@@ -238,7 +231,11 @@ final class CsvImportWizard {
       autoDetect: false,
     ).decode(normalized);
     final rows = <CsvPreviewRow>[];
-    for (var index = 1; index < decoded.length; index++) {
+    for (
+      var index = inspection.headerRowIndex + 1;
+      index < decoded.length;
+      index++
+    ) {
       final rawRow = decoded[index];
       final raw = {
         for (var column = 0; column < inspection.headers.length; column++)
@@ -470,34 +467,18 @@ final class CsvImportWizard {
   CsvMappingDefinition _suggest(List<String> headers) {
     final roles = <int, CsvColumnRole>{};
     for (var index = 0; index < headers.length; index++) {
-      final header = _normalizeHeader(headers[index]);
-      final role = switch (header) {
-        'date' ||
-        'txndate' ||
-        'transactiondate' ||
-        'valuedate' => CsvColumnRole.date,
-        'description' ||
-        'details' ||
-        'narration' ||
-        'memo' => CsvColumnRole.description,
-        'merchant' || 'counterparty' || 'payee' => CsvColumnRole.merchant,
-        'debit' ||
-        'withdrawal' ||
-        'moneyout' ||
-        'paidout' => CsvColumnRole.debit,
-        'credit' || 'deposit' || 'moneyin' || 'paidin' => CsvColumnRole.credit,
-        'amount' || 'transactionamount' => CsvColumnRole.amount,
-        'direction' || 'drcr' || 'type' => CsvColumnRole.direction,
-        'balance' ||
-        'runningbalance' ||
-        'closingbalance' => CsvColumnRole.balance,
-        'reference' ||
-        'refno' ||
-        'transactionid' ||
-        'txnref' ||
-        'rrn' => CsvColumnRole.reference,
-        'currency' || 'ccy' => CsvColumnRole.currency,
-        _ => CsvColumnRole.ignore,
+      final role = switch (recognizeStatementHeader(headers[index])) {
+        StatementColumnKind.date => CsvColumnRole.date,
+        StatementColumnKind.description => CsvColumnRole.description,
+        StatementColumnKind.merchant => CsvColumnRole.merchant,
+        StatementColumnKind.debit => CsvColumnRole.debit,
+        StatementColumnKind.credit => CsvColumnRole.credit,
+        StatementColumnKind.amount => CsvColumnRole.amount,
+        StatementColumnKind.direction => CsvColumnRole.direction,
+        StatementColumnKind.balance => CsvColumnRole.balance,
+        StatementColumnKind.reference => CsvColumnRole.reference,
+        StatementColumnKind.currency => CsvColumnRole.currency,
+        StatementColumnKind.unknown => CsvColumnRole.ignore,
       };
       roles[index] = role;
     }
@@ -556,15 +537,6 @@ final class CsvImportWizard {
     return parsed.year == year && parsed.month == month && parsed.day == day
         ? parsed
         : null;
-  }
-
-  String _detectDelimiter(String text) {
-    final header = const LineSplitter().convert(text).firstOrNull ?? '';
-    final counts = {
-      for (final value in [',', ';', '\t', '|'])
-        value: value.allMatches(header).length,
-    };
-    return counts.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
   }
 
   String _normalizeHeader(String value) =>

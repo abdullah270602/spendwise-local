@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:spendwise/app/theme.dart';
 import 'package:spendwise/features/accounts/accounts_screen.dart';
 import 'package:spendwise/features/import/import_csv_screen.dart';
+import 'package:spendwise/features/insights/insights_screen.dart';
 import 'package:spendwise/features/shell/spendwise_shell.dart';
 import 'package:spendwise/features/shell/spendwise_view_model.dart';
 import 'package:spendwise/features/onboarding/onboarding_screen.dart';
@@ -164,7 +165,7 @@ void main() {
     expect(find.text('Choose CSV or Excel file'), findsOneWidget);
     expect(
       find.text('CSV, XLSX, or XLS · read only on this device'),
-      findsOneWidget,
+      findsNothing,
     );
   });
 
@@ -216,6 +217,7 @@ void main() {
         home: AccountsScreen(viewModel: viewModel),
       ),
     );
+    expect(find.text('Enabled Bank'), findsNothing);
     await tester.tap(find.text('Everyday'));
     await tester.pumpAndSettle();
     expect(find.text('Enabled Bank'), findsOneWidget);
@@ -287,9 +289,7 @@ void main() {
     expect(find.text('Emergency fund'), findsOneWidget);
   });
 
-  testWidgets('dashboard excludes savings from its available balance', (
-    tester,
-  ) async {
+  testWidgets('dashboard hides savings by default', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: SpendWiseTheme.dark,
@@ -300,8 +300,26 @@ void main() {
 
     expect(find.text('Available to spend'), findsOneWidget);
     expect(find.text('PKR 25,000'), findsOneWidget);
-    expect(find.text('PKR 100,000 saved separately'), findsOneWidget);
+    expect(find.text('PKR 100,000 saved separately'), findsNothing);
+    expect(find.text('Emergency fund'), findsNothing);
     expect(find.text('PKR 125,000'), findsNothing);
+  });
+
+  testWidgets('Insights combines everyday and savings balances', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: InsightsScreen(viewModel: _SavingsViewModel()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Total tracked'), findsOneWidget);
+    expect(find.text('PKR 125,000'), findsOneWidget);
+    expect(find.text('PKR 25,000'), findsOneWidget);
+    expect(find.text('PKR 100,000'), findsOneWidget);
   });
 }
 

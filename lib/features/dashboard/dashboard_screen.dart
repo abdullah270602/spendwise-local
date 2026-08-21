@@ -22,6 +22,10 @@ class DashboardScreen extends StatelessWidget {
     final data = viewModel.dashboard;
     final availableBalance = data.spendableBalance ?? data.netWorth;
     final savingsBalance = data.savingsBalance ?? const MoneyViewData(0);
+    final showSavings = viewModel.uiShowSavingsOnHome;
+    final homeAccounts = showSavings
+        ? viewModel.accounts
+        : viewModel.accounts.where((account) => account.isIncluded).toList();
     final recent = viewModel.transactions.take(5).toList();
     final netFlow =
         data.netCashFlow ??
@@ -125,7 +129,7 @@ class DashboardScreen extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      if (savingsBalance.minorUnits != 0) ...[
+                      if (showSavings && savingsBalance.minorUnits != 0) ...[
                         const SizedBox(height: 10),
                         TextButton.icon(
                           style: TextButton.styleFrom(
@@ -232,28 +236,18 @@ class DashboardScreen extends StatelessWidget {
                         ),
                 ),
               ),
-              const SizedBox(height: 20),
-              const SectionHeading('Account balances'),
-              const SizedBox(height: 8),
-              if (viewModel.accounts.isEmpty)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      'Add an account to start tracking balances.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                )
-              else
+              if (homeAccounts.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                const SectionHeading('Account balances'),
+                const SizedBox(height: 8),
                 SizedBox(
                   height: 106,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
-                    itemCount: viewModel.accounts.length,
+                    itemCount: homeAccounts.length,
                     separatorBuilder: (_, _) => const SizedBox(width: 10),
                     itemBuilder: (context, index) {
-                      final account = viewModel.accounts[index];
+                      final account = homeAccounts[index];
                       return SizedBox(
                         width: 188,
                         child: Card(
@@ -290,6 +284,7 @@ class DashboardScreen extends StatelessWidget {
                     },
                   ),
                 ),
+              ],
               if (transfers.isNotEmpty) ...[
                 const SizedBox(height: 20),
                 const SectionHeading('Transfer activity'),

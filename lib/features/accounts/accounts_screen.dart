@@ -163,20 +163,6 @@ class AccountsScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              if (account.sources.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 7,
-                  runSpacing: 7,
-                  children: [
-                    for (final source in account.sources)
-                      Chip(
-                        avatar: Icon(_sourceIcon(source.kind), size: 15),
-                        label: Text(source.label),
-                      ),
-                  ],
-                ),
-              ],
             ],
           ),
         ),
@@ -190,13 +176,6 @@ class AccountsScreen extends StatelessWidget {
     String value when value.contains('wallet') => Icons.wallet_outlined,
     String value when value.contains('card') => Icons.credit_card_outlined,
     _ => Icons.account_balance_outlined,
-  };
-
-  static IconData _sourceIcon(String kind) => switch (kind.toLowerCase()) {
-    'sms' || 'messages' => Icons.sms_outlined,
-    'statement' || 'csv' => Icons.table_view_outlined,
-    'institution' || 'bank' => Icons.account_balance_outlined,
-    _ => Icons.notifications_outlined,
   };
 
   Future<void> _restoreAccount(

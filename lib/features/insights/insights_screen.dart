@@ -37,98 +37,204 @@ class _InsightsScreenState extends State<InsightsScreen> {
               .toList()
             ..sort();
       return Scaffold(
-        appBar: AppBar(title: const Text('Spending insights')),
-        body: widget.viewModel.transactions.isEmpty
-            ? const EmptyState(
-                icon: Icons.insights_outlined,
-                title: 'No trends yet',
-                message: 'Once transactions reach your ledger, SpendWise will compare spending across days, months, years, and categories.',
-              )
-            : CustomScrollView(
-                slivers: [
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(18, 4, 18, 10),
-                    sliver: SliverToBoxAdapter(
-                      child: SegmentedButton<AnalyticsResolution>(
-                        showSelectedIcon: false,
-                        segments: const [
-                          ButtonSegment(
-                            value: AnalyticsResolution.days,
-                            label: Text('Days'),
+        appBar: AppBar(title: const Text('Insights')),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 4, 18, 14),
+              child: _BalanceSnapshot(accounts: widget.viewModel.accounts),
+            ),
+            Expanded(
+              child: widget.viewModel.transactions.isEmpty
+                  ? const EmptyState(
+                      icon: Icons.insights_outlined,
+                      title: 'No trends yet',
+                      message: 'Once transactions reach your ledger, SpendWise will compare spending across days, months, years, and categories.',
+                    )
+                  : CustomScrollView(
+                      slivers: [
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(18, 4, 18, 10),
+                          sliver: SliverToBoxAdapter(
+                            child: SegmentedButton<AnalyticsResolution>(
+                              showSelectedIcon: false,
+                              segments: const [
+                                ButtonSegment(
+                                  value: AnalyticsResolution.days,
+                                  label: Text('Days'),
+                                ),
+                                ButtonSegment(
+                                  value: AnalyticsResolution.months,
+                                  label: Text('Months'),
+                                ),
+                                ButtonSegment(
+                                  value: AnalyticsResolution.years,
+                                  label: Text('Years'),
+                                ),
+                              ],
+                              selected: {resolution},
+                              onSelectionChanged: (value) => setState(() {
+                                resolution = value.first;
+                              }),
+                            ),
                           ),
-                          ButtonSegment(
-                            value: AnalyticsResolution.months,
-                            label: Text('Months'),
-                          ),
-                          ButtonSegment(
-                            value: AnalyticsResolution.years,
-                            label: Text('Years'),
-                          ),
-                        ],
-                        selected: {resolution},
-                        onSelectionChanged: (value) => setState(() {
-                          resolution = value.first;
-                        }),
-                      ),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: SizedBox(
-                      height: 46,
-                      child: ListView.separated(
-                        padding: const EdgeInsets.symmetric(horizontal: 18),
-                        scrollDirection: Axis.horizontal,
-                        itemCount: categories.length + 1,
-                        separatorBuilder: (_, _) => const SizedBox(width: 8),
-                        itemBuilder: (context, index) {
-                          final value = index == 0
-                              ? null
-                              : categories[index - 1];
-                          return ChoiceChip(
-                            label: Text(value ?? 'All spending'),
-                            selected: category == value,
-                            onSelected: (_) => setState(() => category = value),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(18, 14, 18, 36),
-                    sliver: SliverList.list(
-                      children: [
-                        _SummaryBand(analytics),
-                        const SizedBox(height: 22),
-                        SectionHeading(
-                          category == null
-                              ? 'Money moving over time'
-                              : '$category spending over time',
                         ),
-                        const SizedBox(height: 8),
-                        _TrendChart(analytics),
-                        const SizedBox(height: 22),
-                        if (category == null) ...[
-                          const SectionHeading('Where your money went'),
-                          const SizedBox(height: 8),
-                          _CategoryBreakdown(analytics),
-                          const SizedBox(height: 22),
-                        ],
-                        const SectionHeading('Spending rhythm'),
-                        const SizedBox(height: 8),
-                        _WeekdayRhythm(analytics),
-                        const SizedBox(height: 18),
-                        Text(
-                          'Calculated only from your local ledger. Transfers are excluded from spending and income.',
-                          style: Theme.of(context).textTheme.bodySmall,
-                          textAlign: TextAlign.center,
+                        SliverToBoxAdapter(
+                          child: SizedBox(
+                            height: 46,
+                            child: ListView.separated(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                              ),
+                              scrollDirection: Axis.horizontal,
+                              itemCount: categories.length + 1,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(width: 8),
+                              itemBuilder: (context, index) {
+                                final value = index == 0
+                                    ? null
+                                    : categories[index - 1];
+                                return ChoiceChip(
+                                  label: Text(value ?? 'All spending'),
+                                  selected: category == value,
+                                  onSelected: (_) =>
+                                      setState(() => category = value),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(18, 14, 18, 36),
+                          sliver: SliverList.list(
+                            children: [
+                              _SummaryBand(analytics),
+                              const SizedBox(height: 22),
+                              SectionHeading(
+                                category == null
+                                    ? 'Money moving over time'
+                                    : '$category spending over time',
+                              ),
+                              const SizedBox(height: 8),
+                              _TrendChart(analytics),
+                              const SizedBox(height: 22),
+                              if (category == null) ...[
+                                const SectionHeading('Where your money went'),
+                                const SizedBox(height: 8),
+                                _CategoryBreakdown(analytics),
+                                const SizedBox(height: 22),
+                              ],
+                              const SectionHeading('Spending rhythm'),
+                              const SizedBox(height: 8),
+                              _WeekdayRhythm(analytics),
+                              const SizedBox(height: 18),
+                              Text(
+                                'Calculated only from your local ledger. Transfers are excluded from spending and income.',
+                                style: Theme.of(context).textTheme.bodySmall,
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
+            ),
+          ],
+        ),
       );
     },
+  );
+}
+
+class _BalanceSnapshot extends StatelessWidget {
+  const _BalanceSnapshot({required this.accounts});
+
+  final List<AccountViewData> accounts;
+
+  @override
+  Widget build(BuildContext context) {
+    final currency = accounts.firstOrNull?.currency ?? 'PKR';
+    final available = accounts
+        .where((account) => account.isIncluded)
+        .fold<int>(0, (sum, account) => sum + account.balance.minorUnits);
+    final savings = accounts
+        .where((account) => !account.isIncluded)
+        .fold<int>(0, (sum, account) => sum + account.balance.minorUnits);
+    final total = available + savings;
+    final totalMoney = MoneyViewData(total, currency: currency);
+    final availableMoney = MoneyViewData(available, currency: currency);
+    final savingsMoney = MoneyViewData(savings, currency: currency);
+    return Semantics(
+      container: true,
+      label:
+          'Total tracked ${formatMoney(totalMoney)}. Available to spend ${formatMoney(availableMoney)}. Savings ${formatMoney(savingsMoney)}.',
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: ExcludeSemantics(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Total tracked',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  formatMoney(totalMoney),
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _BalancePart(
+                        label: 'Available to spend',
+                        value: availableMoney,
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 38,
+                      color: SpendWiseColors.border,
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _BalancePart(
+                        label: 'Savings',
+                        value: savingsMoney,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BalancePart extends StatelessWidget {
+  const _BalancePart({required this.label, required this.value});
+
+  final String label;
+  final MoneyViewData value;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(label, style: Theme.of(context).textTheme.bodySmall),
+      const SizedBox(height: 3),
+      Text(
+        formatMoney(value),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
+    ],
   );
 }
 

@@ -26,7 +26,8 @@ A bank-app debit, an SMS alert for the same debit, and a wallet credit can descr
 - Everyday and savings accounts with separate available/saved totals
 - Manual income/expense/transfer entry, ledger search, and filters
 - Conservative CSV, XLSX, and XLS statement import with local CSV export
-- Editable CSV mappings, remembered statement formats, duplicate previews, and import batches
+- Smart bank-table detection skips statement titles, account metadata, and blank rows before the real transaction header
+- Editable column mappings, remembered statement formats, duplicate previews, and import batches
 - Evidence timelines, source health, category analytics, filtered CSV/JSON export, and removable demo data
 - One-action local data erasure
 
@@ -56,7 +57,7 @@ The debug APK is written to `build/app/outputs/flutter-apk/app-debug.apk`.
 
 ## First run
 
-1. Add the bank, wallet, cash, card, or savings accounts you want to track. Savings remain visible but are excluded from **Available to spend**.
+1. Add the bank, wallet, cash, card, or savings accounts you want to track. Savings remain in **Accounts** and the combined **Insights** total, stay excluded from **Available to spend**, and can optionally be shown on Home.
 2. Open Settings → Notification access and grant Android notification-listener access.
 3. Enable only the financial source apps you want SpendWise to observe.
 4. Use the ledger normally; uncertain evidence appears in Review.
