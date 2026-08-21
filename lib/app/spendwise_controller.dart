@@ -840,13 +840,17 @@ final class SpendWiseController extends ChangeNotifier
   @override
   Future<void> commitCsvImport(CsvImportDraft draft) => _runBusy(() async {
     final prepared = _prepareStatementImport(draft);
-    for (final sheet in prepared.sheets) {
-      sheet.wizard.commit(
-        preview: sheet.preview,
-        accountId: sheet.sheet.accountId,
-        mappingName: '${draft.sourceLabel} · ${sheet.sheet.sheetName}',
-      );
-    }
+    _ledger.runAtomic(() {
+      for (final sheet in prepared.sheets) {
+        sheet.wizard.commit(
+          preview: sheet.preview,
+          accountId: sheet.sheet.accountId,
+          mappingName: '${draft.sourceLabel} · ${sheet.sheet.sheetName}',
+          reconcile: false,
+        );
+      }
+      _ledger.finishBatch(insideTransaction: true);
+    });
   });
 
   String? _batchDuplicateKey(String accountId, CsvPreviewRow row) {
