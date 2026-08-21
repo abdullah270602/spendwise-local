@@ -53,6 +53,14 @@ class MainActivity : FlutterActivity() {
                     SpendWiseNotificationListenerService.requestConfiguredSourcesSync()
                     result.success(true)
                 }
+                "setNotificationSourceEnabled" -> {
+                    val packageName = call.argument<String>("packageName").orEmpty()
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    val packages = NotificationSourceStore(applicationContext)
+                        .setConfigured(packageName, enabled)
+                    SpendWiseNotificationListenerService.requestConfiguredSourcesSync()
+                    result.success(packages.sorted())
+                }
                 "clearNotificationData" -> {
                     NotificationEventStore(applicationContext).use { it.clear() }
                     NotificationSourceStore(applicationContext).clear()

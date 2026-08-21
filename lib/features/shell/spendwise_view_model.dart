@@ -147,6 +147,7 @@ class SourceViewData {
     this.health = SourceHealth.idle,
     this.observationCount = 0,
     this.statusDetail = '',
+    this.iconPng,
   });
   final String packageName;
   final String label;
@@ -155,6 +156,7 @@ class SourceViewData {
   final SourceHealth health;
   final int observationCount;
   final String statusDetail;
+  final Uint8List? iconPng;
 }
 
 @immutable

@@ -43,4 +43,25 @@ void main() {
 
     await const NotificationBridge().acknowledge([3, 7]);
   });
+
+  test(
+    'atomically toggles one source and returns the persisted allowlist',
+    () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            expect(call.method, 'setNotificationSourceEnabled');
+            expect(call.arguments, {
+              'packageName': 'pk.example.bank',
+              'enabled': true,
+            });
+            return ['pk.example.bank', 'com.google.android.apps.messaging'];
+          });
+
+      final configured = await const NotificationBridge().setSourceEnabled(
+        'pk.example.bank',
+        true,
+      );
+      expect(configured, contains('pk.example.bank'));
+    },
+  );
 }

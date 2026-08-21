@@ -10,3 +10,4 @@ export 'parsing/notification_parser.dart';
 export 'parsing/parser_definition.dart';
 export 'parsers/pakistan/default_parsers.dart';
 export 'reconciliation/reconciler.dart';
+export 'categories/category_classifier.dart';
