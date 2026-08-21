@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spendwise/app/theme.dart';
+import 'package:spendwise/features/accounts/accounts_screen.dart';
 import 'package:spendwise/features/shell/spendwise_shell.dart';
 import 'package:spendwise/features/shell/spendwise_view_model.dart';
 import 'package:spendwise/features/onboarding/onboarding_screen.dart';
@@ -116,6 +117,70 @@ void main() {
     expect(find.text('Transfer'), findsOneWidget);
     expect(find.text('expense'), findsNothing);
   });
+
+  testWidgets('first account accepts grouped balance and closes cleanly', (
+    tester,
+  ) async {
+    final viewModel = _AccountCreateViewModel();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: AnimatedBuilder(
+          animation: viewModel,
+          builder: (_, _) => AccountsScreen(viewModel: viewModel),
+        ),
+      ),
+    );
+
+    expect(
+      find.ancestor(
+        of: find.text('Add your first account'),
+        matching: find.byType(Center),
+      ),
+      findsWidgets,
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Add account'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Account name'),
+      'UBL',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Opening balance'),
+      '477379',
+    );
+    expect(find.text('477,379'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Add account').last);
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('UBL'), findsOneWidget);
+    expect(find.text('PKR 477,379'), findsOneWidget);
+  });
+}
+
+class _AccountCreateViewModel extends _FakeViewModel {
+  List<AccountViewData> _accounts = const [];
+
+  @override
+  List<AccountViewData> get accounts => _accounts;
+
+  @override
+  Future<void> addAccount(
+    String name,
+    String type,
+    MoneyViewData openingBalance,
+  ) async {
+    _accounts = [
+      AccountViewData(
+        id: 'created',
+        name: name,
+        type: type,
+        balance: openingBalance,
+      ),
+    ];
+    notifyListeners();
+  }
 }
 
 class _EmptyViewModel extends _FakeViewModel {
