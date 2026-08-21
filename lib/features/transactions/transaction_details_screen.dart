@@ -92,7 +92,7 @@ class TransactionDetailsScreen extends StatelessWidget {
           Card(
             child: Column(
               children: [
-                _Detail('Type', transaction.kind.name),
+                _Detail('Type', titleCase(transaction.kind.name)),
                 _Detail('Category', transaction.category),
                 _Detail(
                   'Account',
@@ -127,16 +127,18 @@ class TransactionDetailsScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${transaction.evidenceCount} evidence ${transaction.evidenceCount == 1 ? 'item' : 'items'}',
+                          transaction.evidenceCount == 0
+                              ? 'No linked evidence'
+                              : '${transaction.evidenceCount} evidence ${transaction.evidenceCount == 1 ? 'item' : 'items'}',
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 3),
-                        Text(
-                          transaction.evidenceCount > 1
-                              ? 'Multiple observations support this transaction.'
-                              : 'This transaction currently has one supporting observation.',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
+                        Text(switch (transaction.evidenceCount) {
+                          0 => 'Manual and older transactions may not have a linked notification or import.',
+                          1 => 'One notification or import supports this transaction.',
+                          _ =>
+                            'Multiple observations support this transaction.',
+                        }, style: Theme.of(context).textTheme.bodySmall),
                       ],
                     ),
                   ),
@@ -151,12 +153,6 @@ class TransactionDetailsScreen extends StatelessWidget {
                 item: transaction.evidence[i],
                 isLast: i == transaction.evidence.length - 1,
               ),
-          ] else ...[
-            const SizedBox(height: 10),
-            Text(
-              'Detailed source evidence is unavailable for this legacy record.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
           ],
         ],
       ),
@@ -202,97 +198,82 @@ class TransactionDetailsScreen extends StatelessWidget {
       isScrollControlled: true,
       showDragHandle: true,
       builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setModalState) => Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            0,
-            20,
-            MediaQuery.viewInsetsOf(context).bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Edit classification',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Change the type, category, or account. Original source evidence stays unchanged.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 18),
-              SegmentedButton<TransactionKind>(
-                segments: const [
-                  ButtonSegment(
-                    value: TransactionKind.expense,
-                    label: Text('Expense'),
-                  ),
-                  ButtonSegment(
-                    value: TransactionKind.income,
-                    label: Text('Income'),
-                  ),
-                  ButtonSegment(
-                    value: TransactionKind.transfer,
-                    label: Text('Transfer'),
-                  ),
-                ],
-                selected: {kind},
-                onSelectionChanged: (value) =>
-                    setModalState(() => kind = value.first),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: category,
-                decoration: const InputDecoration(labelText: 'Category'),
-                items:
-                    {
-                          'Food & dining',
-                          'Shopping',
-                          'Transport',
-                          'Bills & utilities',
-                          'Entertainment',
-                          'Subscriptions & digital services',
-                          'Cash withdrawal',
-                          'Fees',
-                          'Income',
-                          'Transfer',
-                          'Other',
-                          transaction.category,
-                        }
-                        .map(
-                          (value) => DropdownMenuItem(
-                            value: value,
-                            child: Text(value),
-                          ),
-                        )
-                        .toList(),
-                onChanged: (value) => category = value ?? category,
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: accountId,
-                decoration: const InputDecoration(labelText: 'Account'),
-                items: viewModel.accounts
-                    .map(
-                      (value) => DropdownMenuItem(
-                        value: value.id,
-                        child: Text(value.name),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) => accountId = value,
-              ),
-              if (kind == TransactionKind.transfer) ...[
+        builder: (context, setModalState) => SafeArea(
+          top: false,
+          minimum: const EdgeInsets.only(bottom: 16),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              0,
+              20,
+              MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Edit classification',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Change the type, category, or account. Original source evidence stays unchanged.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 18),
+                SegmentedButton<TransactionKind>(
+                  segments: const [
+                    ButtonSegment(
+                      value: TransactionKind.expense,
+                      label: Text('Expense'),
+                    ),
+                    ButtonSegment(
+                      value: TransactionKind.income,
+                      label: Text('Income'),
+                    ),
+                    ButtonSegment(
+                      value: TransactionKind.transfer,
+                      label: Text('Transfer'),
+                    ),
+                  ],
+                  selected: {kind},
+                  onSelectionChanged: (value) =>
+                      setModalState(() => kind = value.first),
+                ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  initialValue: toAccountId,
-                  decoration: const InputDecoration(
-                    labelText: 'Destination account',
-                  ),
+                  initialValue: category,
+                  decoration: const InputDecoration(labelText: 'Category'),
+                  items:
+                      {
+                            'Food & dining',
+                            'Shopping',
+                            'Transport',
+                            'Bills & utilities',
+                            'Entertainment',
+                            'Subscriptions & digital services',
+                            'Cash withdrawal',
+                            'Fees',
+                            'Income',
+                            'Transfer',
+                            'Other',
+                            transaction.category,
+                          }
+                          .map(
+                            (value) => DropdownMenuItem(
+                              value: value,
+                              child: Text(value),
+                            ),
+                          )
+                          .toList(),
+                  onChanged: (value) => category = value ?? category,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: accountId,
+                  decoration: const InputDecoration(labelText: 'Account'),
                   items: viewModel.accounts
-                      .where((value) => value.id != accountId)
                       .map(
                         (value) => DropdownMenuItem(
                           value: value.id,
@@ -300,43 +281,62 @@ class TransactionDetailsScreen extends StatelessWidget {
                         ),
                       )
                       .toList(),
-                  onChanged: (value) => toAccountId = value,
+                  onChanged: (value) => accountId = value,
                 ),
-              ],
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () async {
-                    try {
-                      await viewModel.uiCorrectTransaction(
-                        transaction.id,
-                        TransactionCorrectionDraft(
-                          kind: kind,
-                          category: category,
-                          accountId: accountId,
-                          toAccountId: toAccountId,
-                        ),
-                      );
-                      if (sheetContext.mounted) {
-                        Navigator.pop(sheetContext, true);
-                      }
-                    } on UnsupportedError {
-                      if (sheetContext.mounted) {
-                        ScaffoldMessenger.of(sheetContext).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'This ledger build cannot edit imported records yet.',
-                            ),
+                if (kind == TransactionKind.transfer) ...[
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: toAccountId,
+                    decoration: const InputDecoration(
+                      labelText: 'Destination account',
+                    ),
+                    items: viewModel.accounts
+                        .where((value) => value.id != accountId)
+                        .map(
+                          (value) => DropdownMenuItem(
+                            value: value.id,
+                            child: Text(value.name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) => toAccountId = value,
+                  ),
+                ],
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () async {
+                      try {
+                        await viewModel.uiCorrectTransaction(
+                          transaction.id,
+                          TransactionCorrectionDraft(
+                            kind: kind,
+                            category: category,
+                            accountId: accountId,
+                            toAccountId: toAccountId,
                           ),
                         );
+                        if (sheetContext.mounted) {
+                          Navigator.pop(sheetContext, true);
+                        }
+                      } on UnsupportedError {
+                        if (sheetContext.mounted) {
+                          ScaffoldMessenger.of(sheetContext).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'This ledger build cannot edit imported records yet.',
+                              ),
+                            ),
+                          );
+                        }
                       }
-                    }
-                  },
-                  child: const Text('Save classification'),
+                    },
+                    child: const Text('Save classification'),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

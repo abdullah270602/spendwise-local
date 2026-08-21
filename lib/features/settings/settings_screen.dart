@@ -7,9 +7,18 @@ import '../shell/spendwise_view_model.dart';
 import 'source_selection_screen.dart';
 import 'export_screen.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, required this.viewModel});
   final SpendWiseViewModel viewModel;
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  bool changingDemoData = false;
+
+  SpendWiseViewModel get viewModel => widget.viewModel;
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Settings & privacy')),
@@ -93,17 +102,17 @@ class SettingsScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 22),
-        const SectionHeading('Development'),
+        const SectionHeading('Sample data'),
         const SizedBox(height: 8),
         Card(
           child: SwitchListTile(
             secondary: const Icon(Icons.science_outlined),
-            title: const Text('Demo data'),
+            title: const Text('Demo transactions'),
             subtitle: const Text(
               'Use clearly labelled sample transactions for previews',
             ),
             value: viewModel.uiDemoDataEnabled,
-            onChanged: viewModel.uiSetDemoDataEnabled,
+            onChanged: changingDemoData ? null : _setDemoDataEnabled,
           ),
         ),
         const SizedBox(height: 22),
@@ -147,29 +156,65 @@ class SettingsScreen extends StatelessWidget {
       ],
     ),
   );
-  void _confirmErase(BuildContext context) => showDialog<void>(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: const Text('Erase all local data?'),
-      content: const Text(
-        'This permanently removes accounts, evidence, transactions, rules, and settings from this device.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialogContext),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          style: FilledButton.styleFrom(
-            backgroundColor: SpendWiseColors.expense,
+  Future<void> _setDemoDataEnabled(bool enabled) async {
+    setState(() => changingDemoData = true);
+    try {
+      await viewModel.uiSetDemoDataEnabled(enabled);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not update sample data: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => changingDemoData = false);
+    }
+  }
+
+  Future<void> _confirmErase(BuildContext context) async {
+    var erasing = false;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Erase all local data?'),
+          content: const Text(
+            'This permanently removes accounts, evidence, transactions, rules, and settings from this device.',
           ),
-          onPressed: () async {
-            await viewModel.eraseAllData();
-            if (dialogContext.mounted) Navigator.pop(dialogContext);
-          },
-          child: const Text('Erase everything'),
+          actions: [
+            TextButton(
+              onPressed: erasing ? null : () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: SpendWiseColors.expense,
+              ),
+              onPressed: erasing
+                  ? null
+                  : () async {
+                      setDialogState(() => erasing = true);
+                      try {
+                        await viewModel.eraseAllData();
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext);
+                        }
+                      } catch (error) {
+                        if (dialogContext.mounted) {
+                          setDialogState(() => erasing = false);
+                          ScaffoldMessenger.of(dialogContext).showSnackBar(
+                            SnackBar(
+                              content: Text('Could not erase data: $error'),
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: Text(erasing ? 'Erasing…' : 'Erase everything'),
+            ),
+          ],
         ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
