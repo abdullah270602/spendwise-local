@@ -7,6 +7,7 @@ import 'package:spendwise/features/insights/insights_screen.dart';
 import 'package:spendwise/features/shell/spendwise_shell.dart';
 import 'package:spendwise/features/shell/spendwise_view_model.dart';
 import 'package:spendwise/features/onboarding/onboarding_screen.dart';
+import 'package:spendwise/features/review/review_inbox_screen.dart';
 import 'package:spendwise/features/settings/export_screen.dart';
 import 'package:spendwise/features/transactions/transaction_details_screen.dart';
 
@@ -166,6 +167,29 @@ void main() {
     expect(
       find.text('CSV, XLSX, or XLS · read only on this device'),
       findsNothing,
+    );
+  });
+
+  testWidgets('review can recover currently visible notifications', (
+    tester,
+  ) async {
+    final model = _BatchImportViewModel();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: ReviewInboxScreen(viewModel: model),
+      ),
+    );
+
+    expect(find.text('Scan notification tray'), findsOneWidget);
+    expect(find.textContaining('Cleared or dismissed'), findsOneWidget);
+    await tester.tap(find.text('Scan notification tray'));
+    await tester.pumpAndSettle();
+
+    expect(model.trayScans, 1);
+    expect(
+      find.text('Recovered 2 new notifications from the tray.'),
+      findsOneWidget,
     );
   });
 
@@ -424,6 +448,7 @@ class _AccountSourcesViewModel extends _FakeViewModel {
 
 class _BatchImportViewModel extends _FakeViewModel
     implements SpendWiseAdvancedViewModel {
+  int trayScans = 0;
   @override
   List<AccountViewData> get accounts => const [
     AccountViewData(
@@ -507,6 +532,18 @@ class _BatchImportViewModel extends _FakeViewModel
   );
   @override
   Future<void> restoreAccount(String id) async {}
+  @override
+  Future<NotificationTrayScanViewData> scanNotificationTray() async {
+    trayScans++;
+    return const NotificationTrayScanViewData(
+      status: NotificationTrayScanViewStatus.completed,
+      activeCount: 4,
+      eligibleCount: 3,
+      queuedCount: 2,
+      duplicateCount: 1,
+    );
+  }
+
   @override
   Future<void> setDemoDataEnabled(bool enabled) async {}
   @override

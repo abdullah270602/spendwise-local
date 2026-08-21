@@ -27,20 +27,167 @@ class ReviewInboxScreen extends StatelessWidget {
         ),
       ),
     ),
-    body: viewModel.reviews.isEmpty
-        ? const EmptyState(
+    body: ListView(
+      padding: const EdgeInsets.fromLTRB(18, 12, 18, 100),
+      children: [
+        _NotificationRecoveryPanel(viewModel: viewModel),
+        const SizedBox(height: 20),
+        if (viewModel.reviews.isEmpty)
+          const EmptyState(
             icon: Icons.verified_outlined,
             title: 'You’re all caught up',
             message:
                 'New uncertain matches and unparsed events will appear here.',
           )
-        : ListView.builder(
-            padding: const EdgeInsets.fromLTRB(18, 12, 18, 100),
-            itemCount: viewModel.reviews.length,
-            itemBuilder: (context, i) =>
-                _ReviewCard(item: viewModel.reviews[i], viewModel: viewModel),
-          ),
+        else
+          for (final item in viewModel.reviews)
+            _ReviewCard(item: item, viewModel: viewModel),
+      ],
+    ),
   );
+}
+
+class _NotificationRecoveryPanel extends StatefulWidget {
+  const _NotificationRecoveryPanel({required this.viewModel});
+
+  final SpendWiseViewModel viewModel;
+
+  @override
+  State<_NotificationRecoveryPanel> createState() =>
+      _NotificationRecoveryPanelState();
+}
+
+class _NotificationRecoveryPanelState
+    extends State<_NotificationRecoveryPanel> {
+  bool _scanning = false;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: SpendWiseColors.surfaceRaised,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: SpendWiseColors.border),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.notification_add_outlined,
+                color: SpendWiseColors.accent,
+                size: 22,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Missing a transaction?',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Check enabled-source notifications still visible in your Android tray. Already captured alerts are safely ignored.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _scanning ? null : _scan,
+              icon: _scanning
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh_rounded),
+              label: Text(
+                _scanning ? 'Scanning tray…' : 'Scan notification tray',
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Cleared or dismissed notifications cannot be recovered by Android.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Future<void> _scan() async {
+    setState(() => _scanning = true);
+    try {
+      final result = await widget.viewModel.uiScanNotificationTray();
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      switch (result.status) {
+        case NotificationTrayScanViewStatus.accessRequired:
+          messenger.showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Notification access is required before SpendWise can scan the tray.',
+              ),
+              action: SnackBarAction(
+                label: 'Open settings',
+                onPressed: widget.viewModel.requestNotificationAccess,
+              ),
+            ),
+          );
+        case NotificationTrayScanViewStatus.listenerUnavailable:
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Android is reconnecting SpendWise. Wait a moment, then scan again.',
+              ),
+            ),
+          );
+        case NotificationTrayScanViewStatus.completed:
+          messenger.showSnackBar(
+            SnackBar(content: Text(_completedMessage(result))),
+          );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'The tray could not be scanned. Check notification access and try again.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _scanning = false);
+    }
+  }
+
+  String _completedMessage(NotificationTrayScanViewData result) {
+    if (result.failedCount > 0) {
+      return 'Recovered ${result.queuedCount} new ${_plural(result.queuedCount, 'notification')}; ${result.failedCount} could not be read.';
+    }
+    if (result.queuedCount > 0) {
+      return 'Recovered ${result.queuedCount} new ${_plural(result.queuedCount, 'notification')} from the tray.';
+    }
+    if (result.eligibleCount > 0) {
+      return 'Checked ${result.eligibleCount} ${_plural(result.eligibleCount, 'notification')}. Everything visible was already captured.';
+    }
+    return 'No enabled-source notifications are currently visible in the tray.';
+  }
+
+  String _plural(int count, String singular) =>
+      count == 1 ? singular : '${singular}s';
 }
 
 class _ReviewCard extends StatelessWidget {

@@ -16,6 +16,30 @@ final class NotificationIngestionHealth {
   final DateTime? lastCaptureAt;
 }
 
+enum NotificationTrayScanStatus {
+  completed,
+  accessRequired,
+  listenerUnavailable,
+}
+
+final class NotificationTrayScanResult {
+  const NotificationTrayScanResult({
+    required this.status,
+    this.activeCount = 0,
+    this.eligibleCount = 0,
+    this.queuedCount = 0,
+    this.duplicateCount = 0,
+    this.failedCount = 0,
+  });
+
+  final NotificationTrayScanStatus status;
+  final int activeCount;
+  final int eligibleCount;
+  final int queuedCount;
+  final int duplicateCount;
+  final int failedCount;
+}
+
 final class NotificationSource {
   const NotificationSource({
     required this.packageName,
@@ -109,6 +133,29 @@ final class NotificationBridge {
   );
 
   Future<void> clear() => _channel.invokeMethod<void>('clearNotificationData');
+
+  Future<NotificationTrayScanResult> scanCurrentTray() async {
+    final raw = await _channel.invokeMapMethod<Object?, Object?>(
+      'scanCurrentNotificationTray',
+    );
+    final row = raw ?? const <Object?, Object?>{};
+    final status = switch (row['status']) {
+      'completed' => NotificationTrayScanStatus.completed,
+      'accessRequired' => NotificationTrayScanStatus.accessRequired,
+      'listenerUnavailable' => NotificationTrayScanStatus.listenerUnavailable,
+      _ => throw const FormatException(
+        'Android returned an invalid tray scan result.',
+      ),
+    };
+    return NotificationTrayScanResult(
+      status: status,
+      activeCount: (row['activeCount'] as num?)?.toInt() ?? 0,
+      eligibleCount: (row['eligibleCount'] as num?)?.toInt() ?? 0,
+      queuedCount: (row['queuedCount'] as num?)?.toInt() ?? 0,
+      duplicateCount: (row['duplicateCount'] as num?)?.toInt() ?? 0,
+      failedCount: (row['failedCount'] as num?)?.toInt() ?? 0,
+    );
+  }
 
   Future<NotificationIngestionHealth> health() async {
     final raw = await _channel.invokeMapMethod<Object?, Object?>(

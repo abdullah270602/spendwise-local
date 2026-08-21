@@ -72,14 +72,51 @@ class SpendWiseNotificationListenerService : NotificationListenerService() {
         rankingMap: RankingMap?,
         reason: String,
         capturedAt: Long,
-    ) {
-        if (status.packageName == packageName) return
-        if (!sourceStore.isConfigured(status.packageName)) return
+    ): CaptureOutcome {
+        if (status.packageName == packageName) return CaptureOutcome.SKIPPED
+        if (!sourceStore.isConfigured(status.packageName)) return CaptureOutcome.SKIPPED
         val snapshot = runCatching {
             NotificationSnapshotExtractor.extract(status, rankingMap, reason, capturedAt)
-        }.getOrNull() ?: return
-        eventStore.enqueue(snapshot)
-        sourceStore.markCapture(capturedAt)
+        }.getOrNull() ?: return CaptureOutcome.FAILED
+        return when (eventStore.enqueue(snapshot)) {
+            NotificationEnqueueResult.INSERTED -> {
+                sourceStore.markCapture(capturedAt)
+                CaptureOutcome.INSERTED
+            }
+            NotificationEnqueueResult.DUPLICATE -> CaptureOutcome.DUPLICATE
+            NotificationEnqueueResult.ENCRYPTION_FAILED -> CaptureOutcome.FAILED
+        }
+    }
+
+    private fun scanCurrentTray(): NotificationTrayScanResult {
+        val capturedAt = System.currentTimeMillis()
+        val active = runCatching { activeNotifications?.toList().orEmpty() }
+            .getOrElse { throw IllegalStateException("Android could not read the notification tray", it) }
+        val eligible = active.filter {
+            it.packageName != packageName && sourceStore.isConfigured(it.packageName)
+        }
+        val rankings = runCatching { currentRanking }.getOrNull()
+        return writer.submit<NotificationTrayScanResult> {
+            var queued = 0
+            var duplicates = 0
+            var failed = 0
+            eligible.forEach { status ->
+                when (captureNow(status, rankings, "manual_recovery", capturedAt)) {
+                    CaptureOutcome.INSERTED -> queued++
+                    CaptureOutcome.DUPLICATE -> duplicates++
+                    CaptureOutcome.FAILED -> failed++
+                    CaptureOutcome.SKIPPED -> Unit
+                }
+            }
+            sourceStore.markActiveSync(capturedAt)
+            NotificationTrayScanResult(
+                activeCount = active.size,
+                eligibleCount = eligible.size,
+                queuedCount = queued,
+                duplicateCount = duplicates,
+                failedCount = failed,
+            )
+        }.get(MANUAL_SCAN_TIMEOUT_SECONDS, TimeUnit.SECONDS)
     }
 
     override fun onDestroy() {
@@ -91,6 +128,7 @@ class SpendWiseNotificationListenerService : NotificationListenerService() {
 
     companion object {
         private const val WRITER_QUEUE_CAPACITY = 256
+        private const val MANUAL_SCAN_TIMEOUT_SECONDS = 15L
 
         @Volatile
         private var activeInstance: SpendWiseNotificationListenerService? = null
@@ -100,5 +138,18 @@ class SpendWiseNotificationListenerService : NotificationListenerService() {
             listener.syncActiveNotifications("source_configuration_changed")
             return true
         }
+
+        internal fun requestManualRecoveryScan(): NotificationTrayScanResult? =
+            activeInstance?.scanCurrentTray()
     }
 }
+
+internal enum class CaptureOutcome { INSERTED, DUPLICATE, FAILED, SKIPPED }
+
+internal data class NotificationTrayScanResult(
+    val activeCount: Int,
+    val eligibleCount: Int,
+    val queuedCount: Int,
+    val duplicateCount: Int,
+    val failedCount: Int,
+)
