@@ -13,7 +13,19 @@ internal class NotificationSourceStore(context: Context) {
 
     fun replaceConfiguredPackages(packages: Collection<String>) {
         val normalized = packages.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
-        preferences.edit().putStringSet(KEY_PACKAGES, normalized).apply()
+        check(preferences.edit().putStringSet(KEY_PACKAGES, normalized).commit()) {
+            "Unable to persist notification sources"
+        }
+    }
+
+    fun setConfigured(packageName: String, enabled: Boolean): Set<String> {
+        val normalized = packageName.trim()
+        require(normalized.isNotEmpty()) { "Package name is required" }
+        val updated = configuredPackages().toMutableSet().apply {
+            if (enabled) add(normalized) else remove(normalized)
+        }.toSet()
+        replaceConfiguredPackages(updated)
+        return updated
     }
 
     fun isConfigured(packageName: String): Boolean = configuredPackages().contains(packageName)

@@ -292,6 +292,7 @@ final class SpendWiseController extends ChangeNotifier
           enabled: item.configured,
           lastSeenAt: item.lastObservedAt?.toLocal(),
           observationCount: item.observationCount,
+          iconPng: item.iconPng,
           health: !_notificationAccess
               ? SourceHealth.permissionRequired
               : !item.installed || !item.enabled
@@ -319,12 +320,7 @@ final class SpendWiseController extends ChangeNotifier
 
   @override
   Future<void> setSourceEnabled(String packageName, bool enabled) async {
-    final selected = _nativeSources
-        .where((item) => item.configured)
-        .map((item) => item.packageName)
-        .toSet();
-    enabled ? selected.add(packageName) : selected.remove(packageName);
-    await _bridge.setSources(selected);
+    await _bridge.setSourceEnabled(packageName, enabled);
     await _refreshPlatform();
   }
 

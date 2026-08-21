@@ -318,6 +318,15 @@ final class LocalLedger {
         kind TEXT NOT NULL CHECK(kind IN ('expense','income','both')),
         is_system INTEGER NOT NULL DEFAULT 0
       );
+      CREATE TABLE IF NOT EXISTS category_rules (
+        id TEXT PRIMARY KEY,
+        normalized_match TEXT NOT NULL UNIQUE,
+        category_id TEXT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+        source TEXT NOT NULL CHECK(source IN ('user','system')),
+        priority INTEGER NOT NULL DEFAULT 100,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS parser_definitions (
         id TEXT PRIMARY KEY,
         version INTEGER NOT NULL,
@@ -391,6 +400,7 @@ final class LocalLedger {
       CREATE INDEX IF NOT EXISTS raw_snapshot_key_idx ON raw_notification_snapshots(notification_key, posted_at);
       CREATE INDEX IF NOT EXISTS evidence_match_idx ON financial_evidence(currency, amount_minor, direction, occurred_at);
       CREATE INDEX IF NOT EXISTS import_hash_idx ON import_batches(file_sha256, account_id);
+      CREATE INDEX IF NOT EXISTS category_rule_match_idx ON category_rules(priority DESC, normalized_match);
     ''');
 
     _addColumn('accounts', 'institution_name', 'TEXT');
@@ -447,6 +457,7 @@ final class LocalLedger {
       "TEXT NOT NULL DEFAULT '[]'",
     );
     _addColumn('transactions', 'updated_at', 'INTEGER');
+    _addColumn('transactions', 'category_rule_id', 'TEXT');
 
     _db.execute('''
       INSERT OR IGNORE INTO categories(id,name,icon_key,color_value,kind,is_system) VALUES
@@ -454,6 +465,8 @@ final class LocalLedger {
         ('shopping','Shopping','shopping_bag',4294198070,'expense',1),
         ('transport','Transport','directions_car',4280391411,'expense',1),
         ('bills','Bills & utilities','receipt',4294940672,'expense',1),
+        ('entertainment','Entertainment','movie',4286208615,'expense',1),
+        ('subscriptions','Subscriptions & digital services','subscriptions',4288585374,'expense',1),
         ('cash','Cash withdrawal','payments',4286141768,'expense',1),
         ('fees','Fees','account_balance',4294198070,'expense',1),
         ('income','Income','trending_up',4283215696,'income',1),
@@ -470,7 +483,29 @@ final class LocalLedger {
       SELECT id,'legacy:' || source_package,created_at
       FROM accounts WHERE source_package IS NOT NULL;
     ''');
-    _db.execute('PRAGMA user_version = 2');
+    _recategorizeAutomaticTransactions();
+    _db.execute('PRAGMA user_version = 3');
+  }
+
+  void _recategorizeAutomaticTransactions() {
+    final transactions = _db
+        .select(
+          "SELECT * FROM transactions WHERE origin='automatic' AND locked=0 AND (category_id IS NULL OR category_id='other')",
+        )
+        .map(_transactionFromRow)
+        .toList(growable: false);
+    for (final transaction in transactions) {
+      final classification = _automaticCategory(transaction);
+      _db.execute(
+        'UPDATE transactions SET category_id=?,category=?,category_rule_id=? WHERE id=?',
+        [
+          classification.categoryId,
+          classification.categoryId,
+          classification.ruleId,
+          transaction.id,
+        ],
+      );
+    }
   }
 
   void _addColumn(String table, String column, String definition) {
@@ -1607,12 +1642,19 @@ final class LocalLedger {
             fromAccountId == toAccountId)) {
       throw ArgumentError('Transfers require two different accounts.');
     }
+    final learnedRuleId = categoryId == null
+        ? null
+        : _rememberUserCategoryRule(
+            transactionId: id,
+            categoryId: categoryId,
+            fallbackDescription: description,
+          );
     _db.execute(
       '''
       UPDATE transactions SET
         kind=?,amount_minor=?,currency=?,occurred_at=?,account_id=?,
         from_account_id=?,to_account_id=?,description=?,category_id=?,
-        category=?,needs_review=0,locked=1,reconcile_state='confirmed',
+        category=?,category_rule_id=?,needs_review=0,locked=1,reconcile_state='confirmed',
         confidence=100,updated_at=?
       WHERE id=?
       ''',
@@ -1627,10 +1669,55 @@ final class LocalLedger {
         description.trim(),
         categoryId,
         categoryId,
+        learnedRuleId,
         _now,
         id,
       ],
     );
+  }
+
+  String? _rememberUserCategoryRule({
+    required String transactionId,
+    required String categoryId,
+    required String fallbackDescription,
+  }) {
+    final transaction = _db.select(
+      'SELECT origin FROM transactions WHERE id = ? LIMIT 1',
+      [transactionId],
+    );
+    String? merchant;
+    if (transaction.isNotEmpty &&
+        transaction.first['origin'] == TransactionOrigin.manual.name) {
+      merchant = fallbackDescription;
+    } else {
+      final candidates = _db.select(
+        '''
+            SELECT c.counterparty FROM transaction_evidence link
+            JOIN event_candidates c ON c.observation_id=link.observation_id
+            WHERE link.transaction_id=? AND c.counterparty IS NOT NULL
+              AND TRIM(c.counterparty) != '' LIMIT 1
+            ''',
+        [transactionId],
+      );
+      merchant = candidates.isEmpty
+          ? null
+          : candidates.first['counterparty'] as String?;
+    }
+    final normalized = CategoryClassifier.normalize(merchant ?? '');
+    if (normalized.length < 2 || normalized.length > 80) return null;
+    final id = 'user-category:${sha256.convert(utf8.encode(normalized))}';
+    _db.execute(
+      '''
+      INSERT INTO category_rules(
+        id,normalized_match,category_id,source,priority,created_at,updated_at
+      ) VALUES (?,? ,?,'user',1000,?,?)
+      ON CONFLICT(normalized_match) DO UPDATE SET
+        category_id=excluded.category_id,source='user',priority=1000,
+        updated_at=excluded.updated_at
+      ''',
+      [id, normalized, categoryId, _now, _now],
+    );
+    return id;
   }
 
   void dismissUnparsed() {
@@ -1771,10 +1858,17 @@ final class LocalLedger {
     );
     _db.execute('BEGIN IMMEDIATE');
     try {
-      _db.execute("DELETE FROM transactions WHERE origin = 'automatic'");
+      _db.execute(
+        "DELETE FROM transactions WHERE origin = 'automatic' AND locked = 0",
+      );
       for (final item in result.transactions.where(
         (item) => item.origin == TransactionOrigin.automatic,
       )) {
+        final locked = _db.select(
+          'SELECT 1 FROM transactions WHERE id = ? AND locked = 1 LIMIT 1',
+          [item.id],
+        );
+        if (locked.isNotEmpty) continue;
         _insertTransaction(item);
       }
       for (final decision in result.decisions) {
@@ -1805,8 +1899,9 @@ final class LocalLedger {
   }
 
   void _insertTransaction(CanonicalTransaction item) {
+    final classification = _automaticCategory(item);
     _db.execute(
-      'INSERT OR REPLACE INTO transactions(id,kind,amount_minor,currency,occurred_at,account_id,from_account_id,to_account_id,description,needs_review,locked,origin,reconcile_state,confidence,match_reasons_json,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      'INSERT OR REPLACE INTO transactions(id,kind,amount_minor,currency,occurred_at,account_id,from_account_id,to_account_id,description,needs_review,locked,origin,category_id,category,category_rule_id,reconcile_state,confidence,match_reasons_json,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       [
         item.id,
         item.kind.name,
@@ -1820,6 +1915,9 @@ final class LocalLedger {
         item.needsReview ? 1 : 0,
         item.locked ? 1 : 0,
         item.origin.name,
+        classification.categoryId,
+        classification.categoryId,
+        classification.ruleId,
         item.effectiveReconciliationState.name,
         item.effectiveReconciliationState == ReconciliationState.confirmed
             ? 100
@@ -1836,6 +1934,48 @@ final class LocalLedger {
         [item.id, evidenceId],
       );
     }
+  }
+
+  CategoryClassification _automaticCategory(CanonicalTransaction item) {
+    final ids = item.evidenceIds.toList(growable: false);
+    final text = <String>[item.description ?? ''];
+    final types = <CandidateType>[];
+    if (ids.isNotEmpty) {
+      final placeholders = List.filled(ids.length, '?').join(',');
+      for (final row in _db.select('''
+        SELECT r.title,r.body,c.counterparty,c.description,c.candidate_type
+        FROM raw_observations r
+        LEFT JOIN event_candidates c ON c.observation_id=r.id
+        WHERE r.id IN ($placeholders)
+        ''', ids)) {
+        text.addAll([
+          row['title'] as String? ?? '',
+          row['body'] as String? ?? '',
+          row['counterparty'] as String? ?? '',
+          row['description'] as String? ?? '',
+        ]);
+        final type = row['candidate_type'] as String?;
+        if (type != null) types.add(CandidateType.values.byName(type));
+      }
+    }
+    final normalized = CategoryClassifier.normalize(text.join(' '));
+    for (final row in _db.select(
+      'SELECT normalized_match,category_id,id FROM category_rules ORDER BY priority DESC,updated_at DESC',
+    )) {
+      final matcher = row['normalized_match'] as String;
+      if (matcher.isNotEmpty && ' $normalized '.contains(' $matcher ')) {
+        return CategoryClassification(
+          categoryId: row['category_id'] as String,
+          ruleId: row['id'] as String,
+          confidence: 1,
+        );
+      }
+    }
+    return const CategoryClassifier().classify(
+      text: text.join(' '),
+      kind: item.kind,
+      candidateTypes: types,
+    );
   }
 
   Account _accountFromRow(Row row) => Account(

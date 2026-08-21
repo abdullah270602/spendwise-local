@@ -84,6 +84,14 @@ final class NotificationBridge {
         'packageNames': packageNames.toList(growable: false),
       });
 
+  Future<Set<String>> setSourceEnabled(String packageName, bool enabled) async {
+    final configured = await _channel.invokeListMethod<String>(
+      'setNotificationSourceEnabled',
+      {'packageName': packageName, 'enabled': enabled},
+    );
+    return (configured ?? const <String>[]).toSet();
+  }
+
   Future<List<Map<String, Object?>>> peek({int limit = 500}) async {
     final rows =
         await _channel.invokeListMethod<Object?>('peekQueuedEvents', {
