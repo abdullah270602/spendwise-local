@@ -1,5 +1,13 @@
 # SpendWise
 
+**Private. Local. Yours.**
+
+[![Flutter CI](https://github.com/abdullah270602/spendwise-local/actions/workflows/flutter.yml/badge.svg)](https://github.com/abdullah270602/spendwise-local/actions/workflows/flutter.yml)
+[![Latest release](https://img.shields.io/github/v/release/abdullah270602/spendwise-local?display_name=tag)](https://github.com/abdullah270602/spendwise-local/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-60D394.svg)](LICENSE)
+
+[**Download the latest Android APK**](https://github.com/abdullah270602/spendwise-local/releases/latest/download/spendwise-local.apk)
+
 SpendWise is an Android-first, privacy-first personal finance ledger built with Flutter. It turns financial notification evidence, CSV statement rows, and manual entries into canonical local transactions.
 
 > Raw event ≠ financial transaction.
@@ -23,7 +31,16 @@ A bank-app debit, an SMS alert for the same debit, and a wallet credit can descr
 
 There is no backend, account system, telemetry, analytics, advertising, crash reporter, AI integration, or `INTERNET` permission.
 
-## Build
+## Install on Android
+
+1. Download [`spendwise-local.apk`](https://github.com/abdullah270602/spendwise-local/releases/latest/download/spendwise-local.apk).
+2. Open the downloaded file on Android 7.0 or newer.
+3. If Android asks, allow your browser or file manager to install this one unknown app.
+4. Install SpendWise, then revoke that installer permission if you no longer need it.
+
+The GitHub APK is an early community build signed with the project's development key. Android may show an unfamiliar-app warning because it is distributed outside Google Play. Verify the SHA-256 checksum published in the matching [GitHub Release](https://github.com/abdullah270602/spendwise-local/releases/latest) before installing.
+
+## Build from source
 
 Requirements: Flutter 3.47+, Dart 3.13+, Android SDK 37, JDK 17 or newer.
 
@@ -51,14 +68,6 @@ The ledger database, WAL, and journals are SQLCipher-encrypted. The native queue
 
 SpendWise protects data at rest in the app sandbox; it cannot protect an already-unlocked, compromised device.
 
-## Screenshots
-
-Screenshots are intentionally left as placeholders until release branding is finalized:
-
-- Home dashboard — `docs/screenshots/home.png`
-- Transaction evidence — `docs/screenshots/evidence.png`
-- CSV mapping wizard — `docs/screenshots/csv-import.png`
-
 ## Current limitations
 
 - Android only; iOS, web, and desktop are out of scope for V1.
@@ -76,6 +85,12 @@ Screenshots are intentionally left as placeholders until release branding is fin
 - `android/.../com/spendwise/app`: encrypted notification capture and queue
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for invariants and data flow. The exact trust boundary is documented in [SECURITY.md](SECURITY.md).
+
+## Contributing and security
+
+Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), and use sanitized fixtures only—never commit real financial notifications, statements, account numbers, or secrets.
+
+Please report vulnerabilities through a [private GitHub security advisory](https://github.com/abdullah270602/spendwise-local/security/advisories/new), not a public issue. See [SECURITY.md](SECURITY.md) for the threat model and reporting guidance.
 
 ## License
 
