@@ -108,6 +108,26 @@ final class LedgerSnapshot {
     return total;
   }
 
+  int get spendableBalanceMinor {
+    var total = 0;
+    for (final account in accounts.where(
+      (account) => account.type != AccountType.savings,
+    )) {
+      total += accountBalanceMinor(account.id);
+    }
+    return total;
+  }
+
+  int get savingsBalanceMinor {
+    var total = 0;
+    for (final account in accounts.where(
+      (account) => account.type == AccountType.savings,
+    )) {
+      total += accountBalanceMinor(account.id);
+    }
+    return total;
+  }
+
   int accountBalanceMinor(String accountId) {
     var value = openingBalances[accountId] ?? 0;
     for (final item in transactions) {
@@ -1121,12 +1141,20 @@ final class LocalLedger {
   void updateAccount({
     required String id,
     required String name,
+    required AccountType type,
     String? institutionName,
     String? accountSuffix,
   }) {
     _db.execute(
-      'UPDATE accounts SET name=?, institution_name=?, account_suffix=?, updated_at=? WHERE id=?',
-      [name.trim(), institutionName?.trim(), accountSuffix?.trim(), _now, id],
+      'UPDATE accounts SET name=?, type=?, institution_name=?, account_suffix=?, updated_at=? WHERE id=?',
+      [
+        name.trim(),
+        type.name,
+        institutionName?.trim(),
+        accountSuffix?.trim(),
+        _now,
+        id,
+      ],
     );
   }
 

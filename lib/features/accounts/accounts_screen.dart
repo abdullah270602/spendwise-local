@@ -12,6 +12,14 @@ class AccountsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final deleted = viewModel.uiLastDeletedAccount;
+    final everyday = viewModel.accounts
+        .where((account) => account.isIncluded)
+        .toList(growable: false);
+    final savings = viewModel.accounts
+        .where((account) => !account.isIncluded)
+        .toList(growable: false);
+    final everydayTotal = _sumBalances(everyday);
+    final savingsTotal = _sumBalances(savings);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Accounts'),
@@ -58,110 +66,131 @@ class AccountsScreen extends StatelessWidget {
                 ],
                 const SizedBox(height: 20),
                 if (viewModel.accounts.isNotEmpty) ...[
-                  const SectionHeading('Your accounts'),
-                  const SizedBox(height: 8),
-                ],
-                for (final account in viewModel.accounts)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Card(
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
-                        onTap: () => _editAccount(context, account),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 44,
-                                    height: 44,
-                                    decoration: BoxDecoration(
-                                      color: SpendWiseColors.accentMuted,
-                                      borderRadius: BorderRadius.circular(13),
-                                    ),
-                                    child: Icon(
-                                      account.type.toLowerCase().contains(
-                                            'cash',
-                                          )
-                                          ? Icons.payments_outlined
-                                          : Icons.account_balance_outlined,
-                                      color: SpendWiseColors.accent,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          account.name,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                        Text(
-                                          titleCase(account.type),
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .bodySmall,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text(
-                                        formatMoney(account.balance),
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      Text(
-                                        [
-                                          if (account.suffix.isNotEmpty)
-                                            '••${account.suffix}',
-                                          account.currency,
-                                        ].join(' · '),
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall,
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              if (account.sources.isNotEmpty) ...[
-                                const SizedBox(height: 12),
-                                Wrap(
-                                  spacing: 7,
-                                  runSpacing: 7,
-                                  children: [
-                                    for (final source in account.sources)
-                                      Chip(
-                                        avatar: Icon(
-                                          _sourceIcon(source.kind),
-                                          size: 15,
-                                        ),
-                                        label: Text(source.label),
-                                      ),
-                                  ],
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+                  _BalanceOverview(
+                    available: everydayTotal,
+                    savings: savingsTotal,
+                    hasSavings: savings.isNotEmpty,
                   ),
+                  const SizedBox(height: 24),
+                ],
+                if (everyday.isNotEmpty) ...[
+                  const SectionHeading('Everyday accounts'),
+                  const SizedBox(height: 8),
+                  for (final account in everyday)
+                    _accountCard(context, account),
+                ],
+                if (savings.isNotEmpty) ...[
+                  if (everyday.isNotEmpty) const SizedBox(height: 14),
+                  SectionHeading('Savings', action: formatMoney(savingsTotal)),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Set aside and tracked separately from money available to spend.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 10),
+                  for (final account in savings) _accountCard(context, account),
+                ],
               ],
             ),
     );
   }
+
+  static MoneyViewData _sumBalances(List<AccountViewData> accounts) =>
+      MoneyViewData(
+        accounts.fold<int>(
+          0,
+          (total, account) => total + account.balance.minorUnits,
+        ),
+        currency: accounts.firstOrNull?.currency ?? 'PKR',
+      );
+
+  Widget _accountCard(BuildContext context, AccountViewData account) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => _editAccount(context, account),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: SpendWiseColors.accentMuted,
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                    child: Icon(
+                      _accountIcon(account.type),
+                      color: SpendWiseColors.accent,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          account.name,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        Text(
+                          titleCase(account.type),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        formatMoney(account.balance),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      Text(
+                        [
+                          if (account.suffix.isNotEmpty) '••${account.suffix}',
+                          account.currency,
+                        ].join(' · '),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              if (account.sources.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 7,
+                  runSpacing: 7,
+                  children: [
+                    for (final source in account.sources)
+                      Chip(
+                        avatar: Icon(_sourceIcon(source.kind), size: 15),
+                        label: Text(source.label),
+                      ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
+  static IconData _accountIcon(String type) => switch (type.toLowerCase()) {
+    String value when value.contains('saving') => Icons.savings_outlined,
+    String value when value.contains('cash') => Icons.payments_outlined,
+    String value when value.contains('wallet') => Icons.wallet_outlined,
+    String value when value.contains('card') => Icons.credit_card_outlined,
+    _ => Icons.account_balance_outlined,
+  };
 
   static IconData _sourceIcon(String kind) => switch (kind.toLowerCase()) {
     'sms' || 'messages' => Icons.sms_outlined,
@@ -193,6 +222,7 @@ class AccountsScreen extends StatelessWidget {
     final name = TextEditingController(text: account.name);
     final institution = TextEditingController(text: account.institution);
     final suffix = TextEditingController(text: account.suffix);
+    var type = _typeLabel(account.type);
     final selected = account.sources
         .map((source) => source.packageName)
         .where((value) => value.isNotEmpty)
@@ -340,6 +370,26 @@ class AccountsScreen extends StatelessWidget {
                           : null,
                     ),
                     const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: type,
+                      decoration: const InputDecoration(labelText: 'Type'),
+                      items: _accountTypes
+                          .map(
+                            (value) => DropdownMenuItem(
+                              value: value,
+                              child: Text(value),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: saving
+                          ? null
+                          : (value) => setState(() => type = value ?? type),
+                    ),
+                    if (type == 'Savings') ...[
+                      const SizedBox(height: 8),
+                      const _SavingsExplanation(),
+                    ],
+                    const SizedBox(height: 12),
                     TextField(
                       controller: institution,
                       decoration: const InputDecoration(
@@ -399,6 +449,7 @@ class AccountsScreen extends StatelessWidget {
                                     account.id,
                                     AccountUpdateDraft(
                                       name: name.text.trim(),
+                                      type: type,
                                       institution: institution.text.trim(),
                                       suffix: suffix.text.trim(),
                                       sourcePackages: Set.unmodifiable(
@@ -496,13 +547,17 @@ class AccountsScreen extends StatelessWidget {
                     DropdownButtonFormField<String>(
                       initialValue: type,
                       decoration: const InputDecoration(labelText: 'Type'),
-                      items: const ['Bank', 'Wallet', 'Cash', 'Credit card']
+                      items: _accountTypes
                           .map(
                             (v) => DropdownMenuItem(value: v, child: Text(v)),
                           )
                           .toList(),
                       onChanged: (v) => setState(() => type = v ?? type),
                     ),
+                    if (type == 'Savings') ...[
+                      const SizedBox(height: 8),
+                      const _SavingsExplanation(),
+                    ],
                     const SizedBox(height: 12),
                     TextField(
                       controller: institution,
@@ -668,6 +723,123 @@ class AccountsScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+const _accountTypes = ['Bank', 'Wallet', 'Cash', 'Credit card', 'Savings'];
+
+String _typeLabel(String type) => switch (type.toLowerCase()) {
+  String value when value.contains('saving') => 'Savings',
+  String value when value.contains('wallet') => 'Wallet',
+  String value when value.contains('cash') => 'Cash',
+  String value when value.contains('card') => 'Credit card',
+  _ => 'Bank',
+};
+
+class _BalanceOverview extends StatelessWidget {
+  const _BalanceOverview({
+    required this.available,
+    required this.savings,
+    required this.hasSavings,
+  });
+
+  final MoneyViewData available;
+  final MoneyViewData savings;
+  final bool hasSavings;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    label: hasSavings
+        ? 'Available to spend ${formatMoney(available)}. Savings ${formatMoney(savings)}.'
+        : 'Available to spend ${formatMoney(available)}.',
+    child: Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Row(
+          children: [
+            Expanded(
+              child: _OverviewAmount(
+                label: 'Available to spend',
+                value: available,
+                icon: Icons.account_balance_wallet_outlined,
+              ),
+            ),
+            if (hasSavings) ...[
+              Container(
+                width: 1,
+                height: 54,
+                color: Theme.of(context).dividerColor,
+              ),
+              const SizedBox(width: 18),
+              Expanded(
+                child: _OverviewAmount(
+                  label: 'Savings',
+                  value: savings,
+                  icon: Icons.savings_outlined,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _OverviewAmount extends StatelessWidget {
+  const _OverviewAmount({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final String label;
+  final MoneyViewData value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: SpendWiseColors.accent),
+        const SizedBox(height: 9),
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
+        const SizedBox(height: 2),
+        Text(
+          formatMoney(value),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+        ),
+      ],
+    ),
+  );
+}
+
+class _SavingsExplanation extends StatelessWidget {
+  const _SavingsExplanation();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: SpendWiseColors.accentMuted,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: const Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.savings_outlined, size: 19, color: SpendWiseColors.accent),
+        SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            'Savings stay visible here, but are excluded from Available to spend.',
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 enum _AccountAction { delete }

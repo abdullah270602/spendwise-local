@@ -207,11 +207,15 @@ class DashboardViewData {
     required this.incomeThisMonth,
     required this.spendingThisMonth,
     required this.monthlyChangePercent,
+    this.spendableBalance,
+    this.savingsBalance,
     this.netCashFlow,
     this.categorySpending = const [],
     this.recentTransfers = const [],
   });
   final MoneyViewData netWorth;
+  final MoneyViewData? spendableBalance;
+  final MoneyViewData? savingsBalance;
   final MoneyViewData incomeThisMonth;
   final MoneyViewData spendingThisMonth;
   final double monthlyChangePercent;
@@ -310,11 +314,13 @@ class AccountCreationDraft {
 class AccountUpdateDraft {
   const AccountUpdateDraft({
     required this.name,
+    required this.type,
     required this.institution,
     required this.suffix,
     required this.sourcePackages,
   });
   final String name;
+  final String type;
   final String institution;
   final String suffix;
   final Set<String> sourcePackages;

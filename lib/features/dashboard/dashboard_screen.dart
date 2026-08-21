@@ -20,6 +20,8 @@ class DashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final data = viewModel.dashboard;
+    final availableBalance = data.spendableBalance ?? data.netWorth;
+    final savingsBalance = data.savingsBalance ?? const MoneyViewData(0);
     final recent = viewModel.transactions.take(5).toList();
     final netFlow =
         data.netCashFlow ??
@@ -90,7 +92,7 @@ class DashboardScreen extends StatelessWidget {
                       Row(
                         children: [
                           Text(
-                            'Total balance',
+                            'Available to spend',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                           const Spacer(),
@@ -108,7 +110,7 @@ class DashboardScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 9),
                       Text(
-                        formatMoney(data.netWorth),
+                        formatMoney(availableBalance),
                         style: Theme.of(context).textTheme.displaySmall,
                       ),
                       const SizedBox(height: 12),
@@ -123,6 +125,20 @@ class DashboardScreen extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
+                      if (savingsBalance.minorUnits != 0) ...[
+                        const SizedBox(height: 10),
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          onPressed: onOpenAccounts,
+                          icon: const Icon(Icons.savings_outlined, size: 18),
+                          label: Text(
+                            '${formatMoney(savingsBalance)} saved separately',
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

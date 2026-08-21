@@ -1,4 +1,4 @@
-enum AccountType { bank, wallet, cash, card, other }
+enum AccountType { bank, wallet, cash, card, savings, other }
 
 final class Account {
   const Account({
