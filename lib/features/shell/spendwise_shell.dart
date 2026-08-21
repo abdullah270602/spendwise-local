@@ -30,10 +30,13 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
         DashboardScreen(
           viewModel: widget.viewModel,
           onSeeLedger: () => setState(() => index = 1),
+          onOpenSettings: () => setState(() => index = 4),
+          onOpenAccounts: () => setState(() => index = 3),
         ),
         LedgerScreen(viewModel: widget.viewModel),
         ReviewInboxScreen(viewModel: widget.viewModel),
         AccountsScreen(viewModel: widget.viewModel),
+        SettingsScreen(viewModel: widget.viewModel),
       ];
       return Scaffold(
         body: Stack(
@@ -61,6 +64,11 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
                         const Icon(Icons.error_outline_rounded),
                         const SizedBox(width: 10),
                         Expanded(child: Text(message)),
+                        IconButton(
+                          onPressed: widget.viewModel.uiDismissError,
+                          tooltip: 'Dismiss error',
+                          icon: const Icon(Icons.close_rounded),
+                        ),
                       ],
                     ),
                   ),
@@ -68,17 +76,15 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
               ),
           ],
         ),
-        endDrawer: Drawer(
-          width: MediaQuery.sizeOf(context).width.clamp(300, 420).toDouble(),
-          backgroundColor: SpendWiseColors.background,
-          child: SafeArea(child: SettingsScreen(viewModel: widget.viewModel)),
-        ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () => _showManual(context),
-          backgroundColor: SpendWiseColors.accent,
-          foregroundColor: SpendWiseColors.background,
-          child: const Icon(Icons.add_rounded),
-        ),
+        floatingActionButton: index <= 1 && widget.viewModel.accounts.isNotEmpty
+            ? FloatingActionButton(
+                onPressed: () => _showManual(context),
+                tooltip: 'Add transaction',
+                backgroundColor: SpendWiseColors.accent,
+                foregroundColor: SpendWiseColors.background,
+                child: const Icon(Icons.add_rounded),
+              )
+            : null,
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         bottomNavigationBar: NavigationBar(
           selectedIndex: index,
@@ -87,7 +93,7 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
             const NavigationDestination(
               icon: Icon(Icons.home_outlined),
               selectedIcon: Icon(Icons.home_rounded),
-              label: 'Overview',
+              label: 'Home',
             ),
             const NavigationDestination(
               icon: Icon(Icons.receipt_long_outlined),
@@ -106,6 +112,11 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
               icon: Icon(Icons.account_balance_wallet_outlined),
               selectedIcon: Icon(Icons.account_balance_wallet_rounded),
               label: 'Accounts',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.settings_outlined),
+              selectedIcon: Icon(Icons.settings_rounded),
+              label: 'Settings',
             ),
           ],
         ),

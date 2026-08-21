@@ -176,6 +176,14 @@ class _ExportScreenState extends State<ExportScreen> {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('Export saved')));
       }
+    } on ExportCancelledException {
+      // The Android document picker was closed without creating a file.
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not create export: $error')),
+        );
+      }
     } finally {
       if (mounted) setState(() => busy = false);
     }

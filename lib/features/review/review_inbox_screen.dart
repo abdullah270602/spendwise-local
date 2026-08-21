@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../widgets/spendwise_components.dart';
 import '../shell/spendwise_view_model.dart';
+import '../settings/source_selection_screen.dart';
+import '../transactions/transaction_details_screen.dart';
 
 class ReviewInboxScreen extends StatelessWidget {
   const ReviewInboxScreen({super.key, required this.viewModel});
@@ -51,11 +53,9 @@ class _ReviewCard extends StatelessWidget {
       ReviewReason.possibleDuplicate => Icons.content_copy_rounded,
       ReviewReason.possibleTransfer => Icons.swap_horiz_rounded,
       ReviewReason.needsCategory => Icons.category_outlined,
+      ReviewReason.lowConfidence => Icons.help_outline_rounded,
       ReviewReason.parseFailed => Icons.text_snippet_outlined,
     };
-    final canMerge =
-        item.reason == ReviewReason.possibleDuplicate ||
-        item.reason == ReviewReason.possibleTransfer;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Card(
@@ -88,42 +88,101 @@ class _ReviewCard extends StatelessWidget {
                 item.description,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
-              const SizedBox(height: 12),
-              Container(
-                decoration: BoxDecoration(
-                  color: SpendWiseColors.background,
-                  borderRadius: BorderRadius.circular(12),
+              if (item.transactions.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    color: SpendWiseColors.background,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      for (final tx in item.transactions) TransactionTile(tx),
+                    ],
+                  ),
                 ),
-                child: Column(
+              ],
+              const SizedBox(height: 14),
+              if (item.transactions.isEmpty)
+                Row(
                   children: [
-                    for (final tx in item.transactions) TransactionTile(tx),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                SourceSelectionScreen(viewModel: viewModel),
+                          ),
+                        ),
+                        child: const Text('Configure sources'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => _confirmDismiss(context),
+                        child: const Text('Dismiss all'),
+                      ),
+                    ),
+                  ],
+                )
+              else
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => TransactionDetailsScreen(
+                              viewModel: viewModel,
+                              transaction: item.transactions.first,
+                            ),
+                          ),
+                        ),
+                        child: const Text('Inspect details'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () =>
+                            viewModel.resolveReview(item.id, merge: false),
+                        child: const Text('Confirm as shown'),
+                      ),
+                    ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () =>
-                          viewModel.resolveReview(item.id, merge: false),
-                      child: Text(canMerge ? 'Keep separate' : 'Dismiss'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () =>
-                          viewModel.resolveReview(item.id, merge: true),
-                      child: Text(canMerge ? 'Merge' : 'Accept'),
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _confirmDismiss(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Dismiss unsupported evidence?'),
+        content: Text(
+          '${item.title}\n\nThese observations stay stored locally, but will no longer appear in Review.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Dismiss all'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await viewModel.resolveReview(item.id, merge: false);
+    }
   }
 }

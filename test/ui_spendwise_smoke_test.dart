@@ -18,9 +18,35 @@ void main() {
     expect(find.text('Total balance'), findsOneWidget);
     expect(find.text('Net cash flow'), findsOneWidget);
     expect(find.text('Spending by category'), findsOneWidget);
+    expect(find.text('12.0% of income retained'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Account balances'), 300);
     expect(find.text('Account balances'), findsOneWidget);
   });
+
+  testWidgets(
+    'settings is a primary destination and manual entry is account-gated',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SpendWiseTheme.dark,
+          home: SpendWiseShell(viewModel: _EmptyViewModel()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(FloatingActionButton), findsNothing);
+      expect(find.text('Finish setup'), findsOneWidget);
+      await tester.tap(find.text('Settings'));
+      await tester.pumpAndSettle();
+    expect(find.text('Settings & privacy'), findsOneWidget);
+    },
+  );
+}
+
+class _EmptyViewModel extends _FakeViewModel {
+  @override
+  List<AccountViewData> get accounts => const [];
+  @override
+  List<TransactionViewData> get transactions => const [];
 }
 
 class _FakeViewModel extends ChangeNotifier implements SpendWiseViewModel {

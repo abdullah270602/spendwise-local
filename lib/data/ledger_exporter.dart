@@ -13,6 +13,7 @@ final class LedgerExportFilter {
     this.accountIds = const {},
     this.kinds = const {},
     this.categoryIds = const {},
+    this.includeEvidence = false,
   });
 
   final DateTime? from;
@@ -20,6 +21,7 @@ final class LedgerExportFilter {
   final Set<String> accountIds;
   final Set<TransactionKind> kinds;
   final Set<String> categoryIds;
+  final bool includeEvidence;
 }
 
 final class LedgerExporter {
@@ -41,6 +43,7 @@ final class LedgerExporter {
         'To account',
         'Evidence count',
         'Reconciliation state',
+        if (filter.includeEvidence) 'Evidence (JSON)',
       ],
       for (final item in transactions)
         [
@@ -55,6 +58,7 @@ final class LedgerExporter {
           item['toAccount'],
           (item['evidence'] as List).length,
           item['reconciliationState'],
+          if (filter.includeEvidence) jsonEncode(item['evidence']),
         ],
     ];
     return Uint8List.fromList(utf8.encode(Csv(addBom: true).encode(rows)));
@@ -83,7 +87,14 @@ final class LedgerExporter {
             },
           )
           .toList(growable: false),
-      'transactions': _rows(filter),
+      'transactions': _rows(filter)
+          .map((row) {
+            if (filter.includeEvidence) return row;
+            return Map<String, Object?>.from(row)
+              ..['evidenceCount'] = (row['evidence'] as List).length
+              ..remove('evidence');
+          })
+          .toList(growable: false),
     };
     return Uint8List.fromList(
       utf8.encode(const JsonEncoder.withIndent('  ').convert(payload)),

@@ -26,13 +26,12 @@ class TransactionDetailsScreen extends StatelessWidget {
           IconButton(
             onPressed: () => _showCorrection(context),
             icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Correct transaction',
+            tooltip: 'Edit classification',
           ),
           PopupMenuButton<String>(
             onSelected: (v) async {
               if (v == 'delete') {
-                await viewModel.deleteTransaction(transaction.id);
-                if (context.mounted) Navigator.pop(context);
+                await _confirmDelete(context);
               }
             },
             itemBuilder: (_) => const [
@@ -111,7 +110,7 @@ class TransactionDetailsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
-          const SectionHeading('Reconciliation'),
+          const SectionHeading('Source evidence'),
           const SizedBox(height: 8),
           Card(
             child: Padding(
@@ -134,7 +133,7 @@ class TransactionDetailsScreen extends StatelessWidget {
                         const SizedBox(height: 3),
                         Text(
                           transaction.evidenceCount > 1
-                              ? 'Multiple observations were reconciled into this transaction.'
+                              ? 'Multiple observations support this transaction.'
                               : 'This transaction currently has one supporting observation.',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
@@ -164,13 +163,41 @@ class TransactionDetailsScreen extends StatelessWidget {
     );
   }
 
-  void _showCorrection(BuildContext context) {
+  Future<void> _confirmDelete(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete this transaction?'),
+        content: const Text(
+          'The ledger entry will be removed. Its original notification or import evidence remains available for reconciliation.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: SpendWiseColors.expense,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete transaction'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await viewModel.deleteTransaction(transaction.id);
+    if (context.mounted) Navigator.pop(context);
+  }
+
+  Future<void> _showCorrection(BuildContext context) async {
     var kind = transaction.kind;
     var category = transaction.category;
     String? accountId =
         transaction.accountId ?? viewModel.accounts.firstOrNull?.id;
     String? toAccountId = transaction.toAccountId;
-    showModalBottomSheet<void>(
+    final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -187,12 +214,12 @@ class TransactionDetailsScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Correct transaction',
+                'Edit classification',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 6),
               Text(
-                'Corrections update the canonical ledger; source evidence stays unchanged.',
+                'Change the type, category, or account. Original source evidence stays unchanged.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 18),
@@ -291,7 +318,9 @@ class TransactionDetailsScreen extends StatelessWidget {
                           toAccountId: toAccountId,
                         ),
                       );
-                      if (sheetContext.mounted) Navigator.pop(sheetContext);
+                      if (sheetContext.mounted) {
+                        Navigator.pop(sheetContext, true);
+                      }
                     } on UnsupportedError {
                       if (sheetContext.mounted) {
                         ScaffoldMessenger.of(sheetContext).showSnackBar(
@@ -304,7 +333,7 @@ class TransactionDetailsScreen extends StatelessWidget {
                       }
                     }
                   },
-                  child: const Text('Save correction'),
+                  child: const Text('Save classification'),
                 ),
               ),
             ],
@@ -312,6 +341,7 @@ class TransactionDetailsScreen extends StatelessWidget {
         ),
       ),
     );
+    if (saved == true && context.mounted) Navigator.pop(context);
   }
 }
 
@@ -354,7 +384,7 @@ class _EvidenceCard extends StatelessWidget {
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               subtitle: Text(
-                '${item.state.name} · ${(item.confidence * 100).round()}% confidence',
+                '${_stateLabel(item.state)} · ${(item.confidence * 100).round()}% confidence',
               ),
               childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
               children: [
@@ -375,9 +405,9 @@ class _EvidenceCard extends StatelessWidget {
                     ),
                   ),
                 const SizedBox(height: 10),
-                _Meta('Parser', item.parserId),
-                if (item.ruleId.isNotEmpty) _Meta('Rule', item.ruleId),
-                _Meta('Observed', item.observedAt.toLocal().toString()),
+                _Meta('Source reader', item.parserId),
+                if (item.ruleId.isNotEmpty) _Meta('Matching rule', item.ruleId),
+                _Meta('Observed', _dateTime(item.observedAt)),
                 if (item.reasons.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Align(
@@ -393,7 +423,7 @@ class _EvidenceCard extends StatelessWidget {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        '• $reason',
+                        '• ${reason.replaceAll('_', ' ')}',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
@@ -405,6 +435,19 @@ class _EvidenceCard extends StatelessWidget {
       ),
     ],
   );
+
+  static String _stateLabel(EvidenceState state) => switch (state) {
+    EvidenceState.accepted => 'Supporting evidence',
+    EvidenceState.duplicate => 'Duplicate observation',
+    EvidenceState.matched => 'Matched transfer leg',
+    EvidenceState.unparsed => 'Could not be read',
+    EvidenceState.ignored => 'Not used',
+  };
+
+  static String _dateTime(DateTime value) {
+    final local = value.toLocal();
+    return '${local.day}/${local.month}/${local.year} · ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+  }
 }
 
 class _Meta extends StatelessWidget {

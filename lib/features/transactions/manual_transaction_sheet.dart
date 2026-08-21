@@ -20,6 +20,7 @@ class _ManualTransactionSheetState extends State<ManualTransactionSheet> {
   String? toAccountId;
   String category = 'Other';
   bool saving = false;
+  DateTime occurredAt = DateTime.now();
   @override
   void dispose() {
     title.dispose();
@@ -79,6 +80,15 @@ class _ManualTransactionSheetState extends State<ManualTransactionSheet> {
                     : null,
               ),
               const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.schedule_outlined),
+                title: const Text('Date and time'),
+                subtitle: Text(_formatDateTime(occurredAt)),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: _pickDateTime,
+              ),
+              const SizedBox(height: 4),
               TextFormField(
                 controller: amount,
                 keyboardType: const TextInputType.numberWithOptions(
@@ -173,18 +183,53 @@ class _ManualTransactionSheetState extends State<ManualTransactionSheet> {
     if (!formKey.currentState!.validate()) return;
     setState(() => saving = true);
     final units = Money.parsePkr('PKR ${amount.text}').minorUnits;
-    await widget.viewModel.saveManualTransaction(
-      ManualTransactionDraft(
-        title: title.text.trim(),
-        amount: MoneyViewData(units),
-        kind: kind,
-        accountId: accountId!,
-        toAccountId: toAccountId,
-        category: category,
-        occurredAt: DateTime.now(),
-        note: note.text.trim(),
+    try {
+      await widget.viewModel.saveManualTransaction(
+        ManualTransactionDraft(
+          title: title.text.trim(),
+          amount: MoneyViewData(units),
+          kind: kind,
+          accountId: accountId!,
+          toAccountId: toAccountId,
+          category: category,
+          occurredAt: occurredAt,
+          note: note.text.trim(),
+        ),
+      );
+      if (mounted) Navigator.pop(context);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save transaction: $error')),
+      );
+    }
+  }
+
+  Future<void> _pickDateTime() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: occurredAt,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now().add(const Duration(days: 1)),
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(occurredAt),
+    );
+    if (time == null || !mounted) return;
+    setState(
+      () => occurredAt = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
       ),
     );
-    if (mounted) Navigator.pop(context);
   }
+
+  String _formatDateTime(DateTime value) =>
+      '${value.day}/${value.month}/${value.year} · ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 }
