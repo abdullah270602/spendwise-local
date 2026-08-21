@@ -314,6 +314,7 @@ final class CsvImportWizard {
     required String accountId,
     String? sourceId,
     String mappingName = 'Statement format',
+    bool reconcile = true,
   }) {
     if (preview.sameFileAlreadyImported) {
       return CsvCommitResult(
@@ -384,7 +385,7 @@ final class CsvImportWizard {
         rawObservationId: observationId,
       );
     }
-    ledger.finishBatch();
+    if (reconcile) ledger.finishBatch();
     ledger.finishImportBatch(
       batchId: batchId,
       importedCount: imported,

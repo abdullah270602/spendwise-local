@@ -199,6 +199,18 @@ final class LocalLedger {
   @visibleForTesting
   void rerunMigrationsForTests() => _migrate();
 
+  T runAtomic<T>(T Function() operation) {
+    _db.execute('BEGIN IMMEDIATE');
+    try {
+      final result = operation();
+      _db.execute('COMMIT');
+      return result;
+    } catch (_) {
+      _db.execute('ROLLBACK');
+      rethrow;
+    }
+  }
+
   static Future<String> _loadOrCreateKey() async {
     final existing = await _secureStorage.read(key: _keyName);
     if (existing != null && existing.length == 64) return existing;
@@ -1935,9 +1947,10 @@ final class LocalLedger {
     return raw.id;
   }
 
-  void finishBatch() => _reconcile();
+  void finishBatch({bool insideTransaction = false}) =>
+      _reconcile(manageTransaction: !insideTransaction);
 
-  void _reconcile() {
+  void _reconcile({bool manageTransaction = true}) {
     final candidates = _db
         .select('''
       SELECT c.*, r.kind AS raw_kind, r.external_id, r.source_package,
@@ -1994,7 +2007,7 @@ final class LocalLedger {
       candidates,
       existing: existingLocked,
     );
-    _db.execute('BEGIN IMMEDIATE');
+    if (manageTransaction) _db.execute('BEGIN IMMEDIATE');
     try {
       _db.execute(
         "DELETE FROM transactions WHERE origin = 'automatic' AND locked = 0",
@@ -2029,9 +2042,9 @@ final class LocalLedger {
           ],
         );
       }
-      _db.execute('COMMIT');
+      if (manageTransaction) _db.execute('COMMIT');
     } catch (_) {
-      _db.execute('ROLLBACK');
+      if (manageTransaction) _db.execute('ROLLBACK');
       rethrow;
     }
   }

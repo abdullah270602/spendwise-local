@@ -118,4 +118,51 @@ void main() {
       expect(ledger.snapshot().transactions, hasLength(3));
     },
   );
+
+  test('rolls back every sheet when one sheet cannot be committed', () async {
+    final ledger = LocalLedger.openInMemoryForTests();
+    addTearDown(ledger.close);
+    final account = ledger.addAccount(
+      name: 'Current',
+      type: domain.AccountType.bank,
+    );
+    final controller = SpendWiseController.forTests(ledger);
+    addTearDown(controller.dispose);
+    const text = '''Date,Description,Debit,Credit,Reference
+2026-08-20,Groceries,1000,,TX-1
+''';
+    const mapping = {
+      ImportField.date: 'Date',
+      ImportField.description: 'Description',
+      ImportField.debit: 'Debit',
+      ImportField.credit: 'Credit',
+      ImportField.reference: 'Reference',
+    };
+    final draft = CsvImportDraft(
+      csvText: text,
+      accountId: account,
+      mapping: mapping,
+      fileName: 'atomic.xlsx',
+      sheets: [
+        StatementSheetImportDraft(
+          sheetName: 'Valid',
+          csvText: text,
+          accountId: account,
+          mapping: mapping,
+        ),
+        const StatementSheetImportDraft(
+          sheetName: 'Broken account mapping',
+          csvText: text,
+          accountId: 'missing-account',
+          mapping: mapping,
+        ),
+      ],
+    );
+
+    await expectLater(controller.commitCsvImport(draft), throwsA(anything));
+
+    expect(ledger.snapshot().transactions, isEmpty);
+    final preview = await controller.previewCsvImport(draft);
+    expect(preview.reimportedSheetCount, 0);
+  });
 }
