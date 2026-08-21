@@ -19,6 +19,11 @@ String formatMoney(MoneyViewData money, {bool signed = false}) {
   return '$prefix${money.currency} $grouped$decimals';
 }
 
+String titleCase(String value) {
+  if (value.isEmpty) return value;
+  return '${value[0].toUpperCase()}${value.substring(1)}';
+}
+
 class SectionHeading extends StatelessWidget {
   const SectionHeading(this.title, {super.key, this.action, this.onAction});
   final String title;

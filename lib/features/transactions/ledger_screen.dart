@@ -218,7 +218,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                   children: [
                     for (final value in TransactionKind.values)
                       ChoiceChip(
-                        label: Text(value.name),
+                        label: Text(titleCase(value.name)),
                         selected: draftKind == value,
                         onSelected: (_) =>
                             modalSetState(() => draftKind = value),

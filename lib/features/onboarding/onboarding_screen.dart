@@ -38,8 +38,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       return;
     }
     setState(() => busy = true);
-    await widget.viewModel.completeOnboarding();
-    if (mounted) setState(() => busy = false);
+    try {
+      await widget.viewModel.completeOnboarding();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not finish setup: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
   }
 
   @override

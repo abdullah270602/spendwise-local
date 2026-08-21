@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
@@ -35,7 +36,9 @@ final class SpendWiseController extends ChangeNotifier
       ledger.snapshot(),
     );
     WidgetsBinding.instance.addObserver(controller);
-    await controller._refreshPlatform();
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => unawaited(controller._refreshPlatform()),
+    );
     return controller;
   }
 

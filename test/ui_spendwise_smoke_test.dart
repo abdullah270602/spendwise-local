@@ -3,6 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:spendwise/app/theme.dart';
 import 'package:spendwise/features/shell/spendwise_shell.dart';
 import 'package:spendwise/features/shell/spendwise_view_model.dart';
+import 'package:spendwise/features/onboarding/onboarding_screen.dart';
+import 'package:spendwise/features/settings/export_screen.dart';
+import 'package:spendwise/features/transactions/transaction_details_screen.dart';
 
 void main() {
   testWidgets('shell renders cash-flow dashboard and local privacy state', (
@@ -45,6 +48,72 @@ void main() {
       expect(find.text('Settings & privacy'), findsOneWidget);
     },
   );
+
+  testWidgets('onboarding explains the local ledger before completion', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: OnboardingScreen(viewModel: _FakeViewModel()),
+      ),
+    );
+    expect(find.text('One trustworthy ledger'), findsOneWidget);
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('Duplicates become context'), findsOneWidget);
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('Private by design'), findsOneWidget);
+    expect(find.text('Start privately'), findsOneWidget);
+  });
+
+  testWidgets('transaction with no evidence uses accurate source copy', (
+    tester,
+  ) async {
+    final transaction = TransactionViewData(
+      id: 'manual',
+      title: 'Cash purchase',
+      subtitle: 'Everyday',
+      amount: const MoneyViewData(-1000),
+      kind: TransactionKind.expense,
+      occurredAt: DateTime(2026, 8, 22),
+      category: 'Other',
+      evidenceCount: 0,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: TransactionDetailsScreen(
+          viewModel: _FakeViewModel(),
+          transaction: transaction,
+        ),
+      ),
+    );
+    await tester.scrollUntilVisible(
+      find.text('No linked evidence'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('No linked evidence'), findsOneWidget);
+    expect(find.textContaining('one supporting observation'), findsNothing);
+    expect(find.text('Expense'), findsOneWidget);
+  });
+
+  testWidgets('export labels transaction types for people, not enums', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: ExportScreen(viewModel: _FakeViewModel()),
+      ),
+    );
+    expect(find.text('Expense'), findsOneWidget);
+    expect(find.text('Income'), findsOneWidget);
+    expect(find.text('Transfer'), findsOneWidget);
+    expect(find.text('expense'), findsNothing);
+  });
 }
 
 class _EmptyViewModel extends _FakeViewModel {
