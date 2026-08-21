@@ -29,6 +29,27 @@ void main() {
     }
   });
 
+  test('classifies broader everyday statement merchants', () {
+    const cases = {
+      'IMTIAZ SUPERMARKET': 'groceries',
+      'CITY PHARMACY': 'health',
+      'UNIVERSITY FEE': 'education',
+      'AIRBLUE TICKET': 'travel',
+      'JUBILEE LIFE INSURANCE PREMIUM': 'insurance',
+      'FBR TAX PAYMENT': 'government-tax',
+      'EDHI FOUNDATION DONATION': 'gifts-charity',
+    };
+    for (final entry in cases.entries) {
+      expect(
+        classifier
+            .classify(text: entry.key, kind: TransactionKind.expense)
+            .categoryId,
+        entry.value,
+        reason: entry.key,
+      );
+    }
+  });
+
   test('type rules take priority and unknown merchants stay other', () {
     expect(
       classifier

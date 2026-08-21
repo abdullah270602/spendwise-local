@@ -10,6 +10,7 @@ import '../data/csv_importer.dart';
 import '../data/csv_import_wizard.dart';
 import '../data/ledger_exporter.dart';
 import '../data/local_ledger.dart';
+import '../data/statement_account_inferer.dart';
 import '../data/statement_file_decoder.dart';
 import '../domain/domain.dart' as domain;
 import '../features/shell/spendwise_view_model.dart';
@@ -19,6 +20,14 @@ final class SpendWiseController extends ChangeNotifier
     with WidgetsBindingObserver
     implements SpendWiseAdvancedViewModel {
   SpendWiseController._(this._ledger, this._bridge, this._snapshot);
+
+  @visibleForTesting
+  factory SpendWiseController.forTests(LocalLedger ledger) =>
+      SpendWiseController._(
+        ledger,
+        const NotificationBridge(),
+        ledger.snapshot(),
+      );
 
   LocalLedger _ledger;
   final NotificationBridge _bridge;
@@ -560,15 +569,44 @@ final class SpendWiseController extends ChangeNotifier
       fileName: file.name,
       bytes: bytes,
     );
+    final profiles = accounts
+        .map(
+          (account) => StatementAccountProfile(
+            id: account.id,
+            name: account.name,
+            institution: account.institution,
+            suffix: account.suffix,
+          ),
+        )
+        .toList(growable: false);
     return StatementFileViewData(
       fileName: decoded.fileName,
       sheets: decoded.sheets
-          .map(
-            (sheet) => StatementSheetViewData(
-              name: sheet.name,
-              csvText: sheet.csvText,
-            ),
-          )
+          .map((sheet) {
+            try {
+              final inference = const StatementAccountInferer().infer(
+                sheetName: sheet.name,
+                csvText: sheet.csvText,
+                accounts: profiles,
+              );
+              return StatementSheetViewData(
+                name: sheet.name,
+                csvText: sheet.csvText,
+                suggestedAccountId: inference.suggestedAccountId,
+                accountInferenceReason: inference.reason,
+                accountInferenceConfidence: inference.confidence,
+                detectedInstitution: inference.detectedInstitution,
+                detectedSuffix: inference.detectedSuffix,
+              );
+            } on FormatException catch (error) {
+              return StatementSheetViewData(
+                name: sheet.name,
+                csvText: sheet.csvText,
+                importable: false,
+                detectionError: error.message,
+              );
+            }
+          })
           .toList(growable: false),
     );
   }
@@ -635,20 +673,18 @@ final class SpendWiseController extends ChangeNotifier
     );
   });
 
-  ({
-    CsvImportWizard wizard,
-    CsvImportPreview preview,
-    CsvMappingDefinition mapping,
-  })
-  _prepareCsvImport(CsvImportDraft draft) {
+  _PreparedSheetImport _prepareCsvSheetImport(
+    CsvImportDraft draft,
+    StatementSheetImportDraft sheet,
+  ) {
     final wizard = CsvImportWizard(_ledger);
     final inspection = wizard.inspect(
-      fileName: draft.fileName,
-      text: draft.csvText,
-      accountId: draft.accountId,
+      fileName: '${draft.fileName} · ${sheet.sheetName}',
+      text: sheet.csvText,
+      accountId: sheet.accountId,
     );
     final roles = <int, CsvColumnRole>{};
-    for (final entry in draft.mapping.entries) {
+    for (final entry in sheet.mapping.entries) {
       final index = inspection.headers.indexOf(entry.value);
       if (index < 0) continue;
       roles[index] = switch (entry.key) {
@@ -670,66 +706,170 @@ final class SpendWiseController extends ChangeNotifier
       dateFormat: _detectDateFormat(inspection, roles),
       defaultCurrency:
           accounts
-              .where((account) => account.id == draft.accountId)
+              .where((account) => account.id == sheet.accountId)
               .map((account) => account.currency)
               .firstOrNull ??
           'PKR',
     );
     final preview = wizard.preview(
       inspection: inspection,
-      text: draft.csvText,
-      accountId: draft.accountId,
+      text: sheet.csvText,
+      accountId: sheet.accountId,
       mapping: mapping,
     );
-    return (wizard: wizard, preview: preview, mapping: mapping);
+    return _PreparedSheetImport(
+      sheet: sheet,
+      wizard: wizard,
+      preview: preview,
+      mapping: mapping,
+    );
+  }
+
+  _PreparedStatementImport _prepareStatementImport(CsvImportDraft draft) {
+    final sheets = draft.effectiveSheets
+        .map((sheet) => _prepareCsvSheetImport(draft, sheet))
+        .toList(growable: false);
+    final seen = <String, (int, int)>{};
+    final crossSheetDuplicates = <String>{};
+    final adjusted = <_PreparedSheetImport>[];
+    for (var sheetIndex = 0; sheetIndex < sheets.length; sheetIndex++) {
+      final prepared = sheets[sheetIndex];
+      final rows = <CsvPreviewRow>[];
+      for (
+        var rowIndex = 0;
+        rowIndex < prepared.preview.rows.length;
+        rowIndex++
+      ) {
+        final row = prepared.preview.rows[rowIndex];
+        final key = _batchDuplicateKey(prepared.sheet.accountId, row);
+        final prior = key == null ? null : seen[key];
+        final isCrossSheet = prior != null && prior.$1 != sheetIndex;
+        if (key != null && prior == null) seen[key] = (sheetIndex, rowIndex);
+        if (isCrossSheet) {
+          crossSheetDuplicates.add('$sheetIndex:$rowIndex');
+        }
+        rows.add(isCrossSheet ? row.copyWith(probableDuplicate: true) : row);
+      }
+      adjusted.add(
+        prepared.copyWith(preview: prepared.preview.copyWith(rows: rows)),
+      );
+    }
+    return _PreparedStatementImport(
+      sheets: adjusted,
+      crossSheetDuplicates: crossSheetDuplicates,
+    );
   }
 
   @override
   Future<CsvImportPreviewViewData> previewCsvImport(
     CsvImportDraft draft,
   ) async {
-    final prepared = _prepareCsvImport(draft);
-    final preview = prepared.preview;
+    final prepared = _prepareStatementImport(draft);
+    final previewRows = <CsvPreviewRowViewData>[];
+    var validCount = 0;
+    var errorCount = 0;
+    var duplicateCount = 0;
+    var reimportedSheetCount = 0;
+    for (
+      var sheetIndex = 0;
+      sheetIndex < prepared.sheets.length;
+      sheetIndex++
+    ) {
+      final sheet = prepared.sheets[sheetIndex];
+      final accountName =
+          accounts
+              .where((account) => account.id == sheet.sheet.accountId)
+              .map((account) => account.name)
+              .firstOrNull ??
+          'Unknown account';
+      if (sheet.preview.sameFileAlreadyImported) reimportedSheetCount++;
+      validCount += sheet.preview.validCount;
+      errorCount += sheet.preview.errorCount;
+      duplicateCount += sheet.preview.duplicateCount;
+      for (var rowIndex = 0; rowIndex < sheet.preview.rows.length; rowIndex++) {
+        final row = sheet.preview.rows[rowIndex];
+        final category = row.valid
+            ? _ledger.classifyDescription(
+                text: row.description ?? row.merchant ?? '',
+                kind: row.direction == domain.EntryDirection.debit
+                    ? domain.TransactionKind.expense
+                    : domain.TransactionKind.income,
+              )
+            : null;
+        final crossSheet = prepared.crossSheetDuplicates.contains(
+          '$sheetIndex:$rowIndex',
+        );
+        previewRows.add(
+          CsvPreviewRowViewData(
+            rowNumber: row.rowNumber,
+            sheetName: sheet.sheet.sheetName,
+            accountName: accountName,
+            category: category == null
+                ? 'Other'
+                : _ledger.categoryName(category.categoryId),
+            date:
+                row.occurredAt?.toLocal().toIso8601String().split('T').first ??
+                (row.raw.values.firstOrNull ?? ''),
+            description: row.description ?? row.merchant ?? '',
+            amount: row.amount == null
+                ? ''
+                : '${row.direction?.name == 'debit' ? '-' : '+'}${row.amount!.currency} ${(row.amount!.minorUnits / 100).toStringAsFixed(2)}',
+            valid: row.valid,
+            duplicate: row.probableDuplicate,
+            duplicateReason: crossSheet
+                ? 'Also appears in another selected sheet'
+                : row.probableDuplicate
+                ? 'Possible match in your ledger'
+                : '',
+            error: row.error,
+          ),
+        );
+      }
+    }
     return CsvImportPreviewViewData(
-      validCount: preview.validCount,
-      errorCount: preview.errorCount,
-      duplicateCount: preview.duplicateCount,
-      sameFileAlreadyImported: preview.sameFileAlreadyImported,
-      rows: preview.rows
-          .map(
-            (row) => CsvPreviewRowViewData(
-              rowNumber: row.rowNumber,
-              date:
-                  row.occurredAt
-                      ?.toLocal()
-                      .toIso8601String()
-                      .split('T')
-                      .first ??
-                  (row.raw.values.firstOrNull ?? ''),
-              description: row.description ?? row.merchant ?? '',
-              amount: row.amount == null
-                  ? ''
-                  : '${row.direction?.name == 'debit' ? '-' : '+'}${row.amount!.currency} ${(row.amount!.minorUnits / 100).toStringAsFixed(2)}',
-              valid: row.valid,
-              duplicate: row.probableDuplicate,
-              error: row.error,
-            ),
-          )
-          .toList(growable: false),
+      validCount: validCount,
+      errorCount: errorCount,
+      duplicateCount: duplicateCount,
+      sameFileAlreadyImported: reimportedSheetCount == prepared.sheets.length,
+      sheetCount: prepared.sheets.length,
+      reimportedSheetCount: reimportedSheetCount,
+      rows: previewRows,
     );
   }
 
   @override
   Future<void> commitCsvImport(CsvImportDraft draft) => _runBusy(() async {
-    final prepared = _prepareCsvImport(draft);
-    final wizard = prepared.wizard;
-    final preview = prepared.preview;
-    wizard.commit(
-      preview: preview,
-      accountId: draft.accountId,
-      mappingName: draft.sourceLabel,
-    );
+    final prepared = _prepareStatementImport(draft);
+    for (final sheet in prepared.sheets) {
+      sheet.wizard.commit(
+        preview: sheet.preview,
+        accountId: sheet.sheet.accountId,
+        mappingName: '${draft.sourceLabel} · ${sheet.sheet.sheetName}',
+      );
+    }
   });
+
+  String? _batchDuplicateKey(String accountId, CsvPreviewRow row) {
+    if (!row.valid) return null;
+    final date = row.occurredAt!.toUtc().toIso8601String().split('T').first;
+    final base = [
+      accountId,
+      date,
+      row.direction!.name,
+      row.amount!.currency,
+      '${row.amount!.minorUnits}',
+    ].join('|');
+    final reference = domain.CategoryClassifier.normalize(row.reference ?? '');
+    if (reference.isNotEmpty) return '$base|reference:$reference';
+    final description = domain.CategoryClassifier.normalize(
+      row.description ?? row.merchant ?? '',
+    );
+    if (row.balanceMinor != null) {
+      return '$base|balance:${row.balanceMinor}|$description';
+    }
+    if (description.isNotEmpty) return '$base|description:$description';
+    return null;
+  }
 
   @override
   void dismissError() {
@@ -841,6 +981,38 @@ final class SpendWiseController extends ChangeNotifier
     _nativeSources = const [];
     notifyListeners();
   }
+}
+
+final class _PreparedSheetImport {
+  const _PreparedSheetImport({
+    required this.sheet,
+    required this.wizard,
+    required this.preview,
+    required this.mapping,
+  });
+
+  final StatementSheetImportDraft sheet;
+  final CsvImportWizard wizard;
+  final CsvImportPreview preview;
+  final CsvMappingDefinition mapping;
+
+  _PreparedSheetImport copyWith({CsvImportPreview? preview}) =>
+      _PreparedSheetImport(
+        sheet: sheet,
+        wizard: wizard,
+        preview: preview ?? this.preview,
+        mapping: mapping,
+      );
+}
+
+final class _PreparedStatementImport {
+  const _PreparedStatementImport({
+    required this.sheets,
+    required this.crossSheetDuplicates,
+  });
+
+  final List<_PreparedSheetImport> sheets;
+  final Set<String> crossSheetDuplicates;
 }
 
 extension<T> on Iterable<T> {

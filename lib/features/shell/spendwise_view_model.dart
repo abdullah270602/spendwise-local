@@ -246,20 +246,65 @@ class CsvImportDraft {
     required this.mapping,
     this.sourceLabel = 'Statement import',
     this.fileName = 'statement.csv',
+    this.sheets = const [],
   });
   final String csvText;
   final String accountId;
   final String sourceLabel;
   final String fileName;
   final Map<ImportField, String> mapping;
+  final List<StatementSheetImportDraft> sheets;
+
+  List<StatementSheetImportDraft> get effectiveSheets => sheets.isNotEmpty
+      ? sheets
+      : [
+          StatementSheetImportDraft(
+            sheetName: 'Statement',
+            csvText: csvText,
+            accountId: accountId,
+            mapping: mapping,
+          ),
+        ];
+}
+
+@immutable
+class StatementSheetImportDraft {
+  const StatementSheetImportDraft({
+    required this.sheetName,
+    required this.csvText,
+    required this.accountId,
+    required this.mapping,
+  });
+
+  final String sheetName;
+  final String csvText;
+  final String accountId;
+  final Map<ImportField, String> mapping;
 }
 
 @immutable
 class StatementSheetViewData {
-  const StatementSheetViewData({required this.name, required this.csvText});
+  const StatementSheetViewData({
+    required this.name,
+    required this.csvText,
+    this.suggestedAccountId,
+    this.accountInferenceReason = '',
+    this.accountInferenceConfidence = 0,
+    this.detectedInstitution = '',
+    this.detectedSuffix = '',
+    this.importable = true,
+    this.detectionError = '',
+  });
 
   final String name;
   final String csvText;
+  final String? suggestedAccountId;
+  final String accountInferenceReason;
+  final double accountInferenceConfidence;
+  final String detectedInstitution;
+  final String detectedSuffix;
+  final bool importable;
+  final String detectionError;
 }
 
 @immutable
@@ -279,6 +324,10 @@ class CsvPreviewRowViewData {
     required this.amount,
     required this.valid,
     required this.duplicate,
+    this.sheetName = 'Statement',
+    this.accountName = '',
+    this.category = 'Other',
+    this.duplicateReason = '',
     this.error,
   });
   final int rowNumber;
@@ -287,6 +336,10 @@ class CsvPreviewRowViewData {
   final String amount;
   final bool valid;
   final bool duplicate;
+  final String sheetName;
+  final String accountName;
+  final String category;
+  final String duplicateReason;
   final String? error;
 }
 
@@ -298,12 +351,16 @@ class CsvImportPreviewViewData {
     required this.errorCount,
     required this.duplicateCount,
     required this.sameFileAlreadyImported,
+    this.sheetCount = 1,
+    this.reimportedSheetCount = 0,
   });
   final List<CsvPreviewRowViewData> rows;
   final int validCount;
   final int errorCount;
   final int duplicateCount;
   final bool sameFileAlreadyImported;
+  final int sheetCount;
+  final int reimportedSheetCount;
 }
 
 @immutable
