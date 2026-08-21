@@ -30,7 +30,6 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
         DashboardScreen(
           viewModel: widget.viewModel,
           onSeeLedger: () => setState(() => index = 1),
-          onOpenSettings: () => setState(() => index = 4),
           onOpenAccounts: () => setState(() => index = 3),
         ),
         LedgerScreen(viewModel: widget.viewModel),

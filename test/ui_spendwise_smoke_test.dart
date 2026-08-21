@@ -18,6 +18,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    expect(find.text('Private. Local. Yours.'), findsOneWidget);
+    expect(find.byTooltip('Open settings'), findsNothing);
     expect(find.text('Total balance'), findsOneWidget);
     expect(find.text('Net cash flow'), findsOneWidget);
     expect(find.text('12.0% of income retained'), findsOneWidget);

@@ -149,7 +149,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SizedBox(height: 24),
         Center(
           child: Text(
-            'SpendWise · local-first finance',
+            'SpendWise · Private. Local. Yours.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ),

@@ -12,12 +12,10 @@ class DashboardScreen extends StatelessWidget {
     super.key,
     required this.viewModel,
     required this.onSeeLedger,
-    required this.onOpenSettings,
     required this.onOpenAccounts,
   });
   final SpendWiseViewModel viewModel;
   final VoidCallback onSeeLedger;
-  final VoidCallback onOpenSettings;
   final VoidCallback onOpenAccounts;
   @override
   Widget build(BuildContext context) {
@@ -49,17 +47,24 @@ class DashboardScreen extends StatelessWidget {
       slivers: [
         SliverAppBar(
           floating: true,
-          title: const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          title: const Row(
             children: [
-              Text('SpendWise'),
-              Text(
-                'LOCAL LEDGER',
-                style: TextStyle(
-                  fontSize: 9,
-                  letterSpacing: 1.8,
-                  color: SpendWiseColors.accent,
-                ),
+              SpendWiseMark(size: 34),
+              SizedBox(width: 11),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('SpendWise'),
+                  Text(
+                    'Private. Local. Yours.',
+                    style: TextStyle(
+                      fontSize: 10,
+                      letterSpacing: .3,
+                      color: SpendWiseColors.accent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -68,11 +73,6 @@ class DashboardScreen extends StatelessWidget {
               onPressed: () => _openInsights(context),
               tooltip: 'Open spending insights',
               icon: const Icon(Icons.insights_rounded),
-            ),
-            IconButton(
-              onPressed: onOpenSettings,
-              tooltip: 'Open settings',
-              icon: const Icon(Icons.settings_outlined),
             ),
             const SizedBox(width: 8),
           ],
