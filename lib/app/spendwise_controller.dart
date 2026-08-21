@@ -303,7 +303,7 @@ final class SpendWiseController extends ChangeNotifier
               ? 'Notification access required'
               : !item.installed
               ? 'App is no longer installed'
-              : '${item.observationCount} captured · ${_ingestionHealth?.pendingCount ?? 0} pending',
+              : '${item.observationCount} captured · ${_ingestionHealth?.pendingCount ?? 0} pending${(_ingestionHealth?.evictedCount ?? 0) > 0 ? ' · ${_ingestionHealth!.evictedCount} queue evicted' : ''}',
         ),
       )
       .toList(growable: false);
