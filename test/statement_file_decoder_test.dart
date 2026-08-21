@@ -52,11 +52,21 @@ void main() {
       final workbook = Excel.createExcel();
       final sheet = workbook[workbook.getDefaultSheet() ?? 'Sheet1'];
       sheet
+        ..appendRow([TextCellValue('UBL Account Statement')])
         ..appendRow([
-          TextCellValue('Date'),
-          TextCellValue('Description'),
-          TextCellValue('Debit'),
-          TextCellValue('Reference'),
+          TextCellValue('Account title'),
+          TextCellValue('Sample customer'),
+        ])
+        ..appendRow([
+          TextCellValue('Statement period'),
+          TextCellValue('August 2026'),
+        ])
+        ..appendRow([])
+        ..appendRow([
+          TextCellValue('Transaction Date'),
+          TextCellValue('Transaction Remarks'),
+          TextCellValue('Withdrawal Amount'),
+          TextCellValue('Instrument ID'),
         ])
         ..appendRow([
           TextCellValue('2026-08-20'),
@@ -88,7 +98,10 @@ void main() {
         mapping: inspection.suggestedMapping,
       );
 
+      expect(inspection.headerRowIndex, 3);
+      expect(inspection.headers, contains('Transaction Remarks'));
       expect(preview.validCount, 1);
+      expect(preview.rows.single.rowNumber, 5);
       expect(preview.rows.single.amount?.minorUnits, 425000);
       final result = wizard.commit(preview: preview, accountId: accountId);
       expect(result.imported, 1);

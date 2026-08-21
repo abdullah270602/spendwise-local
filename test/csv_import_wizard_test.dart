@@ -53,6 +53,45 @@ void main() {
     },
   );
 
+  test('finds a bank transaction table below statement metadata', () {
+    const text = '''UBL Account Statement
+Account Title;Sample Customer
+Account Number;00001234
+Statement Period;August 2026
+
+Transaction Date;Value Date;Transaction Remarks;Withdrawal Amount;Deposit Amount;Available Balance;Instrument ID
+20/08/2026;20/08/2026;CARD PURCHASE;1500.50;;98500.50;TX-1
+21/08/2026;21/08/2026;SALARY;;50000;148500.50;TX-2
+''';
+    final inspection = wizard.inspect(
+      fileName: 'bank-export.csv',
+      text: text,
+      accountId: accountId,
+    );
+    final mapping = CsvMappingDefinition(
+      roles: inspection.suggestedMapping.roles,
+      dateFormat: CsvDateFormat.dayMonthYearSlash,
+    );
+    final preview = wizard.preview(
+      inspection: inspection,
+      text: text,
+      accountId: accountId,
+      mapping: mapping,
+    );
+
+    expect(inspection.delimiter, ';');
+    expect(inspection.headerRowIndex, 4);
+    expect(inspection.suggestedMapping.column(CsvColumnRole.date), 0);
+    expect(inspection.suggestedMapping.column(CsvColumnRole.description), 2);
+    expect(inspection.suggestedMapping.column(CsvColumnRole.debit), 3);
+    expect(inspection.suggestedMapping.column(CsvColumnRole.credit), 4);
+    expect(inspection.suggestedMapping.column(CsvColumnRole.balance), 5);
+    expect(inspection.suggestedMapping.column(CsvColumnRole.reference), 6);
+    expect(preview.validCount, 2);
+    expect(preview.rows.first.rowNumber, 6);
+    expect(preview.rows.first.amount?.minorUnits, 150050);
+  });
+
   test('supports a single signed amount column and explicit direction', () {
     const text = '''Date,Description,Amount,Direction,Reference
 2026-08-20,Coffee,-450.50,debit,C-1

@@ -120,4 +120,15 @@ void main() {
     expect(snapshot.savingsBalanceMinor, 10500000);
     expect(snapshot.netWorthMinor, 12500000);
   });
+
+  test('savings visibility on Home defaults off and persists locally', () {
+    final ledger = LocalLedger.openInMemoryForTests();
+    addTearDown(ledger.close);
+
+    expect(ledger.showSavingsOnHome, isFalse);
+    ledger.setShowSavingsOnHome(true);
+    expect(ledger.showSavingsOnHome, isTrue);
+    ledger.setShowSavingsOnHome(false);
+    expect(ledger.showSavingsOnHome, isFalse);
+  });
 }

@@ -16,7 +16,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Spending insights'), findsOneWidget);
+    expect(find.text('Insights'), findsOneWidget);
+    expect(find.text('Total tracked'), findsOneWidget);
     expect(find.text('Money moving over time'), findsOneWidget);
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
     await tester.pumpAndSettle();
@@ -83,7 +84,21 @@ class _InsightsModel extends ChangeNotifier implements SpendWiseViewModel {
     monthlyChangePercent: 0,
   );
   @override
-  List<AccountViewData> get accounts => const [];
+  List<AccountViewData> get accounts => const [
+    AccountViewData(
+      id: 'daily',
+      name: 'Daily',
+      type: 'bank',
+      balance: MoneyViewData(2500000),
+    ),
+    AccountViewData(
+      id: 'savings',
+      name: 'Emergency fund',
+      type: 'savings',
+      balance: MoneyViewData(10000000),
+      isIncluded: false,
+    ),
+  ];
   @override
   List<ReviewViewData> get reviews => const [];
   @override

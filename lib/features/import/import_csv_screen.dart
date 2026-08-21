@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:csv/csv.dart';
 
 import '../../app/theme.dart';
+import '../../data/statement_table_detector.dart';
 import '../../widgets/spendwise_components.dart';
 import '../shell/spendwise_view_model.dart';
 
@@ -22,6 +22,7 @@ class _ImportCsvScreenState extends State<ImportCsvScreen> {
   String sourceLabel = 'Bank statement';
   List<String> headers = const [];
   List<List<String>> rows = const [];
+  int headerRowIndex = 0;
   final mapping = <ImportField, String>{};
   CsvImportPreviewViewData? preview;
   bool exitApproved = false;
@@ -185,45 +186,52 @@ class _ImportCsvScreenState extends State<ImportCsvScreen> {
         onChanged: (v) => sourceLabel = v.trim(),
       ),
       const SizedBox(height: 16),
-      InkWell(
-        onTap: busy ? null : _pick,
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          height: 156,
-          decoration: BoxDecoration(
-            color: SpendWiseColors.surface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: csv == null
-                  ? SpendWiseColors.border
-                  : SpendWiseColors.accent,
+      Semantics(
+        button: true,
+        label: csv == null
+            ? 'Choose CSV or Excel file. Supports CSV, XLSX, and XLS. Read locally on this device.'
+            : '${selectedFile!.fileName}, ${rows.length} data rows',
+        child: InkWell(
+          onTap: busy ? null : _pick,
+          borderRadius: BorderRadius.circular(18),
+          child: Container(
+            width: double.infinity,
+            height: 136,
+            decoration: BoxDecoration(
+              color: SpendWiseColors.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: csv == null
+                    ? SpendWiseColors.border
+                    : SpendWiseColors.accent,
+              ),
             ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                csv == null
-                    ? Icons.upload_file_outlined
-                    : Icons.check_circle_outline_rounded,
-                size: 38,
-                color: SpendWiseColors.accent,
+            child: ExcludeSemantics(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    csv == null
+                        ? Icons.upload_file_outlined
+                        : Icons.check_circle_outline_rounded,
+                    size: 38,
+                    color: SpendWiseColors.accent,
+                  ),
+                  const SizedBox(height: 11),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    child: Text(
+                      csv == null
+                          ? 'Choose CSV or Excel file'
+                          : '${selectedFile!.fileName} · ${rows.length} rows',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 11),
-              Text(
-                csv == null
-                    ? 'Choose CSV or Excel file'
-                    : selectedFile!.fileName,
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                csv == null
-                    ? 'CSV, XLSX, or XLS · read only on this device'
-                    : '${selectedSheetName ?? 'Statement'} · ${rows.length} data rows',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -268,6 +276,13 @@ class _ImportCsvScreenState extends State<ImportCsvScreen> {
                 'Detected headers',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
+              if (headerRowIndex > 0) ...[
+                const SizedBox(height: 3),
+                Text(
+                  'Transaction table found on row ${headerRowIndex + 1}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
               const SizedBox(height: 10),
               Wrap(
                 spacing: 7,
@@ -485,67 +500,36 @@ class _ImportCsvScreenState extends State<ImportCsvScreen> {
 
   void _loadSheet(StatementFileViewData file, StatementSheetViewData sheet) {
     final value = sheet.csvText;
-    final normalized = value.startsWith('\ufeff') ? value.substring(1) : value;
-    final firstLine = normalized
-        .split(RegExp(r'\r?\n'))
-        .firstWhere((line) => line.trim().isNotEmpty, orElse: () => '');
-    if (firstLine.isEmpty) {
-      throw const FormatException('The selected worksheet is empty.');
-    }
-    final delimiters = [',', ';', '\t'];
-    delimiters.sort(
-      (a, b) => b
-          .allMatches(firstLine)
-          .length
-          .compareTo(a.allMatches(firstLine).length),
-    );
-    final decoded = Csv(
-      fieldDelimiter: delimiters.first,
-      autoDetect: false,
-    ).decode(normalized);
-    if (decoded.isEmpty) {
-      throw const FormatException('The selected worksheet is empty.');
-    }
-    final parsedHeaders = decoded.first
-        .map((value) => '$value'.trim())
-        .toList();
-    final parsedRows = decoded
-        .skip(1)
+    final detected = const StatementTableDetector().detect(value);
+    final parsedRows = detected.dataRows
         .map((row) => row.map((value) => '$value').toList())
         .toList();
     setState(() {
       selectedFile = file;
       selectedSheetName = sheet.name;
       csv = value;
-      headers = parsedHeaders;
+      headers = detected.headers;
       rows = parsedRows;
+      headerRowIndex = detected.headerRowIndex;
       mapping.clear();
       preview = null;
       busy = false;
       for (final h in headers) {
-        final key = h.toLowerCase();
-        if (key.contains('date')) {
-          mapping.putIfAbsent(ImportField.date, () => h);
-        }
-        if (key.contains('desc') ||
-            key.contains('merchant') ||
-            key.contains('narrat')) {
-          mapping.putIfAbsent(ImportField.description, () => h);
-        }
-        if (key == 'amount' || key.contains('transaction amount')) {
-          mapping.putIfAbsent(ImportField.amount, () => h);
-        }
-        if (key.contains('debit')) {
-          mapping.putIfAbsent(ImportField.debit, () => h);
-        }
-        if (key.contains('credit')) {
-          mapping.putIfAbsent(ImportField.credit, () => h);
-        }
-        if (key.contains('curr')) {
-          mapping.putIfAbsent(ImportField.currency, () => h);
-        }
-        if (key.contains('ref')) {
-          mapping.putIfAbsent(ImportField.reference, () => h);
+        final field = switch (recognizeStatementHeader(h)) {
+          StatementColumnKind.date => ImportField.date,
+          StatementColumnKind.description => ImportField.description,
+          StatementColumnKind.merchant => ImportField.merchant,
+          StatementColumnKind.debit => ImportField.debit,
+          StatementColumnKind.credit => ImportField.credit,
+          StatementColumnKind.amount => ImportField.amount,
+          StatementColumnKind.direction => ImportField.direction,
+          StatementColumnKind.balance => ImportField.balance,
+          StatementColumnKind.reference => ImportField.reference,
+          StatementColumnKind.currency => ImportField.currency,
+          StatementColumnKind.unknown => null,
+        };
+        if (field != null) {
+          mapping.putIfAbsent(field, () => h);
         }
       }
     });

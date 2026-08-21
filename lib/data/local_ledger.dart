@@ -1546,6 +1546,17 @@ final class LocalLedger {
       .select("SELECT value FROM app_settings WHERE key = 'demo_data_enabled'")
       .any((row) => row['value'] == 'true');
 
+  bool get showSavingsOnHome => _db
+      .select("SELECT value FROM app_settings WHERE key = 'show_savings_home'")
+      .any((row) => row['value'] == 'true');
+
+  void setShowSavingsOnHome(bool enabled) {
+    _db.execute(
+      "INSERT OR REPLACE INTO app_settings(key,value) VALUES ('show_savings_home',?)",
+      [enabled ? 'true' : 'false'],
+    );
+  }
+
   void seedDemoData() {
     if (demoDataEnabled) return;
     _db.execute('BEGIN IMMEDIATE');

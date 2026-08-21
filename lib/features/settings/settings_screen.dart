@@ -16,6 +16,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool changingDemoData = false;
+  bool changingSavingsVisibility = false;
 
   SpendWiseViewModel get viewModel => widget.viewModel;
 
@@ -102,6 +103,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         const SizedBox(height: 22),
+        const SectionHeading('Home'),
+        const SizedBox(height: 8),
+        Card(
+          child: SwitchListTile(
+            secondary: const Icon(Icons.savings_outlined),
+            title: const Text('Show savings on Home'),
+            subtitle: const Text(
+              'Savings always remain available in Accounts and Insights',
+            ),
+            value: viewModel.uiShowSavingsOnHome,
+            onChanged: changingSavingsVisibility ? null : _setSavingsVisibility,
+          ),
+        ),
+        const SizedBox(height: 22),
         const SectionHeading('Sample data'),
         const SizedBox(height: 8),
         Card(
@@ -168,6 +183,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } finally {
       if (mounted) setState(() => changingDemoData = false);
+    }
+  }
+
+  Future<void> _setSavingsVisibility(bool enabled) async {
+    setState(() => changingSavingsVisibility = true);
+    try {
+      await viewModel.uiSetShowSavingsOnHome(enabled);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not update Home: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => changingSavingsVisibility = false);
     }
   }
 
