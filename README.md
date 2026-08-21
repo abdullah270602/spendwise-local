@@ -23,7 +23,8 @@ A bank-app debit, an SMS alert for the same debit, and a wallet credit can descr
 - Strict PKR/Rs amount and direction parsing without floating-point money
 - Duplicate evidence collapse and debit/credit transfer reconciliation
 - Review inbox for ambiguous or unsupported observations
-- Accounts, balances, manual income/expense/transfer entry, search and filters
+- Everyday and savings accounts with separate available/saved totals
+- Manual income/expense/transfer entry, ledger search, and filters
 - Conservative CSV statement import and local CSV export
 - Editable CSV mappings, remembered statement formats, duplicate previews, and import batches
 - Evidence timelines, source health, category analytics, filtered CSV/JSON export, and removable demo data
@@ -55,7 +56,7 @@ The debug APK is written to `build/app/outputs/flutter-apk/app-debug.apk`.
 
 ## First run
 
-1. Add the bank/wallet accounts you want to track.
+1. Add the bank, wallet, cash, card, or savings accounts you want to track. Savings remain visible but are excluded from **Available to spend**.
 2. Open Settings → Notification access and grant Android notification-listener access.
 3. Enable only the financial source apps you want SpendWise to observe.
 4. Use the ledger normally; uncertain evidence appears in Review.

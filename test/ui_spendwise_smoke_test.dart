@@ -21,7 +21,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Private. Local. Yours.'), findsOneWidget);
     expect(find.byTooltip('Open settings'), findsNothing);
-    expect(find.text('Total balance'), findsOneWidget);
+    expect(find.text('Available to spend'), findsOneWidget);
     expect(find.text('Net cash flow'), findsOneWidget);
     expect(find.text('12.0% of income retained'), findsOneWidget);
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
@@ -187,7 +187,7 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('UBL'), findsOneWidget);
-    expect(find.text('PKR 477,379'), findsOneWidget);
+    expect(find.text('PKR 477,379'), findsWidgets);
   });
 
   testWidgets('account management exposes protected deletion', (tester) async {
@@ -205,6 +205,85 @@ void main() {
     await tester.tap(find.byTooltip('Account actions'));
     await tester.pumpAndSettle();
     expect(find.text('Delete account'), findsOneWidget);
+  });
+
+  testWidgets('savings can be selected during account creation', (
+    tester,
+  ) async {
+    final viewModel = _AccountCreateViewModel();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: AnimatedBuilder(
+          animation: viewModel,
+          builder: (_, _) => AccountsScreen(viewModel: viewModel),
+        ),
+      ),
+    );
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Add account'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Bank').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Savings').last);
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Savings stay visible here, but are excluded from Available to spend.',
+      ),
+      findsOneWidget,
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Account name'),
+      'Rainy day',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Opening balance'),
+      '200000',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Add account').last);
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Rainy day'), findsOneWidget);
+    expect(find.text('Everyday accounts'), findsNothing);
+    expect(find.text('PKR 200,000'), findsWidgets);
+  });
+
+  testWidgets('savings stay visible but separate from spendable money', (
+    tester,
+  ) async {
+    final viewModel = _SavingsViewModel();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: AccountsScreen(viewModel: viewModel),
+      ),
+    );
+
+    expect(find.text('Available to spend'), findsOneWidget);
+    expect(find.text('PKR 25,000'), findsWidgets);
+    expect(find.text('Savings'), findsWidgets);
+    expect(find.text('PKR 100,000'), findsWidgets);
+    expect(find.text('Everyday accounts'), findsOneWidget);
+    expect(find.text('Emergency fund'), findsOneWidget);
+  });
+
+  testWidgets('dashboard excludes savings from its available balance', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: SpendWiseShell(viewModel: _SavingsViewModel()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Available to spend'), findsOneWidget);
+    expect(find.text('PKR 25,000'), findsOneWidget);
+    expect(find.text('PKR 100,000 saved separately'), findsOneWidget);
+    expect(find.text('PKR 125,000'), findsNothing);
   });
 }
 
@@ -226,10 +305,40 @@ class _AccountCreateViewModel extends _FakeViewModel {
         name: name,
         type: type,
         balance: openingBalance,
+        isIncluded: !type.toLowerCase().contains('saving'),
       ),
     ];
     notifyListeners();
   }
+}
+
+class _SavingsViewModel extends _FakeViewModel {
+  @override
+  DashboardViewData get dashboard => const DashboardViewData(
+    netWorth: MoneyViewData(12500000),
+    spendableBalance: MoneyViewData(2500000),
+    savingsBalance: MoneyViewData(10000000),
+    incomeThisMonth: MoneyViewData(0),
+    spendingThisMonth: MoneyViewData(0),
+    monthlyChangePercent: 0,
+  );
+
+  @override
+  List<AccountViewData> get accounts => const [
+    AccountViewData(
+      id: 'daily',
+      name: 'Everyday',
+      type: 'bank',
+      balance: MoneyViewData(2500000),
+    ),
+    AccountViewData(
+      id: 'savings',
+      name: 'Emergency fund',
+      type: 'savings',
+      balance: MoneyViewData(10000000),
+      isIncluded: false,
+    ),
+  ];
 }
 
 class _EmptyViewModel extends _FakeViewModel {

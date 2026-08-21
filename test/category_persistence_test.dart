@@ -84,4 +84,40 @@ void main() {
     expect(ledger.sources(accountId: account), hasLength(1));
     expect(ledger.snapshot().transactions, hasLength(1));
   });
+
+  test('savings are tracked without inflating the spendable balance', () {
+    final ledger = LocalLedger.openInMemoryForTests();
+    addTearDown(ledger.close);
+    final daily = ledger.addAccount(
+      name: 'Daily',
+      type: AccountType.bank,
+      openingBalanceMinor: 2500000,
+    );
+    final savings = ledger.addAccount(
+      name: 'Emergency fund',
+      type: AccountType.savings,
+      openingBalanceMinor: 10000000,
+    );
+
+    var snapshot = ledger.snapshot();
+    expect(snapshot.accountBalanceMinor(daily), 2500000);
+    expect(snapshot.accountBalanceMinor(savings), 10000000);
+    expect(snapshot.spendableBalanceMinor, 2500000);
+    expect(snapshot.savingsBalanceMinor, 10000000);
+    expect(snapshot.netWorthMinor, 12500000);
+
+    ledger.addManualTransaction(
+      kind: TransactionKind.transfer,
+      amountMinor: 500000,
+      occurredAt: DateTime.utc(2026, 8, 22),
+      fromAccountId: daily,
+      toAccountId: savings,
+      description: 'Move to savings',
+    );
+
+    snapshot = ledger.snapshot();
+    expect(snapshot.spendableBalanceMinor, 2000000);
+    expect(snapshot.savingsBalanceMinor, 10500000);
+    expect(snapshot.netWorthMinor, 12500000);
+  });
 }

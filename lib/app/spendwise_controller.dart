@@ -130,6 +130,7 @@ final class SpendWiseController extends ChangeNotifier
             id: account.id,
             name: account.name,
             type: account.type.name,
+            isIncluded: account.type != domain.AccountType.savings,
             balance: MoneyViewData(
               _snapshot.accountBalanceMinor(account.id),
               currency: row['currency'] as String? ?? 'PKR',
@@ -258,6 +259,8 @@ final class SpendWiseController extends ChangeNotifier
     );
     return DashboardViewData(
       netWorth: MoneyViewData(_snapshot.netWorthMinor),
+      spendableBalance: MoneyViewData(_snapshot.spendableBalanceMinor),
+      savingsBalance: MoneyViewData(_snapshot.savingsBalanceMinor),
       incomeThisMonth: MoneyViewData(income),
       spendingThisMonth: MoneyViewData(spending),
       monthlyChangePercent: change,
@@ -357,6 +360,7 @@ final class SpendWiseController extends ChangeNotifier
     MoneyViewData openingBalance,
   ) async {
     final accountType = switch (type.toLowerCase()) {
+      String value when value.contains('saving') => domain.AccountType.savings,
       String value when value.contains('wallet') => domain.AccountType.wallet,
       String value when value.contains('cash') => domain.AccountType.cash,
       String value when value.contains('card') => domain.AccountType.card,
@@ -380,6 +384,7 @@ final class SpendWiseController extends ChangeNotifier
       );
     }
     final accountType = switch (draft.type.toLowerCase()) {
+      String value when value.contains('saving') => domain.AccountType.savings,
       String value when value.contains('wallet') => domain.AccountType.wallet,
       String value when value.contains('cash') => domain.AccountType.cash,
       String value when value.contains('card') => domain.AccountType.card,
@@ -440,6 +445,15 @@ final class SpendWiseController extends ChangeNotifier
         _ledger.updateAccount(
           id: id,
           name: draft.name,
+          type: switch (draft.type.toLowerCase()) {
+            String value when value.contains('saving') =>
+              domain.AccountType.savings,
+            String value when value.contains('wallet') =>
+              domain.AccountType.wallet,
+            String value when value.contains('cash') => domain.AccountType.cash,
+            String value when value.contains('card') => domain.AccountType.card,
+            _ => domain.AccountType.bank,
+          },
           institutionName: draft.institution.trim().isEmpty
               ? null
               : draft.institution,
