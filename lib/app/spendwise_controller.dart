@@ -108,6 +108,14 @@ final class SpendWiseController extends ChangeNotifier
   bool get demoDataEnabled => _ledger.demoDataEnabled;
 
   @override
+  DeletedAccountViewData? get lastDeletedAccount {
+    final account = _ledger.latestArchivedAccount();
+    return account == null
+        ? null
+        : DeletedAccountViewData(id: account.id, name: account.name);
+  }
+
+  @override
   List<AccountViewData> get accounts {
     final rows = {
       for (final row in _ledger.exportAccounts()) row['id'] as String: row,
@@ -452,6 +460,16 @@ final class SpendWiseController extends ChangeNotifier
           }
         }
       });
+
+  @override
+  Future<void> archiveAccount(String id) => _runBusy(() async {
+    _ledger.archiveAccount(id);
+  });
+
+  @override
+  Future<void> restoreAccount(String id) => _runBusy(() async {
+    _ledger.restoreAccount(id);
+  });
 
   @override
   Future<void> saveManualTransaction(ManualTransactionDraft draft) async {

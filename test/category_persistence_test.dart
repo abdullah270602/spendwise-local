@@ -46,4 +46,42 @@ void main() {
     expect(names, contains('Bills & utilities'));
     expect(names, contains('Income'));
   });
+
+  test('archiving and restoring an account preserves history and sources', () {
+    final ledger = LocalLedger.openInMemoryForTests();
+    addTearDown(ledger.close);
+    ledger.rememberAndroidSources([
+      {
+        'packageName': 'pk.example.bank',
+        'label': 'Example Bank',
+        'configured': true,
+      },
+    ]);
+    final source = ledger.sources().single;
+    final account = ledger.addAccount(
+      name: 'Daily',
+      type: AccountType.bank,
+      sourceIds: [source.id],
+    );
+    ledger.addManualTransaction(
+      kind: TransactionKind.expense,
+      amountMinor: 25000,
+      occurredAt: DateTime.utc(2026, 8, 22),
+      accountId: account,
+      description: 'Dinner',
+    );
+
+    ledger.archiveAccount(account);
+
+    expect(ledger.snapshot().accounts, isEmpty);
+    expect(ledger.sources(accountId: account), hasLength(1));
+    expect(ledger.snapshot().transactions, hasLength(1));
+    expect(ledger.latestArchivedAccount()?.id, account);
+
+    ledger.restoreAccount(account);
+
+    expect(ledger.snapshot().accounts, hasLength(1));
+    expect(ledger.sources(accountId: account), hasLength(1));
+    expect(ledger.snapshot().transactions, hasLength(1));
+  });
 }

@@ -165,6 +165,14 @@ class SourceViewData {
 }
 
 @immutable
+class DeletedAccountViewData {
+  const DeletedAccountViewData({required this.id, required this.name});
+
+  final String id;
+  final String name;
+}
+
+@immutable
 class CategorySpendViewData {
   const CategorySpendViewData({
     required this.category,
@@ -384,6 +392,7 @@ abstract class SpendWiseAdvancedViewModel implements SpendWiseViewModel {
   bool get busy;
   String? get errorMessage;
   bool get demoDataEnabled;
+  DeletedAccountViewData? get lastDeletedAccount;
   Future<void> correctTransaction(String id, TransactionCorrectionDraft draft);
   Future<CsvImportPreviewViewData> previewCsvImport(CsvImportDraft draft);
   Future<void> commitCsvImport(CsvImportDraft draft);
@@ -391,6 +400,8 @@ abstract class SpendWiseAdvancedViewModel implements SpendWiseViewModel {
   Future<void> setDemoDataEnabled(bool enabled);
   Future<void> addDetailedAccount(AccountCreationDraft draft);
   Future<void> updateDetailedAccount(String id, AccountUpdateDraft draft);
+  Future<void> archiveAccount(String id);
+  Future<void> restoreAccount(String id);
   void dismissError();
 }
 
@@ -402,6 +413,8 @@ extension SpendWiseAdvancedAccess on SpendWiseViewModel {
   bool get uiBusy => _advanced?.busy ?? false;
   String? get uiErrorMessage => _advanced?.errorMessage;
   bool get uiDemoDataEnabled => _advanced?.demoDataEnabled ?? false;
+  DeletedAccountViewData? get uiLastDeletedAccount =>
+      _advanced?.lastDeletedAccount;
   Future<void> uiCorrectTransaction(
     String id,
     TransactionCorrectionDraft draft,
@@ -423,5 +436,11 @@ extension SpendWiseAdvancedAccess on SpendWiseViewModel {
   Future<void> uiUpdateDetailedAccount(String id, AccountUpdateDraft draft) =>
       _advanced?.updateDetailedAccount(id, draft) ??
       Future.error(UnsupportedError('Account editing is not available'));
+  Future<void> uiArchiveAccount(String id) =>
+      _advanced?.archiveAccount(id) ??
+      Future.error(UnsupportedError('Account removal is not available'));
+  Future<void> uiRestoreAccount(String id) =>
+      _advanced?.restoreAccount(id) ??
+      Future.error(UnsupportedError('Account restore is not available'));
   void uiDismissError() => _advanced?.dismissError();
 }

@@ -157,6 +157,21 @@ void main() {
     expect(find.text('UBL'), findsOneWidget);
     expect(find.text('PKR 477,379'), findsOneWidget);
   });
+
+  testWidgets('account management exposes protected deletion', (tester) async {
+    final viewModel = _AccountSourcesViewModel();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: AccountsScreen(viewModel: viewModel),
+      ),
+    );
+    await tester.tap(find.text('Everyday'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete account'), findsOneWidget);
+    expect(find.text('Enabled Bank'), findsOneWidget);
+    expect(find.text('Disabled Bank'), findsNothing);
+  });
 }
 
 class _AccountCreateViewModel extends _FakeViewModel {
@@ -188,6 +203,22 @@ class _EmptyViewModel extends _FakeViewModel {
   List<AccountViewData> get accounts => const [];
   @override
   List<TransactionViewData> get transactions => const [];
+}
+
+class _AccountSourcesViewModel extends _FakeViewModel {
+  @override
+  List<SourceViewData> get sources => const [
+    SourceViewData(
+      packageName: 'pk.enabled.bank',
+      label: 'Enabled Bank',
+      enabled: true,
+    ),
+    SourceViewData(
+      packageName: 'pk.disabled.bank',
+      label: 'Disabled Bank',
+      enabled: false,
+    ),
+  ];
 }
 
 class _FakeViewModel extends ChangeNotifier implements SpendWiseViewModel {
