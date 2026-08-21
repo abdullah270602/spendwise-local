@@ -1,0 +1,33 @@
+name: spendwise
+description: "Private, local-only personal finance ledger for Android."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  crypto: ^3.0.6
+  csv: ^8.0.0
+  file_picker: ^10.3.8
+  flutter_secure_storage: ^9.2.4
+  intl: ^0.20.2
+  path: ^1.9.1
+  path_provider: ^2.1.5
+  sqlite3: ^3.1.5
+  uuid: ^4.5.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlcipher
+
+flutter:
+  uses-material-design: true
