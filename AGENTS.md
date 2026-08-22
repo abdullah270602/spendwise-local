@@ -1,5 +1,9 @@
 # Project rules
 
+Read `PROJECT_STATUS.md` before starting substantial work. It is the durable
+handoff for the current shipped version, architecture, verification workflow,
+release conventions, and known risks. Update it whenever those facts change.
+
 ## Connected-device data safety
 
 Treat every connected physical Android device as containing irreplaceable real user data.
