@@ -462,6 +462,7 @@ abstract class SpendWiseViewModel implements Listenable {
   );
   Future<void> saveManualTransaction(ManualTransactionDraft draft);
   Future<void> deleteTransaction(String id);
+  Future<void> restoreTransaction(String id);
   Future<void> resolveReview(String id, {required bool merge});
   Future<void> importCsv(String csvText);
   Future<String?> pickCsvFile();

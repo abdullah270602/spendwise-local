@@ -621,6 +621,12 @@ final class SpendWiseController extends ChangeNotifier
   }
 
   @override
+  Future<void> restoreTransaction(String id) async {
+    _ledger.restoreTransaction(id);
+    _reload();
+  }
+
+  @override
   Future<void> resolveReview(String id, {required bool merge}) async {
     id == 'unparsed'
         ? _ledger.dismissUnparsed()

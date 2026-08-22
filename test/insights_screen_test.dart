@@ -114,6 +114,8 @@ class _InsightsModel extends ChangeNotifier implements SpendWiseViewModel {
   @override
   Future<void> deleteTransaction(String id) async {}
   @override
+  Future<void> restoreTransaction(String id) async {}
+  @override
   Future<void> eraseAllData() async {}
   @override
   Future<void> exportData() async {}

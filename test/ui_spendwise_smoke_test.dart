@@ -639,6 +639,9 @@ class _FakeViewModel extends ChangeNotifier implements SpendWiseViewModel {
   Future<void> completeOnboarding() async {}
   @override
   Future<void> deleteTransaction(String id) async {}
+
+  @override
+  Future<void> restoreTransaction(String id) async {}
   @override
   Future<void> eraseAllData() async {}
   @override

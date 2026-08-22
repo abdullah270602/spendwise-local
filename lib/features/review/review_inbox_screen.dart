@@ -203,7 +203,7 @@ class _ReviewCard extends StatelessWidget {
       ReviewReason.lowConfidence => Icons.help_outline_rounded,
       ReviewReason.parseFailed => Icons.text_snippet_outlined,
     };
-    return Padding(
+    final card = Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Card(
         child: Padding(
@@ -306,6 +306,53 @@ class _ReviewCard extends StatelessWidget {
         ),
       ),
     );
+    if (item.transactions.isEmpty) return card;
+    final transactionId = item.transactions.first.id;
+    return Dismissible(
+      key: ValueKey('review-${item.id}'),
+      direction: DismissDirection.horizontal,
+      background: const _SwipeBackground(
+        color: SpendWiseColors.income,
+        icon: Icons.check_circle_rounded,
+        label: 'Confirm',
+        alignment: Alignment.centerLeft,
+      ),
+      secondaryBackground: const _SwipeBackground(
+        color: SpendWiseColors.expense,
+        icon: Icons.delete_rounded,
+        label: 'Delete',
+        alignment: Alignment.centerRight,
+      ),
+      onDismissed: (direction) {
+        // Dismissible's own dismiss handling is asynchronous internally, so
+        // mutating state synchronously from here can race the frame that's
+        // still finishing the resize-collapse animation. A post-frame
+        // callback guarantees the rebuild that removes this widget happens
+        // cleanly after Dismissible is done with it.
+        final messenger = ScaffoldMessenger.of(context);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (direction == DismissDirection.startToEnd) {
+            viewModel.resolveReview(item.id, merge: false);
+          } else {
+            _deleteWithUndo(messenger, transactionId);
+          }
+        });
+      },
+      child: card,
+    );
+  }
+
+  void _deleteWithUndo(ScaffoldMessengerState messenger, String transactionId) {
+    viewModel.deleteTransaction(transactionId);
+    messenger.showSnackBar(
+      SnackBar(
+        content: const Text('Transaction deleted'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () => viewModel.restoreTransaction(transactionId),
+        ),
+      ),
+    );
   }
 
   Future<void> _confirmDismiss(BuildContext context) async {
@@ -332,4 +379,49 @@ class _ReviewCard extends StatelessWidget {
       await viewModel.resolveReview(item.id, merge: false);
     }
   }
+}
+
+class _SwipeBackground extends StatelessWidget {
+  const _SwipeBackground({
+    required this.color,
+    required this.icon,
+    required this.label,
+    required this.alignment,
+  });
+  final Color color;
+  final IconData icon;
+  final String label;
+  final Alignment alignment;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Container(
+      alignment: alignment,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .16),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: alignment == Alignment.centerLeft
+            ? [
+                Icon(icon, color: color),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: TextStyle(color: color, fontWeight: FontWeight.w700),
+                ),
+              ]
+            : [
+                Text(
+                  label,
+                  style: TextStyle(color: color, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(width: 8),
+                Icon(icon, color: color),
+              ],
+      ),
+    ),
+  );
 }
