@@ -120,6 +120,7 @@ final class CsvPreviewRow {
     this.reference,
     this.merchant,
     this.balanceMinor,
+    this.dedupeFingerprint,
     this.probableDuplicate = false,
     this.error,
   });
@@ -133,6 +134,7 @@ final class CsvPreviewRow {
   final String? reference;
   final String? merchant;
   final int? balanceMinor;
+  final String? dedupeFingerprint;
   final bool probableDuplicate;
   final String? error;
   bool get valid =>
@@ -141,7 +143,10 @@ final class CsvPreviewRow {
       direction != null &&
       amount != null;
 
-  CsvPreviewRow copyWith({bool? probableDuplicate}) => CsvPreviewRow(
+  CsvPreviewRow copyWith({
+    bool? probableDuplicate,
+    String? dedupeFingerprint,
+  }) => CsvPreviewRow(
     rowNumber: rowNumber,
     raw: raw,
     occurredAt: occurredAt,
@@ -151,6 +156,7 @@ final class CsvPreviewRow {
     reference: reference,
     merchant: merchant,
     balanceMinor: balanceMinor,
+    dedupeFingerprint: dedupeFingerprint ?? this.dedupeFingerprint,
     probableDuplicate: probableDuplicate ?? this.probableDuplicate,
     error: error,
   );
@@ -252,6 +258,7 @@ final class CsvImportWizard {
       autoDetect: false,
     ).decode(normalized);
     final rows = <CsvPreviewRow>[];
+    final fingerprintOccurrences = <String, int>{};
     for (
       var index = inspection.headerRowIndex + 1;
       index < decoded.length;
@@ -271,6 +278,21 @@ final class CsvImportWizard {
           headers: inspection.headers,
           mapping: mapping,
         );
+        final duplicateBase = _duplicateFingerprintBase(
+          accountId: accountId,
+          row: parsed,
+        );
+        final occurrence = duplicateBase == null
+            ? null
+            : (fingerprintOccurrences[duplicateBase] ?? 0) + 1;
+        if (duplicateBase != null) {
+          fingerprintOccurrences[duplicateBase] = occurrence!;
+        }
+        final dedupeFingerprint = duplicateBase == null
+            ? null
+            : sha256
+                  .convert(utf8.encode('$duplicateBase|$occurrence'))
+                  .toString();
         rows.add(
           CsvPreviewRow(
             rowNumber: parsed.rowNumber,
@@ -282,6 +304,7 @@ final class CsvImportWizard {
             reference: parsed.reference,
             merchant: parsed.merchant,
             balanceMinor: parsed.balanceMinor,
+            dedupeFingerprint: dedupeFingerprint,
             probableDuplicate: ledger.probableEvidenceDuplicate(
               accountId: accountId,
               direction: parsed.direction!,
@@ -289,6 +312,8 @@ final class CsvImportWizard {
               occurredAt: parsed.occurredAt!,
               description: parsed.description!,
               reference: parsed.reference,
+              balanceMinor: parsed.balanceMinor,
+              dedupeFingerprint: dedupeFingerprint,
             ),
           ),
         );
@@ -364,6 +389,8 @@ final class CsvImportWizard {
         occurredAt: row.occurredAt!,
         description: row.description!,
         reference: row.reference,
+        balanceMinor: row.balanceMinor,
+        dedupeFingerprint: row.dedupeFingerprint,
         sourceId: sourceId,
       );
       if (observationId != null) imported++;
@@ -398,6 +425,30 @@ final class CsvImportWizard {
       errors: preview.errorCount,
       duplicateCandidates: preview.duplicateCount,
     );
+  }
+
+  String? _duplicateFingerprintBase({
+    required String accountId,
+    required CsvPreviewRow row,
+  }) {
+    if (!row.valid) return null;
+    final description = CategoryClassifier.normalize(
+      row.description ?? row.merchant ?? '',
+    );
+    if (description.isEmpty) return null;
+    final reference = CategoryClassifier.normalize(row.reference ?? '');
+    if (reference.isEmpty && row.balanceMinor == null) return null;
+    final date = row.occurredAt!.toUtc().toIso8601String().split('T').first;
+    return [
+      accountId,
+      date,
+      row.direction!.name,
+      row.amount!.currency,
+      row.amount!.minorUnits,
+      description,
+      if (reference.isNotEmpty) 'reference:$reference',
+      if (row.balanceMinor != null) 'balance:${row.balanceMinor}',
+    ].join('|');
   }
 
   CsvPreviewRow _normalizeRow({

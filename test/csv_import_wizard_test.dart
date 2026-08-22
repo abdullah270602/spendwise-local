@@ -113,6 +113,28 @@ Transaction Date;Value Date;Transaction Remarks;Withdrawal Amount;Deposit Amount
     expect(preview.rows.first.direction, EntryDirection.debit);
   });
 
+  test('maps the exact Meezan workbook headers including document number', () {
+    const text = '''Booking Date,Value Date,Doc No,Description,Debit,Credit,Available Balance
+2026-08-20,2026-08-20,DOC-42,ONLINE PURCHASE FOOD PANDA,4250,,95750
+''';
+    final inspection = wizard.inspect(
+      fileName: 'meezan.xlsx · Sheet1',
+      text: text,
+      accountId: accountId,
+    );
+    final preview = wizard.preview(
+      inspection: inspection,
+      text: text,
+      accountId: accountId,
+      mapping: inspection.suggestedMapping,
+    );
+
+    expect(inspection.suggestedMapping.column(CsvColumnRole.date), 0);
+    expect(inspection.suggestedMapping.column(CsvColumnRole.reference), 2);
+    expect(preview.validCount, 1);
+    expect(preview.rows.single.reference, 'DOC-42');
+  });
+
   test('retains malformed rows as preview errors while valid rows remain importable', () {
     const text = '''Date,Description,Debit,Credit
 31/02/2026,Impossible,100,

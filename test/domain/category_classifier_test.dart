@@ -50,6 +50,66 @@ void main() {
     }
   });
 
+  test('classifies recurring Meezan statement narrations', () {
+    const cases = {
+      'ONLINE PURCHASE FOOD PANDA STAN (123456)': 'food',
+      'CAKES & BAKES POS TRANSACTION STAN (123456)': 'food',
+      'ONLINE PURCHASE DAILY DELI STAN (123456)': 'food',
+      'JALAL SONS POS TRANSACTION STAN (123456)': 'groceries',
+      'BILL PAID ZONG PREPAID 03000000000': 'bills',
+      'CHARGES TAXES PLUS FED STAN (123456)': 'fees',
+      'BANK CHARGES IBB SAMPLE BRANCH': 'fees',
+    };
+    for (final entry in cases.entries) {
+      expect(
+        classifier
+            .classify(text: entry.key, kind: TransactionKind.expense)
+            .categoryId,
+        entry.value,
+        reason: entry.key,
+      );
+    }
+  });
+
+  test('uses transfer and generic card fallbacks after specific merchants', () {
+    expect(
+      classifier
+          .classify(
+            text: 'RAAST P2P FUND TRANSFER TO SAMPLE PERSON',
+            kind: TransactionKind.expense,
+          )
+          .categoryId,
+      'transfer',
+    );
+    expect(
+      classifier
+          .classify(
+            text: 'MONEY RECEIVED FROM SAMPLE PERSON',
+            kind: TransactionKind.income,
+          )
+          .categoryId,
+      'transfer',
+    );
+    expect(
+      classifier
+          .classify(
+            text: 'UNKNOWN MERCHANT POS TRANSACTION STAN 123',
+            kind: TransactionKind.expense,
+          )
+          .categoryId,
+      'shopping',
+    );
+    expect(
+      classifier
+          .classify(
+            text: 'A PLUS PHARMACY POS TRANSACTION',
+            kind: TransactionKind.expense,
+          )
+          .categoryId,
+      'health',
+    );
+  });
+
   test('type rules take priority and unknown merchants stay other', () {
     expect(
       classifier

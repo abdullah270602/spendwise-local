@@ -165,4 +165,60 @@ void main() {
     final preview = await controller.previewCsvImport(draft);
     expect(preview.reimportedSheetCount, 0);
   });
+
+  test('collapses exact cross-file overlap but preserves a repeated purchase with a different balance', () async {
+    final ledger = LocalLedger.openInMemoryForTests();
+    addTearDown(ledger.close);
+    final account = ledger.addAccount(
+      name: 'Meezan Current',
+      type: domain.AccountType.bank,
+    );
+    final controller = SpendWiseController.forTests(ledger);
+    addTearDown(controller.dispose);
+    const first = '''Booking Date,Description,Debit,Credit,Available Balance
+2026-08-20,ONLINE PURCHASE FOOD PANDA,1000,,9000
+''';
+    const overlapAndRepeat =
+        '''Booking Date,Description,Debit,Credit,Available Balance
+2026-08-20,ONLINE PURCHASE FOOD PANDA,1000,,9000
+2026-08-20,ONLINE PURCHASE FOOD PANDA,1000,,8000
+''';
+    const mapping = {
+      ImportField.date: 'Booking Date',
+      ImportField.description: 'Description',
+      ImportField.debit: 'Debit',
+      ImportField.credit: 'Credit',
+      ImportField.balance: 'Available Balance',
+    };
+    final draft = CsvImportDraft(
+      csvText: first,
+      accountId: account,
+      mapping: mapping,
+      fileName: '2 statement files',
+      sheets: [
+        StatementSheetImportDraft(
+          sheetName: 'year-one.xlsx · Sheet1',
+          csvText: first,
+          accountId: account,
+          mapping: mapping,
+        ),
+        StatementSheetImportDraft(
+          sheetName: 'year-two.xlsx · Sheet1',
+          csvText: overlapAndRepeat,
+          accountId: account,
+          mapping: mapping,
+        ),
+      ],
+    );
+
+    final preview = await controller.previewCsvImport(draft);
+    expect(preview.duplicateCount, 1);
+    await controller.commitCsvImport(draft);
+
+    expect(ledger.snapshot().transactions, hasLength(2));
+    expect(
+      controller.transactions.map((transaction) => transaction.evidenceCount),
+      containsAll([1, 2]),
+    );
+  });
 }

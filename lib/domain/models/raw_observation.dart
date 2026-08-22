@@ -64,6 +64,8 @@ final class RawObservation {
   final Map<String, String> metadata;
 
   String get evidenceFingerprint {
+    final importedFingerprint = metadata['dedupeFingerprint']?.trim();
+    if (importedFingerprint?.isNotEmpty == true) return importedFingerprint!;
     final normalized = '${sourcePackage ?? ''}|${accountId ?? ''}|$body'
         .toLowerCase()
         .replaceAll(RegExp(r'\s+'), ' ')

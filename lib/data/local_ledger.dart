@@ -880,6 +880,8 @@ final class LocalLedger {
     required DateTime occurredAt,
     required String description,
     String? reference,
+    int? balanceMinor,
+    String? dedupeFingerprint,
     String? sourceId,
   }) {
     final start = occurredAt
@@ -892,9 +894,11 @@ final class LocalLedger {
         .millisecondsSinceEpoch;
     final rows = _db.select(
       '''
-      SELECT reference,description,occurred_at FROM event_candidates
-      WHERE account_id = ? AND direction = ? AND amount_minor = ? AND currency = ?
-        AND occurred_at BETWEEN ? AND ?
+      SELECT c.reference,c.description,c.occurred_at,r.payload_json
+      FROM event_candidates c
+      JOIN raw_observations r ON r.id = c.observation_id
+      WHERE c.account_id = ? AND c.direction = ? AND c.amount_minor = ?
+        AND c.currency = ? AND c.occurred_at BETWEEN ? AND ?
       ''',
       [
         accountId,
@@ -907,6 +911,11 @@ final class LocalLedger {
     );
     final normalizedDescription = _normalizeMatchText(description);
     return rows.any((row) {
+      final payload = _tryJsonMap(row['payload_json'] as String?);
+      final existingFingerprint = payload?['dedupeFingerprint'] as String?;
+      if (dedupeFingerprint != null && existingFingerprint != null) {
+        return dedupeFingerprint == existingFingerprint;
+      }
       if (reference != null &&
           reference.trim().isNotEmpty &&
           row['reference']?.toString().toLowerCase() ==
@@ -924,6 +933,17 @@ final class LocalLedger {
           normalizedDescription == existingDescription &&
           time.difference(occurredAt.toUtc()).abs() <= const Duration(days: 1);
     });
+  }
+
+  Map<String, Object?>? _tryJsonMap(String? value) {
+    if (value == null || value.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(value);
+      if (decoded is Map<String, dynamic>) return decoded;
+    } on FormatException {
+      return null;
+    }
+    return null;
   }
 
   String createImportBatch({
@@ -1885,6 +1905,8 @@ final class LocalLedger {
     required DateTime occurredAt,
     required String description,
     String? reference,
+    int? balanceMinor,
+    String? dedupeFingerprint,
     String? sourceId,
   }) {
     final externalId = '$batchId:$rowNumber';
@@ -1903,6 +1925,9 @@ final class LocalLedger {
       importBatchId: batchId,
       importRowNumber: rowNumber,
       sourceId: sourceId,
+      metadata: dedupeFingerprint == null
+          ? const {}
+          : {'dedupeFingerprint': dedupeFingerprint},
     );
     _db.execute(
       'INSERT INTO raw_observations(id,kind,external_id,account_id,observed_at,body,parse_status,payload_json,content_hash,source_id,import_batch_id,import_row_number) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
@@ -1919,6 +1944,8 @@ final class LocalLedger {
           'rowNumber': rowNumber,
           'description': description,
           'reference': reference,
+          'balanceMinor': balanceMinor,
+          'dedupeFingerprint': dedupeFingerprint,
         }),
         sha256.convert(utf8.encode('$externalId|$description')).toString(),
         sourceId,
@@ -1958,6 +1985,7 @@ final class LocalLedger {
       FROM event_candidates c JOIN raw_observations r ON r.id = c.observation_id
     ''')
         .map((row) {
+          final payload = jsonDecode(row['payload_json'] as String) as Map;
           final raw = RawObservation(
             id: row['observation_id'] as String,
             kind: ObservationKind.values.byName(row['raw_kind'] as String),
@@ -1971,6 +1999,10 @@ final class LocalLedger {
             accountId: row['account_id'] as String,
             externalId: row['external_id'] as String,
             sourceId: row['source_id'] as String?,
+            metadata: {
+              if (payload['dedupeFingerprint'] is String)
+                'dedupeFingerprint': payload['dedupeFingerprint'] as String,
+            },
           );
           return EventCandidate(
             id: row['id'] as String,

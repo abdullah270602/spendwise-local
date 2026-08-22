@@ -32,6 +32,14 @@ final class CategoryClassifier {
         confidence: 1,
       );
     }
+    final normalized = normalize(text);
+    if (_transferTerms.any((term) => _containsPhrase(normalized, term))) {
+      return const CategoryClassification(
+        categoryId: 'transfer',
+        ruleId: 'narration.transfer',
+        confidence: .95,
+      );
+    }
     if (kind == TransactionKind.income) {
       return const CategoryClassification(
         categoryId: 'income',
@@ -55,7 +63,6 @@ final class CategoryClassifier {
       );
     }
 
-    final normalized = normalize(text);
     for (final rule in _rules) {
       if (rule.terms.any((term) => _containsPhrase(normalized, term))) {
         return CategoryClassification(
@@ -64,6 +71,13 @@ final class CategoryClassifier {
           confidence: rule.confidence,
         );
       }
+    }
+    if (_cardPurchaseTerms.any((term) => _containsPhrase(normalized, term))) {
+      return const CategoryClassification(
+        categoryId: 'shopping',
+        ruleId: 'fallback.card_purchase',
+        confidence: .65,
+      );
     }
     return const CategoryClassification(
       categoryId: 'other',
@@ -82,6 +96,18 @@ final class CategoryClassifier {
   static bool _containsPhrase(String normalized, String phrase) =>
       ' $normalized '.contains(' ${normalize(phrase)} ');
 }
+
+const _transferTerms = <String>[
+  'raast p2p fund transfer',
+  'money transferred to',
+  'money received from',
+  'fund transfer to',
+  'fund transfer from',
+  'ibft to',
+  'ibft from',
+];
+
+const _cardPurchaseTerms = <String>['online purchase', 'pos transaction'];
 
 final class _CategoryRule {
   const _CategoryRule(this.id, this.categoryId, this.terms);
@@ -103,6 +129,7 @@ const _rules = <_CategoryRule>[
     'metro cash and carry',
     'alfatah',
     'al fatah',
+    'jalal sons',
   ]),
   _CategoryRule('merchant.entertainment', 'entertainment', [
     'netflix',
@@ -139,6 +166,7 @@ const _rules = <_CategoryRule>[
   ]),
   _CategoryRule('merchant.food', 'food', [
     'foodpanda',
+    'food panda',
     'restaurant',
     'cafe',
     'coffee',
@@ -147,6 +175,9 @@ const _rules = <_CategoryRule>[
     'mcdonald',
     'dominos',
     'pizza hut',
+    'daily deli',
+    'cakes and bakes',
+    'cakes bakes',
   ]),
   _CategoryRule('merchant.transport', 'transport', [
     'careem',
@@ -247,6 +278,8 @@ const _rules = <_CategoryRule>[
     'nayatel',
     'jazz postpaid',
     'zong postpaid',
+    'zong prepaid',
+    'mobile top up',
     'telenor postpaid',
   ]),
   _CategoryRule('merchant.cash', 'cash', ['atm withdrawal', 'cash withdrawal']),
@@ -256,5 +289,7 @@ const _rules = <_CategoryRule>[
     'annual fee',
     'card fee',
     'transaction fee',
+    'bank charges',
+    'charges taxes plus fed',
   ]),
 ];

@@ -128,6 +128,7 @@ StatementColumnKind recognizeStatementHeader(String value) {
     'txndate' ||
     'transactiondate' ||
     'transactiondatetime' ||
+    'bookingdate' ||
     'postingdate' ||
     'valuedate' => StatementColumnKind.date,
     'description' ||
@@ -174,6 +175,8 @@ StatementColumnKind recognizeStatementHeader(String value) {
     'rrn' ||
     'instrumentid' ||
     'chequeno' ||
+    'docno' ||
+    'documentno' ||
     'tracenumber' => StatementColumnKind.reference,
     'currency' || 'ccy' => StatementColumnKind.currency,
     _ => StatementColumnKind.unknown,

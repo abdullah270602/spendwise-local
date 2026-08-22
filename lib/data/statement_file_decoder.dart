@@ -16,11 +16,47 @@ final class DecodedStatementFile {
   final List<DecodedStatementSheet> sheets;
 }
 
+final class StatementFileInput {
+  const StatementFileInput({required this.fileName, required this.bytes});
+
+  final String fileName;
+  final List<int> bytes;
+}
+
 /// Decodes statement files without network access or temporary plaintext files.
 final class StatementFileDecoder {
   const StatementFileDecoder();
 
   static const maxFileBytes = 25 * 1024 * 1024;
+
+  Future<DecodedStatementFile> decodeMany(
+    Iterable<StatementFileInput> inputs,
+  ) async {
+    final files = inputs.toList(growable: false);
+    if (files.isEmpty) {
+      throw const FormatException('Choose at least one statement file.');
+    }
+    if (files.length == 1) {
+      final file = files.single;
+      return decode(fileName: file.fileName, bytes: file.bytes);
+    }
+    final sheets = <DecodedStatementSheet>[];
+    for (final file in files) {
+      final decoded = await decode(fileName: file.fileName, bytes: file.bytes);
+      for (final sheet in decoded.sheets) {
+        sheets.add(
+          DecodedStatementSheet(
+            name: '${decoded.fileName} · ${sheet.name}',
+            csvText: sheet.csvText,
+          ),
+        );
+      }
+    }
+    return DecodedStatementFile(
+      fileName: '${files.length} statement files',
+      sheets: sheets,
+    );
+  }
 
   Future<DecodedStatementFile> decode({
     required String fileName,

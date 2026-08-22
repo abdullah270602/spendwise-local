@@ -137,9 +137,16 @@ final class StatementAccountInferer {
       r'(?:account|a\s*/?\s*c|iban|card)[^\r\n]{0,45}?([0-9][0-9\s-]{3,})',
       caseSensitive: false,
     ).firstMatch(metadata);
-    if (match == null) return '';
-    final digits = match.group(1)!.replaceAll(RegExp(r'\D'), '');
-    if (digits.length < 4) return '';
+    if (match != null) {
+      final digits = match.group(1)!.replaceAll(RegExp(r'\D'), '');
+      if (digits.length >= 4) return digits.substring(digits.length - 4);
+    }
+    final standalone = RegExp(r'(?<!\d)(\d{10,24})(?!\d)')
+        .allMatches(metadata)
+        .map((match) => match.group(1)!)
+        .toSet();
+    if (standalone.length != 1) return '';
+    final digits = standalone.single;
     return digits.substring(digits.length - 4);
   }
 
