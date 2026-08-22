@@ -11,16 +11,38 @@ import android.service.notification.NotificationListenerService
 import java.io.ByteArrayOutputStream
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.StandardMethodCodec
 
 class MainActivity : FlutterActivity() {
+    private var notificationTaskQueue: BinaryMessenger.TaskQueue? = null
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // This channel does SQLite and PackageManager/icon work that must not run on the
+        // main thread: a prior version blocked here (e.g. a synchronous manual-scan wait),
+        // freezing the UI and producing ANRs. A background TaskQueue keeps every call off
+        // the main thread while preserving the normal async result contract on the Dart side.
+        val messenger = flutterEngine.dartExecutor.binaryMessenger
+        val taskQueue = messenger.makeBackgroundTaskQueue()
+        notificationTaskQueue = taskQueue
+        MethodChannel(
+            messenger,
+            NOTIFICATION_CHANNEL,
+            StandardMethodCodec.INSTANCE,
+            taskQueue,
+        ).setMethodCallHandler(::handleNotificationMethod)
+    }
+
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             NOTIFICATION_CHANNEL,
-        ).setMethodCallHandler(::handleNotificationMethod)
+        ).setMethodCallHandler(null)
+        notificationTaskQueue = null
+        super.cleanUpFlutterEngine(flutterEngine)
     }
 
     private fun handleNotificationMethod(call: MethodCall, result: MethodChannel.Result) {
