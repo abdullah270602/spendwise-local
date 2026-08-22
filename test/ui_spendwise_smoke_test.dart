@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:spendwise/app/theme.dart';
 import 'package:spendwise/features/accounts/accounts_screen.dart';
 import 'package:spendwise/features/import/import_csv_screen.dart';
@@ -9,6 +10,7 @@ import 'package:spendwise/features/shell/spendwise_view_model.dart';
 import 'package:spendwise/features/onboarding/onboarding_screen.dart';
 import 'package:spendwise/features/review/review_inbox_screen.dart';
 import 'package:spendwise/features/settings/export_screen.dart';
+import 'package:spendwise/features/settings/settings_screen.dart';
 import 'package:spendwise/features/transactions/transaction_details_screen.dart';
 
 void main() {
@@ -54,6 +56,33 @@ void main() {
       expect(find.text('Settings & privacy'), findsOneWidget);
     },
   );
+
+  testWidgets('settings shows the installed version and GitHub repository', (
+    tester,
+  ) async {
+    PackageInfo.setMockInitialValues(
+      appName: 'SpendWise',
+      packageName: 'com.spendwise.app',
+      version: '0.9.4',
+      buildNumber: '19',
+      buildSignature: '',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: SettingsScreen(viewModel: _EmptyViewModel()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('About SpendWise'), 400);
+    await tester.pumpAndSettle();
+    expect(find.text('v0.9.4 (19)'), findsOneWidget);
+    expect(find.text('GitHub repository'), findsOneWidget);
+    expect(
+      find.text('github.com/abdullah270602/spendwise-local'),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('onboarding explains the local ledger before completion', (
     tester,

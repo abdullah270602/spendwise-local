@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/theme.dart';
 import '../../widgets/spendwise_components.dart';
@@ -15,8 +17,13 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  static final Uri _repositoryUri = Uri.parse(
+    'https://github.com/abdullah270602/spendwise-local',
+  );
+
   bool changingDemoData = false;
   bool changingSavingsVisibility = false;
+  late final Future<PackageInfo> packageInfo = PackageInfo.fromPlatform();
 
   SpendWiseViewModel get viewModel => widget.viewModel;
 
@@ -131,6 +138,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         const SizedBox(height: 22),
+        const SectionHeading('About SpendWise'),
+        const SizedBox(height: 8),
+        Card(
+          child: Column(
+            children: [
+              FutureBuilder<PackageInfo>(
+                future: packageInfo,
+                builder: (context, snapshot) {
+                  final info = snapshot.data;
+                  return ListTile(
+                    leading: const Icon(Icons.info_outline_rounded),
+                    title: const Text('App version'),
+                    subtitle: Text(
+                      info == null
+                          ? 'Loading version…'
+                          : 'v${info.version} (${info.buildNumber})',
+                    ),
+                  );
+                },
+              ),
+              const Divider(height: 1, indent: 56),
+              ListTile(
+                leading: const Icon(Icons.code_rounded),
+                title: const Text('GitHub repository'),
+                subtitle: const Text(
+                  'github.com/abdullah270602/spendwise-local',
+                ),
+                trailing: const Icon(Icons.open_in_new_rounded),
+                onTap: _openRepository,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 22),
         const SectionHeading('Privacy controls'),
         const SizedBox(height: 8),
         Card(
@@ -171,6 +212,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ],
     ),
   );
+
+  Future<void> _openRepository() async {
+    try {
+      final opened = await launchUrl(
+        _repositoryUri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened) throw StateError('No browser is available');
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open the GitHub repository')),
+      );
+    }
+  }
+
   Future<void> _setDemoDataEnabled(bool enabled) async {
     setState(() => changingDemoData = true);
     try {
