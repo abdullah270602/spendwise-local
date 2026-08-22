@@ -129,6 +129,104 @@ void main() {
     },
   );
 
+  test('merges the same real transfer reported by two different apps, '
+      'using counterparty alone when no reference is shared', () {
+    const parser = NotificationParser();
+    RawObservation observationAt(
+      String id,
+      String text, {
+      required String account,
+      required String package,
+      required int minute,
+    }) => RawObservation(
+      id: id,
+      kind: ObservationKind.notification,
+      observedAt: baseTime.add(Duration(minutes: minute)),
+      body: text,
+      accountId: account,
+      sourcePackage: package,
+    );
+
+    // 5 minutes apart -- past the reconciler's 3-minute "instant transfer"
+    // bonus, and neither notification carries a reference/TID. Without
+    // counterparty (amount+time alone: score 0.6) this pair falls below
+    // the 0.7 transfer threshold. Both notifications name the account
+    // holder as the counterparty -- realistic for a same-owner IBFT/RAAST
+    // transfer between two of their own accounts -- so counterparty
+    // matching (+0.15) is what pushes it over the line.
+    final debit = parser.parse(
+      observationAt(
+        'ubl-sms',
+        'Rs. 80 sent to Jane Doe via RAAST',
+        account: 'ubl',
+        package: 'messages',
+        minute: 0,
+      ),
+    )!;
+    final credit = parser.parse(
+      observationAt(
+        'nayapay-push',
+        'Rs. 80 received from Jane Doe via RAAST',
+        account: 'nayapay',
+        package: 'com.nayapay.app',
+        minute: 5,
+      ),
+    )!;
+
+    final result = reconciler.reconcile([debit, credit]);
+
+    expect(result.transactions, hasLength(1));
+    final transaction = result.transactions.single;
+    expect(transaction.kind, TransactionKind.transfer);
+    expect(transaction.fromAccountId, 'ubl');
+    expect(transaction.toAccountId, 'nayapay');
+    expect(transaction.evidenceIds, {'ubl-sms', 'nayapay-push'});
+  });
+
+  test('does not merge unrelated opposite-direction candidates with no shared signal', () {
+    const parser = NotificationParser();
+    RawObservation observationAt(
+      String id,
+      String text, {
+      required String account,
+      required int minute,
+    }) => RawObservation(
+      id: id,
+      kind: ObservationKind.notification,
+      observedAt: baseTime.add(Duration(minutes: minute)),
+      body: text,
+      accountId: account,
+      sourcePackage: 'messages',
+    );
+
+    final debit = parser.parse(
+      observationAt(
+        'debit',
+        'Rs. 80 sent to Jane Doe via RAAST',
+        account: 'ubl',
+        minute: 0,
+      ),
+    )!;
+    final credit = parser.parse(
+      observationAt(
+        'credit',
+        'Rs. 80 received from Someone Else via RAAST',
+        account: 'nayapay',
+        minute: 5,
+      ),
+    )!;
+
+    final result = reconciler.reconcile([debit, credit]);
+
+    expect(result.transactions, hasLength(2));
+    expect(
+      result.transactions.every(
+        (item) => item.kind != TransactionKind.transfer,
+      ),
+      isTrue,
+    );
+  });
+
   test('preserves locked and manual existing transactions', () {
     final manual = CanonicalTransaction(
       id: 'manual:1',
