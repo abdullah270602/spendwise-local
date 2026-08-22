@@ -12,6 +12,54 @@ Last updated: 2026-08-22
 - Latest commit at the time of this handoff: `f4401ab` (`perf: make navigation instant`).
 - The connected Pixel 9 was upgraded in place to `0.9.6 (21)` with `adb install -r`.
 
+## Known reliability issues (open)
+
+Reported by the user on `0.9.6+21`: automatic background notification capture
+sometimes silently misses events, manual "scan tray" reports events found but
+the ledger/Review UI never updates, and the app freezes or shows "not
+responding" — most consistently right after tapping manual scan, and
+sometimes at cold start on the way to Home.
+
+Root cause fixed in this pass: `SpendWiseNotificationListenerService.scanCurrentTray()`
+blocked with `writer.submit(...).get(15, TimeUnit.SECONDS)`, and that call ran
+directly on Android's main thread because the `com.spendwise.app/notifications`
+`MethodChannel` had no background `TaskQueue`. `MainActivity.kt` now creates
+the channel with `BinaryMessenger.makeBackgroundTaskQueue()`, which also moves
+`listNotificationSources()`'s per-app icon rendering off the main thread —
+that heavy call ran during startup via `_refreshPlatform()` and was a second
+contributor to the cold-start freeze. `SpendWiseController._drainNotificationQueue()`
+also now yields every 25 events so a large backlog (e.g. accumulated while the
+old bug was blocking drains) can't hold the Dart UI isolate in one unbroken
+synchronous stretch.
+
+Still open / not yet root-caused: background auto-capture occasionally missing
+events entirely, with zero trace even in Review. Current suspicion is
+`SpendWiseNotificationListenerService.captureNow()` swallowing an extraction
+exception via `runCatching { }.getOrNull() ?: return FAILED` with no logging —
+needs `adb logcat` captured live during a reproduction to confirm (no device
+was connected during this investigation). Consider adding a lightweight
+"last capture failure reason" field to ingestion health so this is diagnosable
+without logcat next time.
+
+## Known environment issue (this dev machine)
+
+`flutter test` and `flutter build apk` currently fail during a "native
+assets" build-hook step for the `objective_c` package (pulled in transitively
+by `path_provider_foundation`, unused on this Android-only app) with:
+`'C:\Users\Abdullah' is not recognized as an internal or external command`.
+The Flutter SDK is installed at `C:\Users\Abdullah Naseem\...` — a path
+containing a space — and the native-assets hook runner does not quote it
+when shelling out to `dart compile kernel`. `flutter analyze` is unaffected
+(it doesn't build native assets) and still passes clean.
+
+Flutter self-updated to a build from `2026-08-19` on the stable channel
+(revision `6655482ec0`) at some point before this handoff; the previous
+build (`3.47.0`, `2026-08-11`) doesn't hit this bug but bundles Dart 3.13.0,
+which fails this project's `sdk: ^3.13.1` constraint, so `flutter downgrade`
+is not a clean fix. Resolving this needs either a Flutter reinstall to a
+space-free path or an upstream fix; it was left as-is (SDK restored to its
+original `3.47.1` stable checkout) rather than force a broken workaround.
+
 Version names must continue to start with `0.` until the user explicitly changes
 that policy. Increment both the semantic patch version and Android build number
 for every installed or published build.

@@ -93,13 +93,22 @@ final class SpendWiseController extends ChangeNotifier
     }
   }
 
+  static const _drainYieldBatchSize = 25;
+
   Future<void> _drainNotificationQueue() async {
     final queued = await _bridge.peek();
     final acknowledged = <int>[];
-    for (final event in queued) {
+    for (var index = 0; index < queued.length; index++) {
+      final event = queued[index];
       if (_ledger.ingestNotification(event)) {
         final id = (event['id'] as num?)?.toInt();
         if (id != null) acknowledged.add(id);
+      }
+      // Ingestion is synchronous SQLite work; yield periodically so a large
+      // backlog (e.g. from a prior failed drain) can't hold the UI isolate
+      // for one unbroken stretch and freeze the app on cold start.
+      if (index % _drainYieldBatchSize == _drainYieldBatchSize - 1) {
+        await Future<void>.delayed(Duration.zero);
       }
     }
     if (acknowledged.isNotEmpty) await _bridge.acknowledge(acknowledged);
