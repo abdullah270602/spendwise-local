@@ -37,6 +37,10 @@ final class SpendWiseController extends ChangeNotifier
   NotificationIngestionHealth? _ingestionHealth;
   bool _busy = false;
   String? _errorMessage;
+  List<AccountViewData>? _accountsCache;
+  List<TransactionViewData>? _transactionsCache;
+  DashboardViewData? _dashboardCache;
+  List<ReviewViewData>? _reviewsCache;
 
   static Future<SpendWiseController> create() async {
     final ledger = await LocalLedger.open();
@@ -103,6 +107,10 @@ final class SpendWiseController extends ChangeNotifier
 
   void _reload() {
     _snapshot = _ledger.snapshot();
+    _accountsCache = null;
+    _transactionsCache = null;
+    _dashboardCache = null;
+    _reviewsCache = null;
     notifyListeners();
   }
 
@@ -134,11 +142,13 @@ final class SpendWiseController extends ChangeNotifier
 
   @override
   List<AccountViewData> get accounts {
+    final cached = _accountsCache;
+    if (cached != null) return cached;
     final rows = {
       for (final row in _ledger.exportAccounts()) row['id'] as String: row,
     };
     final sources = {for (final source in _ledger.sources()) source.id: source};
-    return _snapshot.accounts
+    return _accountsCache = _snapshot.accounts
         .map((account) {
           final row = rows[account.id] ?? const <String, Object?>{};
           final sourceIds =
@@ -181,8 +191,10 @@ final class SpendWiseController extends ChangeNotifier
 
   @override
   List<TransactionViewData> get transactions {
+    final cached = _transactionsCache;
+    if (cached != null) return cached;
     final categories = _ledger.transactionCategories();
-    return _snapshot.transactions
+    return _transactionsCache = _snapshot.transactions
         .map((item) {
           final kind = switch (item.kind) {
             domain.TransactionKind.expense => TransactionKind.expense,
@@ -254,6 +266,8 @@ final class SpendWiseController extends ChangeNotifier
 
   @override
   DashboardViewData get dashboard {
+    final cached = _dashboardCache;
+    if (cached != null) return cached;
     final now = DateTime.now();
     var income = 0, spending = 0;
     for (final item in _snapshot.transactions) {
@@ -274,7 +288,7 @@ final class SpendWiseController extends ChangeNotifier
       0,
       (a, b) => a > b ? a : b,
     );
-    return DashboardViewData(
+    return _dashboardCache = DashboardViewData(
       netWorth: MoneyViewData(_snapshot.netWorthMinor),
       spendableBalance: MoneyViewData(_snapshot.spendableBalanceMinor),
       savingsBalance: MoneyViewData(_snapshot.savingsBalanceMinor),
@@ -299,7 +313,7 @@ final class SpendWiseController extends ChangeNotifier
   }
 
   @override
-  List<ReviewViewData> get reviews => [
+  List<ReviewViewData> get reviews => _reviewsCache ??= [
     ...transactions
         .where((item) => !item.isReviewed)
         .map(

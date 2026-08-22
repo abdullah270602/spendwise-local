@@ -19,6 +19,47 @@ class SpendWiseShell extends StatefulWidget {
 
 class _SpendWiseShellState extends State<SpendWiseShell> {
   int index = 0;
+  late final PageController _pageController;
+  late final List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+    _pages = [
+      _ReactivePage(
+        viewModel: widget.viewModel,
+        builder: () => DashboardScreen(
+          viewModel: widget.viewModel,
+          onSeeLedger: () => _selectPage(1),
+          onOpenAccounts: () => _selectPage(3),
+        ),
+      ),
+      _ReactivePage(
+        viewModel: widget.viewModel,
+        builder: () => LedgerScreen(viewModel: widget.viewModel),
+      ),
+      _ReactivePage(
+        viewModel: widget.viewModel,
+        builder: () => ReviewInboxScreen(viewModel: widget.viewModel),
+      ),
+      _ReactivePage(
+        viewModel: widget.viewModel,
+        builder: () => AccountsScreen(viewModel: widget.viewModel),
+      ),
+      _ReactivePage(
+        viewModel: widget.viewModel,
+        builder: () => SettingsScreen(viewModel: widget.viewModel),
+      ),
+    ];
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: widget.viewModel,
@@ -26,21 +67,14 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
       if (!widget.viewModel.onboardingComplete) {
         return OnboardingScreen(viewModel: widget.viewModel);
       }
-      final pages = <Widget>[
-        DashboardScreen(
-          viewModel: widget.viewModel,
-          onSeeLedger: () => setState(() => index = 1),
-          onOpenAccounts: () => setState(() => index = 3),
-        ),
-        LedgerScreen(viewModel: widget.viewModel),
-        ReviewInboxScreen(viewModel: widget.viewModel),
-        AccountsScreen(viewModel: widget.viewModel),
-        SettingsScreen(viewModel: widget.viewModel),
-      ];
       return Scaffold(
         body: Stack(
           children: [
-            IndexedStack(index: index, children: pages),
+            PageView(
+              controller: _pageController,
+              physics: const NeverScrollableScrollPhysics(),
+              children: _pages,
+            ),
             if (widget.viewModel.uiBusy)
               const Positioned(
                 top: 0,
@@ -87,7 +121,7 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         bottomNavigationBar: NavigationBar(
           selectedIndex: index,
-          onDestinationSelected: (v) => setState(() => index = v),
+          onDestinationSelected: _selectPage,
           destinations: [
             const NavigationDestination(
               icon: Icon(Icons.home_outlined),
@@ -123,12 +157,31 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
     },
   );
 
+  void _selectPage(int value) {
+    if (value == index) return;
+    setState(() => index = value);
+    _pageController.jumpToPage(value);
+  }
+
   void _showManual(BuildContext context) => showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
     useSafeArea: true,
     builder: (_) => ManualTransactionSheet(viewModel: widget.viewModel),
+  );
+}
+
+class _ReactivePage extends StatelessWidget {
+  const _ReactivePage({required this.viewModel, required this.builder});
+
+  final SpendWiseViewModel viewModel;
+  final Widget Function() builder;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: viewModel,
+    builder: (context, _) => RepaintBoundary(child: builder()),
   );
 }
 
