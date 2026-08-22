@@ -163,7 +163,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Choose CSV or Excel file'), findsOneWidget);
+    expect(find.text('Choose CSV or Excel files'), findsOneWidget);
     expect(
       find.text('CSV, XLSX, or XLS · read only on this device'),
       findsNothing,
@@ -203,7 +203,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Choose CSV or Excel file'));
+    await tester.tap(find.text('Choose CSV or Excel files'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('2 of 3 sheets'), findsOneWidget);

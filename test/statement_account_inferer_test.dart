@@ -64,4 +64,22 @@ Transaction Date,Transaction Remarks,Withdrawal Amount,Deposit Amount,Reference
     expect(result.suggestedAccountId, isNull);
     expect(result.reason, contains('choose an account'));
   });
+
+  test('uses a lone statement account number as a suffix clue', () {
+    const text = '''00000000004821
+Opening Balance,PKR 100
+Closing Balance,PKR 50
+Currency,Pakistan Rupee(PKR)
+Booking Date,Description,Debit,Credit
+2026-08-20,Card purchase,50,
+''';
+    final result = inferer.infer(
+      sheetName: 'Meezan-25-26.xlsx · Sheet1',
+      csvText: text,
+      accounts: accounts,
+    );
+
+    expect(result.suggestedAccountId, 'meezan');
+    expect(result.detectedSuffix, '4821');
+  });
 }

@@ -169,7 +169,7 @@ class _ImportCsvScreenState extends State<ImportCsvScreen> {
       Semantics(
         button: true,
         label: selectedFile == null
-            ? 'Choose CSV or Excel file. Supports CSV, XLSX, and XLS. Read locally on this device.'
+            ? 'Choose CSV or Excel files. Supports multiple CSV, XLSX, and XLS files, read locally on this device.'
             : '${selectedFile!.fileName}, ${_selectedStates.length} worksheets selected',
         child: InkWell(
           onTap: busy ? null : _pick,
@@ -202,7 +202,7 @@ class _ImportCsvScreenState extends State<ImportCsvScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 18),
                     child: Text(
                       selectedFile == null
-                          ? 'Choose CSV or Excel file'
+                          ? 'Choose CSV or Excel files'
                           : '${selectedFile!.fileName} · ${_selectedStates.length} of ${sheetStates.length} sheets',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

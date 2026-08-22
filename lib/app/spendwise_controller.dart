@@ -602,13 +602,17 @@ final class SpendWiseController extends ChangeNotifier
       type: FileType.custom,
       allowedExtensions: const ['csv', 'xlsx', 'xls'],
       withData: true,
+      allowMultiple: true,
     );
-    final file = result?.files.single;
-    final bytes = file?.bytes;
-    if (file == null || bytes == null) return null;
-    final decoded = await const StatementFileDecoder().decode(
-      fileName: file.name,
-      bytes: bytes,
+    final files = result?.files ?? const [];
+    if (files.isEmpty) return null;
+    if (files.any((file) => file.bytes == null)) {
+      throw const FormatException('One selected statement could not be read.');
+    }
+    final decoded = await const StatementFileDecoder().decodeMany(
+      files.map(
+        (file) => StatementFileInput(fileName: file.name, bytes: file.bytes!),
+      ),
     );
     final profiles = accounts
         .map(
@@ -896,23 +900,9 @@ final class SpendWiseController extends ChangeNotifier
 
   String? _batchDuplicateKey(String accountId, CsvPreviewRow row) {
     if (!row.valid) return null;
-    final date = row.occurredAt!.toUtc().toIso8601String().split('T').first;
-    final base = [
-      accountId,
-      date,
-      row.direction!.name,
-      row.amount!.currency,
-      '${row.amount!.minorUnits}',
-    ].join('|');
-    final reference = domain.CategoryClassifier.normalize(row.reference ?? '');
-    if (reference.isNotEmpty) return '$base|reference:$reference';
-    final description = domain.CategoryClassifier.normalize(
-      row.description ?? row.merchant ?? '',
-    );
-    if (row.balanceMinor != null) {
-      return '$base|balance:${row.balanceMinor}|$description';
+    if (row.dedupeFingerprint != null) {
+      return '$accountId|${row.dedupeFingerprint}';
     }
-    if (description.isNotEmpty) return '$base|description:$description';
     return null;
   }
 

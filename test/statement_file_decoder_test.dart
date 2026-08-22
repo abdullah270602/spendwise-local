@@ -123,4 +123,43 @@ void main() {
       throwsA(isA<FormatException>()),
     );
   });
+
+  test(
+    'combines multiple workbooks and disambiguates repeated sheet names',
+    () async {
+      List<int> workbookBytes(String description) {
+        final workbook = Excel.createExcel();
+        workbook[workbook.getDefaultSheet() ?? 'Sheet1']
+          ..appendRow([
+            TextCellValue('Date'),
+            TextCellValue('Description'),
+            TextCellValue('Debit'),
+          ])
+          ..appendRow([
+            TextCellValue('2026-08-20'),
+            TextCellValue(description),
+            IntCellValue(100),
+          ]);
+        return workbook.save()!;
+      }
+
+      final decoded = await const StatementFileDecoder().decodeMany([
+        StatementFileInput(
+          fileName: 'year-one.xlsx',
+          bytes: workbookBytes('First year'),
+        ),
+        StatementFileInput(
+          fileName: 'year-two.xlsx',
+          bytes: workbookBytes('Second year'),
+        ),
+      ]);
+
+      expect(decoded.fileName, '2 statement files');
+      expect(decoded.sheets, hasLength(2));
+      expect(decoded.sheets.map((sheet) => sheet.name), [
+        'year-one.xlsx · Sheet1',
+        'year-two.xlsx · Sheet1',
+      ]);
+    },
+  );
 }
