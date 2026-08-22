@@ -208,6 +208,109 @@ class AccountsScreen extends StatelessWidget {
         .toSet();
     final formKey = GlobalKey<FormState>();
     var saving = false;
+    Future<void> adjustBalance(BuildContext sheetContext) async {
+      final balance = TextEditingController(
+        text: _editableAmount(account.balance.minorUnits),
+      );
+      final adjustmentKey = GlobalKey<FormState>();
+      var adjusting = false;
+      try {
+        await showDialog<void>(
+          context: sheetContext,
+          builder: (dialogContext) => StatefulBuilder(
+            builder: (context, setDialogState) => AlertDialog(
+              title: const Text('Adjust account balance'),
+              content: Form(
+                key: adjustmentKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Set the balance shown by your bank. Existing transactions stay unchanged; SpendWise adjusts the account baseline by the difference.',
+                    ),
+                    const SizedBox(height: 18),
+                    TextFormField(
+                      controller: balance,
+                      autofocus: true,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                        signed: true,
+                      ),
+                      inputFormatters: const [
+                        _ThousandsSeparatedAmountFormatter(),
+                      ],
+                      decoration: InputDecoration(
+                        labelText: 'Current balance',
+                        prefixText: '${account.currency} ',
+                      ),
+                      validator: (value) =>
+                          Money.tryParsePkr('PKR ${value ?? ''}') == null
+                          ? 'Enter a valid amount with up to 2 decimals'
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: adjusting
+                      ? null
+                      : () => Navigator.pop(dialogContext),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: adjusting
+                      ? null
+                      : () async {
+                          if (!adjustmentKey.currentState!.validate()) return;
+                          final parsed = Money.tryParsePkr(
+                            'PKR ${balance.text}',
+                          )!;
+                          setDialogState(() => adjusting = true);
+                          try {
+                            await viewModel.uiSetAccountCurrentBalance(
+                              account.id,
+                              MoneyViewData(
+                                parsed.minorUnits,
+                                currency: account.currency,
+                              ),
+                            );
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext);
+                            }
+                            if (sheetContext.mounted) {
+                              Navigator.pop(sheetContext);
+                              messenger.showSnackBar(
+                                const SnackBar(
+                                  content: Text('Account balance updated.'),
+                                ),
+                              );
+                            }
+                          } catch (error) {
+                            if (dialogContext.mounted) {
+                              setDialogState(() => adjusting = false);
+                              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Could not update balance: $error',
+                                  ),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                  child: Text(adjusting ? 'Updating…' : 'Update balance'),
+                ),
+              ],
+            ),
+          ),
+        );
+      } finally {
+        balance.dispose();
+      }
+    }
+
     Future<void> deleteAccount(
       BuildContext sheetContext,
       StateSetter setState,
@@ -337,6 +440,12 @@ class AccountsScreen extends StatelessWidget {
                     Text(
                       formatMoney(account.balance),
                       style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: saving ? null : () => adjustBalance(context),
+                      icon: const Icon(Icons.tune_rounded),
+                      label: const Text('Adjust balance'),
                     ),
                     const SizedBox(height: 18),
                     TextFormField(
@@ -713,6 +822,18 @@ String _typeLabel(String type) => switch (type.toLowerCase()) {
   String value when value.contains('card') => 'Credit card',
   _ => 'Bank',
 };
+
+String _editableAmount(int minorUnits) {
+  final sign = minorUnits < 0 ? '-' : '';
+  final absolute = minorUnits.abs();
+  final whole = absolute ~/ 100;
+  final fraction = (absolute % 100).toString().padLeft(2, '0');
+  final grouped = whole.toString().replaceAllMapped(
+    RegExp(r'\B(?=(\d{3})+(?!\d))'),
+    (_) => ',',
+  );
+  return '$sign$grouped.$fraction';
+}
 
 class _BalanceOverview extends StatelessWidget {
   const _BalanceOverview({

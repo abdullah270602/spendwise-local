@@ -484,6 +484,7 @@ abstract class SpendWiseAdvancedViewModel implements SpendWiseViewModel {
   Future<void> setShowSavingsOnHome(bool enabled);
   Future<void> addDetailedAccount(AccountCreationDraft draft);
   Future<void> updateDetailedAccount(String id, AccountUpdateDraft draft);
+  Future<void> setAccountCurrentBalance(String id, MoneyViewData balance);
   Future<void> archiveAccount(String id);
   Future<void> restoreAccount(String id);
   Future<NotificationTrayScanViewData> scanNotificationTray();
@@ -559,6 +560,9 @@ extension SpendWiseAdvancedAccess on SpendWiseViewModel {
   Future<void> uiUpdateDetailedAccount(String id, AccountUpdateDraft draft) =>
       _advanced?.updateDetailedAccount(id, draft) ??
       Future.error(UnsupportedError('Account editing is not available'));
+  Future<void> uiSetAccountCurrentBalance(String id, MoneyViewData balance) =>
+      _advanced?.setAccountCurrentBalance(id, balance) ??
+      Future.error(UnsupportedError('Balance adjustment is not available'));
   Future<void> uiArchiveAccount(String id) =>
       _advanced?.archiveAccount(id) ??
       Future.error(UnsupportedError('Account removal is not available'));
