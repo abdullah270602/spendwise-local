@@ -3,9 +3,13 @@ package com.spendwise.app
 import android.content.ComponentName
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.util.Log
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
+
+/** Diagnostic tag. Logs package names and outcomes only — never notification content. */
+private const val TAG = "SpendWiseNotif"
 
 class SpendWiseNotificationListenerService : NotificationListenerService() {
     /** Bounded serial writer. CallerRunsPolicy provides backpressure instead of dropping evidence. */
@@ -21,6 +25,7 @@ class SpendWiseNotificationListenerService : NotificationListenerService() {
     private val eventStore by lazy { NotificationEventStore(applicationContext) }
 
     override fun onNotificationPosted(statusBarNotification: StatusBarNotification?) {
+        Log.d(TAG, "onNotificationPosted(legacy) pkg=${statusBarNotification?.packageName}")
         capture(statusBarNotification, runCatching { currentRanking }.getOrNull(), "posted")
     }
 
@@ -28,17 +33,20 @@ class SpendWiseNotificationListenerService : NotificationListenerService() {
         statusBarNotification: StatusBarNotification?,
         rankingMap: RankingMap?,
     ) {
+        Log.d(TAG, "onNotificationPosted pkg=${statusBarNotification?.packageName}")
         capture(statusBarNotification, rankingMap, "posted")
     }
 
     override fun onListenerConnected() {
         super.onListenerConnected()
+        Log.d(TAG, "onListenerConnected")
         activeInstance = this
         sourceStore.markListenerConnected()
         syncActiveNotifications("listener_connected")
     }
 
     override fun onListenerDisconnected() {
+        Log.d(TAG, "onListenerDisconnected")
         if (activeInstance === this) activeInstance = null
         sourceStore.markListenerDisconnected()
         requestRebind(ComponentName(this, SpendWiseNotificationListenerService::class.java))
@@ -73,12 +81,21 @@ class SpendWiseNotificationListenerService : NotificationListenerService() {
         reason: String,
         capturedAt: Long,
     ): CaptureOutcome {
-        if (status.packageName == packageName) return CaptureOutcome.SKIPPED
-        if (!sourceStore.isConfigured(status.packageName)) return CaptureOutcome.SKIPPED
+        val pkg = status.packageName
+        if (pkg == packageName) {
+            Log.d(TAG, "captureNow pkg=$pkg reason=$reason outcome=SKIPPED (self)")
+            return CaptureOutcome.SKIPPED
+        }
+        if (!sourceStore.isConfigured(pkg)) {
+            Log.d(TAG, "captureNow pkg=$pkg reason=$reason outcome=SKIPPED (not configured)")
+            return CaptureOutcome.SKIPPED
+        }
         val snapshot = runCatching {
             NotificationSnapshotExtractor.extract(status, rankingMap, reason, capturedAt)
+        }.onFailure { error ->
+            Log.e(TAG, "captureNow pkg=$pkg reason=$reason extraction threw ${error.javaClass.simpleName}: ${error.message}")
         }.getOrNull() ?: return CaptureOutcome.FAILED
-        return when (eventStore.enqueue(snapshot)) {
+        val outcome = when (eventStore.enqueue(snapshot)) {
             NotificationEnqueueResult.INSERTED -> {
                 sourceStore.markCapture(capturedAt)
                 CaptureOutcome.INSERTED
@@ -86,6 +103,8 @@ class SpendWiseNotificationListenerService : NotificationListenerService() {
             NotificationEnqueueResult.DUPLICATE -> CaptureOutcome.DUPLICATE
             NotificationEnqueueResult.ENCRYPTION_FAILED -> CaptureOutcome.FAILED
         }
+        Log.d(TAG, "captureNow pkg=$pkg reason=$reason outcome=$outcome")
+        return outcome
     }
 
     private fun scanCurrentTray(): NotificationTrayScanResult {

@@ -97,10 +97,15 @@ final class SpendWiseController extends ChangeNotifier
 
   Future<void> _drainNotificationQueue() async {
     final queued = await _bridge.peek();
+    debugPrint('SpendWiseNotif: drain peeked ${queued.length} queued event(s)');
     final acknowledged = <int>[];
     for (var index = 0; index < queued.length; index++) {
       final event = queued[index];
-      if (_ledger.ingestNotification(event)) {
+      final ingested = _ledger.ingestNotification(event);
+      debugPrint(
+        'SpendWiseNotif: drain pkg=${event['packageName']} ingested=$ingested',
+      );
+      if (ingested) {
         final id = (event['id'] as num?)?.toInt();
         if (id != null) acknowledged.add(id);
       }
@@ -112,6 +117,9 @@ final class SpendWiseController extends ChangeNotifier
       }
     }
     if (acknowledged.isNotEmpty) await _bridge.acknowledge(acknowledged);
+    debugPrint(
+      'SpendWiseNotif: drain acknowledged ${acknowledged.length} event(s)',
+    );
   }
 
   void _reload() {
