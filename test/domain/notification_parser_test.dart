@@ -36,4 +36,39 @@ void main() {
     expect(parser.parse(observation('Paid PKR 100. Balance PKR 900')), isNull);
     expect(parser.parse(observation('Paid PKR 100', accountId: null)), isNull);
   });
+
+  test('extracts counterparty and TID from a real-shaped bank SMS', () {
+    final result = parser.parse(
+      observation(
+        'Dear NAME, an amount of Rs. 80 has been successfully sent to '
+        'Jane Doe of IBAN No: ****6642 on 2026-08-22 at 22:29:38. '
+        'TID:721537571898 via RAAST',
+      ),
+    );
+    expect(result, isNotNull);
+    expect(result!.direction, EntryDirection.debit);
+    expect(result.counterparty, 'Jane Doe');
+    expect(result.reference, '721537571898');
+  });
+
+  test('extracts counterparty for a credit notification', () {
+    final result = parser.parse(
+      observation('Rs. 500 received from John Smith via RAAST'),
+    );
+    expect(result!.direction, EntryDirection.credit);
+    expect(result.counterparty, 'John Smith');
+  });
+
+  test('extracts a merchant name for card purchases', () {
+    final result = parser.parse(
+      observation('Rs. 1,200 paid at Corner Store on 2026-08-22'),
+    );
+    expect(result!.direction, EntryDirection.debit);
+    expect(result.counterparty, 'Corner Store');
+  });
+
+  test('leaves counterparty null rather than guess when unclear', () {
+    final result = parser.parse(observation('Rs. 100 debited from account'));
+    expect(result!.counterparty, isNull);
+  });
 }

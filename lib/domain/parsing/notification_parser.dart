@@ -21,7 +21,25 @@ final class NotificationParser {
     caseSensitive: false,
   );
   static final RegExp _referencePattern = RegExp(
-    r'\b(?:ref(?:erence)?|txn|transaction|trace|rrn)\s*(?:no\.?|id|#|:|-)?\s*([A-Z0-9-]{4,})',
+    r'\b(?:ref(?:erence)?|txn|transaction|trace|rrn|tid)\s*(?:no\.?|id|#|:|-)?\s*([A-Z0-9-]{4,})',
+    caseSensitive: false,
+  );
+  // Bounded by common trailing markers so a bank's own boilerplate (IBAN,
+  // account suffix, reference, timestamp) is never swept into the name.
+  static const _counterpartyStop =
+      r'(?=\s+(?:of|on|via|IBAN|A\/?c|Ref|Reference|TID|Trx|Rs\.?|PKR|₨|,|\.|$))';
+  static final RegExp _debitCounterpartyPattern = RegExp(
+    r'\b(?:sent|paid|transferred)\s+to\s+([A-Za-z][A-Za-z.\s]{1,40}?)' +
+        _counterpartyStop,
+    caseSensitive: false,
+  );
+  static final RegExp _creditCounterpartyPattern = RegExp(
+    r'\b(?:received|transferred)\s+from\s+([A-Za-z][A-Za-z.\s]{1,40}?)' +
+        _counterpartyStop,
+    caseSensitive: false,
+  );
+  static final RegExp _merchantPattern = RegExp(
+    r'\bat\s+([A-Za-z][A-Za-z0-9.\s&\x27-]{1,40}?)' + _counterpartyStop,
     caseSensitive: false,
   );
 
@@ -91,6 +109,7 @@ final class NotificationParser {
         .firstMatch(text)
         ?.group(1)
         ?.toUpperCase();
+    final counterparty = _counterparty(text, direction);
 
     final candidate = EventCandidate(
       id: 'candidate:${observation.id}',
@@ -100,6 +119,7 @@ final class NotificationParser {
       direction: direction,
       occurredAt: observation.observedAt,
       reference: reference,
+      counterparty: counterparty,
       description: observation.title?.trim().isNotEmpty == true
           ? observation.title!.trim()
           : null,
@@ -119,6 +139,19 @@ final class NotificationParser {
       reasons: candidate.reasons,
       candidate: candidate,
     );
+  }
+
+  /// Best-effort only: a bounded "sent/paid/transferred to X", "received/
+  /// transferred from X", or "at X" match. Returns null rather than risk a
+  /// wrong name — an unset counterparty is a lesser harm than a mislabeled
+  /// one.
+  String? _counterparty(String text, EntryDirection direction) {
+    final match = direction == EntryDirection.debit
+        ? (_debitCounterpartyPattern.firstMatch(text) ??
+              _merchantPattern.firstMatch(text))
+        : _creditCounterpartyPattern.firstMatch(text);
+    final name = match?.group(1)?.trim();
+    return name == null || name.isEmpty ? null : name;
   }
 
   ParserResult? _applyDefinition(
