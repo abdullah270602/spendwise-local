@@ -78,7 +78,12 @@ internal object NotificationSnapshotExtractor {
             "channelId" to content["channelId"],
         )
         val contentHash = SnapshotHash.sha256(JsonCodec.canonical(content))
-        val snapshotHash = SnapshotHash.sha256(JsonCodec.canonical(stable))
+        // Deliberately excludes "ranking" (and the rest of `stable`): Android mutates a
+        // notification's rank/importance/lastAudiblyAlertedAt as other notifications come and
+        // go, so hashing the full payload made the "same" notification look new on every scan
+        // and produced duplicate evidence. Matches the ranking-free formula NotificationEventStore
+        // already uses for its legacy-migration hash.
+        val snapshotHash = SnapshotHash.sha256("${status.key}\u0000${status.postTime}\u0000$contentHash")
         val payload = LinkedHashMap(stable).apply {
             put("capturedAt", capturedAt)
             put("captureReason", captureReason)

@@ -199,6 +199,11 @@ final class LocalLedger {
   @visibleForTesting
   void rerunMigrationsForTests() => _migrate();
 
+  @visibleForTesting
+  void resetDedupMigrationForTests() => _db.execute(
+    "DELETE FROM app_settings WHERE key = 'dedup_ranking_volatile_v1'",
+  );
+
   T runAtomic<T>(T Function() operation) {
     _db.execute('BEGIN IMMEDIATE');
     try {
@@ -529,7 +534,59 @@ final class LocalLedger {
       FROM accounts WHERE source_package IS NOT NULL;
     ''');
     _recategorizeAutomaticTransactions();
+    _dedupeRankingVolatileNotificationDuplicates();
     _db.execute('PRAGMA user_version = 3');
+  }
+
+  /// One-time cleanup for a fixed bug: the native capture path used to hash
+  /// Android's volatile per-notification ranking data into the dedup key, so
+  /// re-scanning the same still-visible notification kept inserting it again
+  /// as "new" evidence instead of recognizing the duplicate. This removes the
+  /// extra copies content-identical duplicates left behind, keeping the
+  /// earliest raw_observation per (source, title, body, observed_at) group.
+  void _dedupeRankingVolatileNotificationDuplicates() {
+    final done = _db.select(
+      "SELECT 1 FROM app_settings WHERE key = 'dedup_ranking_volatile_v1'",
+    );
+    if (done.isNotEmpty) return;
+    final groups = _db.select('''
+      SELECT source_package, title, body, observed_at, MIN(id) AS keep_id
+      FROM raw_observations
+      WHERE kind = 'notification'
+      GROUP BY source_package, title, body, observed_at
+      HAVING COUNT(*) > 1
+    ''');
+    var removed = 0;
+    for (final group in groups) {
+      final duplicates = _db.select(
+        '''
+        SELECT id FROM raw_observations
+        WHERE kind = 'notification' AND source_package IS ? AND title IS ?
+          AND body = ? AND observed_at = ? AND id != ?
+        ''',
+        [
+          group['source_package'],
+          group['title'],
+          group['body'],
+          group['observed_at'],
+          group['keep_id'],
+        ],
+      );
+      for (final row in duplicates) {
+        final id = row['id'] as String;
+        _db.execute(
+          'DELETE FROM transaction_evidence WHERE observation_id = ?',
+          [id],
+        );
+        _db.execute('DELETE FROM raw_observations WHERE id = ?', [id]);
+        removed++;
+      }
+    }
+    _db.execute(
+      "INSERT OR REPLACE INTO app_settings(key, value) VALUES ('dedup_ranking_volatile_v1', ?)",
+      ['$removed'],
+    );
+    if (removed > 0) _reconcile();
   }
 
   void _recategorizeAutomaticTransactions() {
@@ -1498,6 +1555,10 @@ final class LocalLedger {
   }) {
     final result = const NotificationParser().parseDetailed(raw);
     final candidate = result.candidate;
+    debugPrint(
+      'SpendWiseNotif: parse pkg=${raw.sourcePackage} status=${result.status} '
+      'accountId=${raw.accountId} reasons=${result.reasons}',
+    );
     final storedStatus = switch (result.status) {
       ParseStatus.parsed => 'parsed',
       ParseStatus.invalid => 'error',
