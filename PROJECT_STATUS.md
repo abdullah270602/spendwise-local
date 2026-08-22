@@ -4,13 +4,14 @@ Last updated: 2026-08-22
 
 ## Current release
 
-- Version: `0.9.6+21`
+- Version: `0.9.7+22`
 - Android package: `com.spendwise.app` — keep this stable so upgrades retain data.
 - Public repository: <https://github.com/abdullah270602/spendwise-local>
-- Latest release: <https://github.com/abdullah270602/spendwise-local/releases/tag/v0.9.6>
-- Shipped APK is now the optimized `app-release.apk`, not a Flutter debug build.
-- Latest commit at the time of this handoff: `f4401ab` (`perf: make navigation instant`).
-- The connected Pixel 9 was upgraded in place to `0.9.6 (21)` with `adb install -r`.
+- Latest release: <https://github.com/abdullah270602/spendwise-local/releases/tag/v0.9.7>
+- Shipped APK is the optimized `app-release.apk`, not a Flutter debug build.
+- Latest commit at the time of this handoff: `8d2ae69` (`chore: bump version to 0.9.7+22 for release`).
+- Not yet installed on the connected Pixel 9 — the user has not asked for the
+  device upgrade yet; do it only with `adb install -r` when explicitly requested.
 
 ## Known reliability issues (open)
 
@@ -41,24 +42,25 @@ was connected during this investigation). Consider adding a lightweight
 "last capture failure reason" field to ingestion health so this is diagnosable
 without logcat next time.
 
-## Known environment issue (this dev machine)
+## Dev environment note (resolved)
 
-`flutter test` and `flutter build apk` currently fail during a "native
+`flutter test` and `flutter build apk` previously failed during a "native
 assets" build-hook step for the `objective_c` package (pulled in transitively
-by `path_provider_foundation`, unused on this Android-only app) with:
-`'C:\Users\Abdullah' is not recognized as an internal or external command`.
-The Flutter SDK is installed at `C:\Users\Abdullah Naseem\...` — a path
-containing a space — and the native-assets hook runner does not quote it
-when shelling out to `dart compile kernel`. `flutter analyze` is unaffected
-(it doesn't build native assets) and still passes clean.
+by `path_provider_foundation`, unused on this Android-only app), because the
+Flutter SDK was installed at `C:\Users\Abdullah Naseem\...` — a path
+containing a space — and the native-assets hook runner doesn't quote it when
+shelling out to `dart compile kernel`. `flutter analyze` was never affected
+(it doesn't build native assets).
 
-Flutter self-updated to a build from `2026-08-19` on the stable channel
-(revision `6655482ec0`) at some point before this handoff; the previous
-build (`3.47.0`, `2026-08-11`) doesn't hit this bug but bundles Dart 3.13.0,
-which fails this project's `sdk: ^3.13.1` constraint, so `flutter downgrade`
-is not a clean fix. Resolving this needs either a Flutter reinstall to a
-space-free path or an upstream fix; it was left as-is (SDK restored to its
-original `3.47.1` stable checkout) rather than force a broken workaround.
+Fixed by relocating the Flutter SDK to `C:\dev\flutter` (a straight file copy
+of the existing install, so no re-download) and pointing the User `PATH` at
+`C:\dev\flutter\bin` instead of the old `AppData\Local\Programs\flutter\bin`
+entry. The old install was left in place, untouched, in case anything still
+references it. After the move: `flutter test` (79/79) and
+`flutter build apk --release` both succeed again. If a fresh terminal still
+resolves the old path, check `[Environment]::GetEnvironmentVariable('Path','User')`
+for a stale `AppData\Local\Programs\flutter\bin` entry — it should only list
+`C:\dev\flutter\bin` now.
 
 Version names must continue to start with `0.` until the user explicitly changes
 that policy. Increment both the semantic patch version and Android build number
