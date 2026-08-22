@@ -1824,9 +1824,7 @@ final class LocalLedger {
   /// delete "Undo" snackbar). Only clears the soft-delete marker; does not
   /// resurrect a row some other process already hard-deleted.
   void restoreTransaction(String id) {
-    _db.execute('UPDATE transactions SET deleted_at = NULL WHERE id = ?', [
-      id,
-    ]);
+    _db.execute('UPDATE transactions SET deleted_at = NULL WHERE id = ?', [id]);
   }
 
   void confirmTransaction(String id) {
