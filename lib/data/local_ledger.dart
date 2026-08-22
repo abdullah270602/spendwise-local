@@ -1232,6 +1232,23 @@ final class LocalLedger {
     );
   }
 
+  void setAccountCurrentBalance({
+    required String id,
+    required int currentBalanceMinor,
+    required int targetBalanceMinor,
+  }) {
+    final account = _db.select(
+      'SELECT id FROM accounts WHERE id = ? AND archived = 0 LIMIT 1',
+      [id],
+    );
+    if (account.isEmpty) throw StateError('Account was not found.');
+    final difference = targetBalanceMinor - currentBalanceMinor;
+    _db.execute(
+      'UPDATE accounts SET opening_balance_minor = opening_balance_minor + ?, updated_at = ? WHERE id = ?',
+      [difference, _now, id],
+    );
+  }
+
   void archiveAccount(String id) {
     _db.execute('BEGIN IMMEDIATE');
     try {

@@ -297,6 +297,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Enabled Bank'), findsOneWidget);
     expect(find.text('Disabled Bank'), findsNothing);
+    expect(find.text('Adjust balance'), findsOneWidget);
     await tester.tap(find.byTooltip('Account actions'));
     await tester.pumpAndSettle();
     expect(find.text('Delete account'), findsOneWidget);
@@ -577,6 +578,11 @@ class _BatchImportViewModel extends _FakeViewModel
   Future<void> setDemoDataEnabled(bool enabled) async {}
   @override
   Future<void> setShowSavingsOnHome(bool enabled) async {}
+  @override
+  Future<void> setAccountCurrentBalance(
+    String id,
+    MoneyViewData balance,
+  ) async {}
   @override
   Future<void> updateDetailedAccount(
     String id,

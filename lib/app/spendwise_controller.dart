@@ -530,6 +530,23 @@ final class SpendWiseController extends ChangeNotifier
       });
 
   @override
+  Future<void> setAccountCurrentBalance(String id, MoneyViewData balance) =>
+      _runBusy(() async {
+        final account = accounts.where((item) => item.id == id).firstOrNull;
+        if (account == null) throw StateError('Account was not found.');
+        if (balance.currency != account.currency) {
+          throw const FormatException(
+            'Balance currency must match the account.',
+          );
+        }
+        _ledger.setAccountCurrentBalance(
+          id: id,
+          currentBalanceMinor: account.balance.minorUnits,
+          targetBalanceMinor: balance.minorUnits,
+        );
+      });
+
+  @override
   Future<void> archiveAccount(String id) => _runBusy(() async {
     _ledger.archiveAccount(id);
   });
