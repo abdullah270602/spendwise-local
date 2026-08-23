@@ -532,6 +532,9 @@ final class LocalLedger {
       INSERT OR IGNORE INTO account_sources(account_id,source_id,created_at)
       SELECT id,'legacy:' || source_package,created_at
       FROM accounts WHERE source_package IS NOT NULL;
+
+      UPDATE categories SET name = 'Between your accounts'
+      WHERE id = 'transfer' AND is_system = 1;
     ''');
     _recategorizeAutomaticTransactions();
     _dedupeRankingVolatileNotificationDuplicates();
@@ -1709,6 +1712,39 @@ final class LocalLedger {
     );
   }
 
+  List<String> get ownNames {
+    final rows = _db.select(
+      "SELECT value FROM app_settings WHERE key = 'own_names_json'",
+    );
+    if (rows.isEmpty) return const [];
+    return (jsonDecode(rows.first['value'] as String) as List)
+        .cast<String>();
+  }
+
+  void setOwnNames(List<String> names) {
+    final cleaned = names.map((name) => name.trim()).where(
+      (name) => name.isNotEmpty,
+    ).toList();
+    _db.execute(
+      "INSERT OR REPLACE INTO app_settings(key,value) VALUES ('own_names_json',?)",
+      [jsonEncode(cleaned)],
+    );
+  }
+
+  OwnIdentity _ownIdentity() {
+    final suffixes = <String, String>{};
+    for (final row in _db.select(
+      "SELECT id, account_suffix FROM accounts WHERE account_suffix IS NOT NULL AND account_suffix != ''",
+    )) {
+      final digits = (row['account_suffix'] as String).replaceAll(
+        RegExp(r'\D'),
+        '',
+      );
+      if (digits.isNotEmpty) suffixes[row['id'] as String] = digits;
+    }
+    return OwnIdentity(names: ownNames.toSet(), accountSuffixes: suffixes);
+  }
+
   void seedDemoData() {
     if (demoDataEnabled) return;
     _db.execute('BEGIN IMMEDIATE');
@@ -2120,7 +2156,7 @@ final class LocalLedger {
         )
         .map(_transactionFromRow)
         .toList();
-    final result = const Reconciler().reconcile(
+    final result = Reconciler(ownIdentity: _ownIdentity()).reconcile(
       candidates,
       existing: existingLocked,
     );

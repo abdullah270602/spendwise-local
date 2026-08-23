@@ -12,6 +12,7 @@ void main() {
     int minute = 0,
     String? reference,
     String? description,
+    String? counterparty,
   }) {
     final observation = RawObservation(
       id: id,
@@ -30,6 +31,7 @@ void main() {
       occurredAt: observation.observedAt,
       reference: reference,
       description: description,
+      counterparty: counterparty,
     );
   }
 
@@ -226,6 +228,89 @@ void main() {
       isTrue,
     );
   });
+
+  test(
+    'merges a delayed cross-bank transfer when the counterparty is the '
+    'account holder\'s own registered name, even far outside the default '
+    'transfer window',
+    () {
+      const identityReconciler = Reconciler(
+        ownIdentity: OwnIdentity(names: {'Abdullah Naseem'}),
+      );
+      final debit = candidate(
+        id: 'debit',
+        account: 'ubl',
+        direction: EntryDirection.debit,
+        counterparty: 'ABDULLAH NASEEM',
+      );
+      final credit = candidate(
+        id: 'credit',
+        account: 'meezan',
+        direction: EntryDirection.credit,
+        // 20 hours later: settlement delay far past the default 10-minute
+        // transferWindow, and no shared reference between the two legs.
+        minute: 20 * 60,
+      );
+      final result = identityReconciler.reconcile([debit, credit]);
+      expect(result.transactions, hasLength(1));
+      final transaction = result.transactions.single;
+      expect(transaction.kind, TransactionKind.transfer);
+      expect(transaction.fromAccountId, 'ubl');
+      expect(transaction.toAccountId, 'meezan');
+    },
+  );
+
+  test(
+    'merges a delayed cross-bank transfer when the counterparty digits '
+    'match the destination account\'s registered suffix',
+    () {
+      const identityReconciler = Reconciler(
+        ownIdentity: OwnIdentity(accountSuffixes: {'meezan': '4821'}),
+      );
+      final debit = candidate(
+        id: 'debit',
+        account: 'ubl',
+        direction: EntryDirection.debit,
+        counterparty: 'Transfer to Meezan a/c ending 4821',
+      );
+      final credit = candidate(
+        id: 'credit',
+        account: 'meezan',
+        direction: EntryDirection.credit,
+        minute: 20 * 60,
+      );
+      final result = identityReconciler.reconcile([debit, credit]);
+      expect(result.transactions, hasLength(1));
+      expect(result.transactions.single.kind, TransactionKind.transfer);
+    },
+  );
+
+  test(
+    'without a configured own identity, the same delayed pair is left '
+    'unmerged (feature is opt-in and does not change default behavior)',
+    () {
+      final debit = candidate(
+        id: 'debit',
+        account: 'ubl',
+        direction: EntryDirection.debit,
+        counterparty: 'ABDULLAH NASEEM',
+      );
+      final credit = candidate(
+        id: 'credit',
+        account: 'meezan',
+        direction: EntryDirection.credit,
+        minute: 20 * 60,
+      );
+      final result = reconciler.reconcile([debit, credit]);
+      expect(result.transactions, hasLength(2));
+      expect(
+        result.transactions.every(
+          (item) => item.kind != TransactionKind.transfer,
+        ),
+        isTrue,
+      );
+    },
+  );
 
   test('preserves locked and manual existing transactions', () {
     final manual = CanonicalTransaction(

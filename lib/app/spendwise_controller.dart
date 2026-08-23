@@ -150,6 +150,9 @@ final class SpendWiseController extends ChangeNotifier
   bool get showSavingsOnHome => _ledger.showSavingsOnHome;
 
   @override
+  List<String> get ownNames => _ledger.ownNames;
+
+  @override
   DeletedAccountViewData? get lastDeletedAccount {
     final account = _ledger.latestArchivedAccount();
     return account == null
@@ -1032,6 +1035,11 @@ final class SpendWiseController extends ChangeNotifier
   @override
   Future<void> setShowSavingsOnHome(bool enabled) => _runBusy(() async {
     _ledger.setShowSavingsOnHome(enabled);
+  });
+
+  @override
+  Future<void> setOwnNames(List<String> names) => _runBusy(() async {
+    _ledger.setOwnNames(names);
   });
 
   @override

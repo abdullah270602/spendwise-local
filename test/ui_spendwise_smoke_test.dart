@@ -210,9 +210,12 @@ void main() {
       ),
     );
 
-    expect(find.text('Scan notification tray'), findsOneWidget);
-    expect(find.textContaining('Cleared or dismissed'), findsOneWidget);
-    await tester.tap(find.text('Scan notification tray'));
+    final scanButton = find.widgetWithIcon(
+      IconButton,
+      Icons.refresh_rounded,
+    );
+    expect(scanButton, findsOneWidget);
+    await tester.tap(scanButton);
     await tester.pumpAndSettle();
 
     expect(model.trayScans, 1);
@@ -505,6 +508,8 @@ class _BatchImportViewModel extends _FakeViewModel
   DeletedAccountViewData? get lastDeletedAccount => null;
   @override
   bool get showSavingsOnHome => false;
+  @override
+  List<String> get ownNames => const [];
 
   @override
   Future<StatementFileViewData?> pickStatementFile() async =>
@@ -578,6 +583,8 @@ class _BatchImportViewModel extends _FakeViewModel
   Future<void> setDemoDataEnabled(bool enabled) async {}
   @override
   Future<void> setShowSavingsOnHome(bool enabled) async {}
+  @override
+  Future<void> setOwnNames(List<String> names) async {}
   @override
   Future<void> setAccountCurrentBalance(
     String id,

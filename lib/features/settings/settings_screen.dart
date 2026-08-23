@@ -74,6 +74,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         const SizedBox(height: 22),
+        const SectionHeading('Your identity'),
+        const SizedBox(height: 8),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.badge_outlined),
+            title: const Text('Your name(s)'),
+            subtitle: Text(
+              viewModel.uiOwnNames.isEmpty
+                  ? 'Recognizes transfers between your own accounts'
+                  : viewModel.uiOwnNames.join(', '),
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => _editOwnNames(context),
+          ),
+        ),
+        const SizedBox(height: 22),
         const SectionHeading('Your data'),
         const SizedBox(height: 8),
         Card(
@@ -256,6 +272,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } finally {
       if (mounted) setState(() => changingSavingsVisibility = false);
     }
+  }
+
+  Future<void> _editOwnNames(BuildContext context) async {
+    final controller = TextEditingController(
+      text: viewModel.uiOwnNames.join(', '),
+    );
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Your name(s)'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'As they appear in bank or wallet SMS/notifications, e.g. '
+              '"ABDULLAH NASEEM". Used only to recognize transfers between '
+              'your own accounts — separate multiple names with commas.',
+              style: Theme.of(dialogContext).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: 'Abdullah Naseem, A. Naseem',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (saved == true) {
+      await viewModel.uiSetOwnNames(
+        controller.text.split(',').map((name) => name.trim()).toList(),
+      );
+    }
+    controller.dispose();
   }
 
   Future<void> _confirmErase(BuildContext context) async {

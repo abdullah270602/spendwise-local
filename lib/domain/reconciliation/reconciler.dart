@@ -1,5 +1,6 @@
 import '../models/canonical_transaction.dart';
 import '../models/event_candidate.dart';
+import '../models/own_identity.dart';
 import '../models/raw_observation.dart';
 
 final class ReconciliationResult {
@@ -18,10 +19,20 @@ final class Reconciler {
   const Reconciler({
     this.duplicateWindow = const Duration(minutes: 3),
     this.transferWindow = const Duration(minutes: 10),
+    this.ownIdentity = const OwnIdentity(),
+    this.ownAccountTransferWindow = const Duration(hours: 48),
   });
 
   final Duration duplicateWindow;
   final Duration transferWindow;
+
+  /// The user's own name(s) and per-account number suffixes. When a leg's
+  /// counterparty text matches one of these, the opposing leg is treated as
+  /// a confident transfer between the user's own accounts even across a much
+  /// wider [ownAccountTransferWindow] — interbank settlement can take far
+  /// longer than the default [transferWindow].
+  final OwnIdentity ownIdentity;
+  final Duration ownAccountTransferWindow;
 
   ReconciliationResult reconcile(
     Iterable<EventCandidate> candidates, {
@@ -173,11 +184,17 @@ final class Reconciler {
         a.amount != b.amount) {
       return 0;
     }
+    final identityMatch = _matchesOwnIdentity(a, b);
     final age = _difference(a.occurredAt, b.occurredAt);
     final lateCsv =
         a.observation.kind == ObservationKind.csvImport ||
         b.observation.kind == ObservationKind.csvImport;
-    if (age > (lateCsv ? const Duration(hours: 36) : transferWindow)) {
+    final window = identityMatch
+        ? (ownAccountTransferWindow > transferWindow
+              ? ownAccountTransferWindow
+              : transferWindow)
+        : (lateCsv ? const Duration(hours: 36) : transferWindow);
+    if (age > window) {
       return 0;
     }
     var score = age <= const Duration(minutes: 3)
@@ -190,8 +207,15 @@ final class Reconciler {
         (ac.contains(bc) || bc.contains(ac))) {
       score += 0.15;
     }
+    if (identityMatch) score += 0.35;
     return score.clamp(0, 1);
   }
+
+  bool _matchesOwnIdentity(EventCandidate a, EventCandidate b) =>
+      ownIdentity.matchesAccount(a.counterparty, b.accountId) ||
+      ownIdentity.matchesAccount(b.counterparty, a.accountId) ||
+      ownIdentity.matchesOwnName(a.counterparty) ||
+      ownIdentity.matchesOwnName(b.counterparty);
 
   CanonicalTransaction _single(_Leg leg, {required bool needsReview}) {
     final item = leg.primary;

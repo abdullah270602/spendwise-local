@@ -475,6 +475,7 @@ abstract class SpendWiseAdvancedViewModel implements SpendWiseViewModel {
   String? get errorMessage;
   bool get demoDataEnabled;
   bool get showSavingsOnHome;
+  List<String> get ownNames;
   DeletedAccountViewData? get lastDeletedAccount;
   Future<void> correctTransaction(String id, TransactionCorrectionDraft draft);
   Future<StatementFileViewData?> pickStatementFile();
@@ -483,6 +484,7 @@ abstract class SpendWiseAdvancedViewModel implements SpendWiseViewModel {
   Future<void> exportLedger(ExportRequest request);
   Future<void> setDemoDataEnabled(bool enabled);
   Future<void> setShowSavingsOnHome(bool enabled);
+  Future<void> setOwnNames(List<String> names);
   Future<void> addDetailedAccount(AccountCreationDraft draft);
   Future<void> updateDetailedAccount(String id, AccountUpdateDraft draft);
   Future<void> setAccountCurrentBalance(String id, MoneyViewData balance);
@@ -525,6 +527,7 @@ extension SpendWiseAdvancedAccess on SpendWiseViewModel {
   String? get uiErrorMessage => _advanced?.errorMessage;
   bool get uiDemoDataEnabled => _advanced?.demoDataEnabled ?? false;
   bool get uiShowSavingsOnHome => _advanced?.showSavingsOnHome ?? false;
+  List<String> get uiOwnNames => _advanced?.ownNames ?? const [];
   DeletedAccountViewData? get uiLastDeletedAccount =>
       _advanced?.lastDeletedAccount;
   Future<void> uiCorrectTransaction(
@@ -555,6 +558,8 @@ extension SpendWiseAdvancedAccess on SpendWiseViewModel {
       _advanced?.setDemoDataEnabled(enabled) ?? Future.value();
   Future<void> uiSetShowSavingsOnHome(bool enabled) =>
       _advanced?.setShowSavingsOnHome(enabled) ?? Future.value();
+  Future<void> uiSetOwnNames(List<String> names) =>
+      _advanced?.setOwnNames(names) ?? Future.value();
   Future<void> uiAddDetailedAccount(AccountCreationDraft draft) =>
       _advanced?.addDetailedAccount(draft) ??
       addAccount(draft.name, draft.type, draft.openingBalance);

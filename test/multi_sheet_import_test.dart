@@ -108,7 +108,11 @@ void main() {
       );
       expect(
         ledger.transactionCategories().values,
-        containsAll(['Entertainment', 'Health & medical', 'Transfer']),
+        containsAll([
+          'Entertainment',
+          'Health & medical',
+          'Between your accounts',
+        ]),
       );
 
       final secondPreview = await controller.previewCsvImport(draft);
