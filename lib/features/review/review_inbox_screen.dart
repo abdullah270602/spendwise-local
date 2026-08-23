@@ -13,6 +13,10 @@ class ReviewInboxScreen extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: const Text('Review inbox'),
+      actions: [
+        _ScanTrayAction(viewModel: viewModel),
+        const SizedBox(width: 4),
+      ],
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(32),
         child: Align(
@@ -30,8 +34,6 @@ class ReviewInboxScreen extends StatelessWidget {
     body: ListView(
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 100),
       children: [
-        _NotificationRecoveryPanel(viewModel: viewModel),
-        const SizedBox(height: 20),
         if (viewModel.reviews.isEmpty)
           const EmptyState(
             icon: Icons.verified_outlined,
@@ -47,83 +49,28 @@ class ReviewInboxScreen extends StatelessWidget {
   );
 }
 
-class _NotificationRecoveryPanel extends StatefulWidget {
-  const _NotificationRecoveryPanel({required this.viewModel});
+class _ScanTrayAction extends StatefulWidget {
+  const _ScanTrayAction({required this.viewModel});
 
   final SpendWiseViewModel viewModel;
 
   @override
-  State<_NotificationRecoveryPanel> createState() =>
-      _NotificationRecoveryPanelState();
+  State<_ScanTrayAction> createState() => _ScanTrayActionState();
 }
 
-class _NotificationRecoveryPanelState
-    extends State<_NotificationRecoveryPanel> {
+class _ScanTrayActionState extends State<_ScanTrayAction> {
   bool _scanning = false;
 
   @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(
-      color: SpendWiseColors.surfaceRaised,
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: SpendWiseColors.border),
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(
-                Icons.notification_add_outlined,
-                color: SpendWiseColors.accent,
-                size: 22,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Missing a transaction?',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Check enabled-source notifications still visible in your Android tray. Already captured alerts are safely ignored.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _scanning ? null : _scan,
-              icon: _scanning
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.refresh_rounded),
-              label: Text(
-                _scanning ? 'Scanning tray…' : 'Scan notification tray',
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Cleared or dismissed notifications cannot be recovered by Android.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
-      ),
-    ),
+  Widget build(BuildContext context) => IconButton(
+    onPressed: _scanning ? null : _scan,
+    tooltip: 'Scan notification tray for missed transactions',
+    icon: _scanning
+        ? const SizedBox.square(
+            dimension: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : const Icon(Icons.refresh_rounded),
   );
 
   Future<void> _scan() async {

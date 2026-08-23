@@ -4,8 +4,16 @@ import '../../app/theme.dart';
 import '../../widgets/spendwise_components.dart';
 import '../shell/spendwise_view_model.dart';
 import '../insights/insights_screen.dart';
-import '../insights/spending_analytics.dart';
 import '../transactions/transaction_details_screen.dart';
+
+const _categoryColors = [
+  SpendWiseColors.accent,
+  SpendWiseColors.warning,
+  SpendWiseColors.expense,
+  Color(0xFF7AB8FF),
+  Color(0xFFB89CFF),
+  Color(0xFF65C7C1),
+];
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({
@@ -45,10 +53,6 @@ class DashboardScreen extends StatelessWidget {
               .where((item) => item.kind == TransactionKind.transfer)
               .take(3)
               .toList();
-    final monthlyAnalytics = SpendingAnalytics.calculate(
-      transactions: viewModel.transactions,
-      resolution: AnalyticsResolution.months,
-    );
     return CustomScrollView(
       slivers: [
         SliverAppBar(
@@ -180,17 +184,6 @@ class DashboardScreen extends StatelessWidget {
                 detail: 'THIS MONTH',
               ),
               const SizedBox(height: 20),
-              SectionHeading(
-                'Spending trend',
-                action: 'Explore',
-                onAction: () => _openInsights(context),
-              ),
-              const SizedBox(height: 8),
-              _TrendPreview(
-                analytics: monthlyAnalytics,
-                onTap: () => _openInsights(context),
-              ),
-              const SizedBox(height: 20),
               if (viewModel.accounts.isEmpty) ...[
                 Card(
                   child: Padding(
@@ -230,8 +223,14 @@ class DashboardScreen extends StatelessWidget {
                         )
                       : Column(
                           children: [
-                            for (final item in categories.take(5))
-                              _CategoryBar(item),
+                            for (final (index, item) in categories
+                                .take(5)
+                                .indexed)
+                              _CategoryBar(
+                                item,
+                                color: _categoryColors[index %
+                                    _categoryColors.length],
+                              ),
                           ],
                         ),
                 ),
@@ -392,84 +391,6 @@ class DashboardScreen extends StatelessWidget {
   );
 }
 
-class _TrendPreview extends StatelessWidget {
-  const _TrendPreview({required this.analytics, required this.onTap});
-
-  final SpendingAnalytics analytics;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final buckets = analytics.buckets.skip(6).toList();
-    final maxValue = buckets.fold<int>(1, (maximum, bucket) {
-      return bucket.spendingMinor > maximum ? bucket.spendingMinor : maximum;
-    });
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      formatMoney(
-                        MoneyViewData(
-                          analytics.totalSpendingMinor,
-                          currency: analytics.currency,
-                        ),
-                      ),
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      'Last 12 months · tap for days, months, and years',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 14),
-              SizedBox(
-                width: 92,
-                height: 52,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    for (final bucket in buckets)
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 3),
-                          child: Container(
-                            height: bucket.spendingMinor == 0
-                                ? 3
-                                : 48 * bucket.spendingMinor / maxValue,
-                            decoration: BoxDecoration(
-                              color: SpendWiseColors.expense.withValues(
-                                alpha: .72,
-                              ),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(Icons.chevron_right_rounded),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _TransactionCard extends StatelessWidget {
   const _TransactionCard({required this.items, required this.viewModel});
   final List<TransactionViewData> items;
@@ -499,8 +420,9 @@ class _TransactionCard extends StatelessWidget {
 }
 
 class _CategoryBar extends StatelessWidget {
-  const _CategoryBar(this.item);
+  const _CategoryBar(this.item, {required this.color});
   final CategorySpendViewData item;
+  final Color color;
   @override
   Widget build(BuildContext context) => Semantics(
     label: '${item.category} spending',
@@ -533,7 +455,7 @@ class _CategoryBar extends StatelessWidget {
                 value: item.fraction.clamp(0, 1),
                 minHeight: 6,
                 backgroundColor: SpendWiseColors.border,
-                color: SpendWiseColors.accent,
+                color: color,
               ),
             ),
           ),

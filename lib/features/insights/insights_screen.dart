@@ -124,9 +124,6 @@ class _InsightsScreenState extends State<InsightsScreen> {
                                 _CategoryBreakdown(analytics),
                                 const SizedBox(height: 22),
                               ],
-                              const SectionHeading('Spending rhythm'),
-                              const SizedBox(height: 8),
-                              _WeekdayRhythm(analytics),
                               const SizedBox(height: 18),
                               Text(
                                 'Calculated only from your local ledger. Transfers are excluded from spending and income.',
@@ -676,85 +673,3 @@ class _DonutPainter extends CustomPainter {
       oldDelegate.fractions != fractions || oldDelegate.colors != colors;
 }
 
-class _WeekdayRhythm extends StatelessWidget {
-  const _WeekdayRhythm(this.analytics);
-
-  final SpendingAnalytics analytics;
-
-  @override
-  Widget build(BuildContext context) {
-    const labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-    final maxValue = analytics.weekdaySpending.fold<int>(
-      1,
-      (maximum, value) => math.max(maximum, value),
-    );
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Darker days carry more of your selected spending.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                for (var index = 0; index < labels.length; index++)
-                  Expanded(
-                    child: Semantics(
-                      label:
-                          '${_weekdayName(index)}: ${formatMoney(MoneyViewData(analytics.weekdaySpending[index], currency: analytics.currency))}',
-                      child: Padding(
-                        padding: EdgeInsets.only(right: index == 6 ? 0 : 7),
-                        child: Column(
-                          children: [
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 420),
-                              curve: Curves.easeOutCubic,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                color: SpendWiseColors.accent.withValues(
-                                  alpha:
-                                      .08 +
-                                      .84 *
-                                          analytics.weekdaySpending[index] /
-                                          maxValue,
-                                ),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: SpendWiseColors.accent.withValues(
-                                    alpha: .14,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 7),
-                            Text(
-                              labels[index],
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  static String _weekdayName(int index) => const [
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-    'Sunday',
-  ][index];
-}

@@ -22,9 +22,6 @@ void main() {
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
     await tester.pumpAndSettle();
     expect(find.text('Where your money went'), findsOneWidget);
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
-    await tester.pumpAndSettle();
-    expect(find.text('Spending rhythm'), findsOneWidget);
 
     await tester.drag(find.byType(CustomScrollView), const Offset(0, 1000));
     await tester.pumpAndSettle();
