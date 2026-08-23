@@ -548,6 +548,10 @@ final class SpendWiseController extends ChangeNotifier
           accountSuffix: draft.suffix.trim().isEmpty ? null : draft.suffix,
         );
         final attached = _ledger.sources(accountId: id);
+        final attachedPackages = attached
+            .map((source) => source.packageName)
+            .whereType<String>()
+            .toSet();
         final all = _ledger.sources();
         for (final source in attached) {
           if (source.packageName != null &&
@@ -555,9 +559,14 @@ final class SpendWiseController extends ChangeNotifier
             _ledger.detachSource(accountId: id, sourceId: source.id);
           }
         }
+        // Only newly-checked sources need attaching (which reparses that
+        // source's history and rebuilds the ledger) -- re-attaching sources
+        // that were already selected is a costly no-op that made every save
+        // feel slow, even when nothing about the sources actually changed.
         for (final source in all) {
           if (source.packageName != null &&
-              draft.sourcePackages.contains(source.packageName)) {
+              draft.sourcePackages.contains(source.packageName) &&
+              !attachedPackages.contains(source.packageName)) {
             _ledger.attachSource(accountId: id, sourceId: source.id);
           }
         }

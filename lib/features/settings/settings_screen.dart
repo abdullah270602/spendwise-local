@@ -315,9 +315,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
     if (saved == true) {
-      await viewModel.uiSetOwnNames(
-        controller.text.split(',').map((name) => name.trim()).toList(),
-      );
+      final names = controller.text
+          .split(',')
+          .map((name) => name.trim())
+          .toList();
+      // Defer past the dialog's own pop transition -- calling a mutation
+      // that notifies listeners in the same frame the dialog route is still
+      // unwinding is what produced the Dismissible zombie-widget bug earlier
+      // in Review; the same race applies to any dialog-then-notify sequence.
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        try {
+          await viewModel.uiSetOwnNames(names);
+        } catch (error) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Could not save your name(s): $error')),
+            );
+          }
+        }
+      });
     }
     controller.dispose();
   }
