@@ -233,7 +233,7 @@ final class LocalLedger {
 
   @visibleForTesting
   void resetEvidenceRefreshForTests() => _db.execute(
-    "DELETE FROM app_settings WHERE key = 'refresh_stored_evidence_v9'",
+    "DELETE FROM app_settings WHERE key = 'refresh_stored_evidence_v10'",
   );
 
   T runAtomic<T>(T Function() operation) {
@@ -589,10 +589,12 @@ final class LocalLedger {
 
   void _refreshStoredEvidenceInner() {
     final done = _db.select(
-      "SELECT 1 FROM app_settings WHERE key = 'refresh_stored_evidence_v9'",
+      "SELECT 1 FROM app_settings WHERE key = 'refresh_stored_evidence_v10'",
     );
     if (done.isNotEmpty) return;
     var refreshed = 0;
+    var rerouted = 0;
+    final profiles = _accountProfiles();
     // Includes captures the old parser could not read: it rejected any text
     // carrying a second amount, which is every bank SMS that quotes a
     // running balance. Deliberately skips 'ignored' — the user dismissed
@@ -603,7 +605,26 @@ final class LocalLedger {
         AND parse_status IN ('parsed', 'review', 'error')
         AND account_id IS NOT NULL
       ''')) {
-      final result = const NotificationParser().parseDetailed(_rawFromRow(row));
+      // Re-attribute first. History was filed by delivering app, so every
+      // bank's SMS sat on one account; the transactions built from it were
+      // on the wrong account, and same-owner transfers between two real
+      // accounts could never pair because both legs looked like one account.
+      final routed = const AccountRouter().route(
+        text: row['body'] as String? ?? '',
+        sender: _storedSender(row['payload_json'] as String?),
+        accounts: profiles,
+      );
+      final accountId = routed?.accountId ?? row['account_id'] as String?;
+      if (routed != null && routed.accountId != row['account_id']) {
+        _db.execute('UPDATE raw_observations SET account_id = ? WHERE id = ?', [
+          routed.accountId,
+          row['id'],
+        ]);
+        rerouted++;
+      }
+      final result = const NotificationParser().parseDetailed(
+        _rawFromRow(row, accountOverride: accountId),
+      );
       final candidate = result.candidate;
       if (candidate == null) {
         // Retire alerts that carry no amount at all: they were never
@@ -631,8 +652,9 @@ final class LocalLedger {
       _insertCandidate(candidate);
       refreshed++;
     }
+    debugPrint('SpendWisePerf: rerouted $rerouted observation(s) by content');
     _db.execute(
-      "INSERT OR REPLACE INTO app_settings(key,value) VALUES ('refresh_stored_evidence_v9','done')",
+      "INSERT OR REPLACE INTO app_settings(key,value) VALUES ('refresh_stored_evidence_v10','done')",
     );
     if (refreshed > 0) _reconcile();
   }
@@ -1554,7 +1576,22 @@ final class LocalLedger {
         ? null
         : _matchSourceAccount(packageName, text);
     final sourceId = sourceAccount?['source_id'] as String?;
-    final accountId = sourceAccount?['account_id'] as String?;
+    // A source configured with an explicit sender pattern is the user saying
+    // exactly where these belong, so it is never second-guessed. Otherwise
+    // the alert's own contents decide: one messaging app delivers every
+    // bank's SMS, and following the app would file them all into whichever
+    // account that app happens to be attached to.
+    final hasExplicitSenderRule =
+        (sourceAccount?['sender_pattern'] as String?)?.isNotEmpty == true;
+    final routed = hasExplicitSenderRule
+        ? null
+        : const AccountRouter().route(
+            text: text,
+            sender: _notificationSender(envelope),
+            accounts: _accountProfiles(),
+          );
+    final accountId =
+        routed?.accountId ?? sourceAccount?['account_id'] as String?;
     final postedAt =
         (envelope['postedAt'] as num?)?.toInt() ??
         (envelope['postedAtEpochMs'] as num?)?.toInt() ??
@@ -1633,6 +1670,34 @@ final class LocalLedger {
     if (reconcile) _reconcile();
     return true;
   }
+
+  /// The SMS sender recorded with a stored capture, if any. Routing history
+  /// needs the same signal live ingestion uses.
+  String? _storedSender(String? payloadJson) {
+    if (payloadJson == null || payloadJson.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(payloadJson);
+      return decoded is Map<String, Object?>
+          ? _notificationSender(decoded)
+          : null;
+    } on FormatException {
+      return null;
+    }
+  }
+
+  List<AccountProfile> _accountProfiles() => _db
+      .select(
+        'SELECT id, name, institution_name, account_suffix FROM accounts WHERE archived = 0',
+      )
+      .map(
+        (row) => AccountProfile(
+          id: row['id'] as String,
+          name: row['name'] as String? ?? '',
+          institution: row['institution_name'] as String? ?? '',
+          suffix: row['account_suffix'] as String? ?? '',
+        ),
+      )
+      .toList(growable: false);
 
   Row? _matchSourceAccount(String packageName, String notificationText) {
     final candidates = _db.select(
