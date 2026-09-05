@@ -237,14 +237,14 @@ void main() {
   test('does not pair two unrelated same-amount legs a day apart just because '
       'one counterparty carries the account holder\'s own name', () {
     const identityReconciler = Reconciler(
-      ownIdentity: OwnIdentity(names: {'Abdullah Naseem'}),
+      ownIdentity: OwnIdentity(names: {'Your Full Name'}),
     );
     // A genuine self-transfer out of Meezan...
     final meezanDebit = candidate(
       id: 'meezan-debit',
       account: 'meezan',
       direction: EntryDirection.debit,
-      counterparty: 'ABDULLAH NASEEM',
+      counterparty: 'YOUR FULL NAME',
     );
     // ...and an unrelated payment received into UBL a day later that
     // happens to be the same (round) amount. Knowing one leg was sent to
@@ -270,13 +270,13 @@ void main() {
   test('still pairs a same-owner transfer reported minutes apart when only the '
       'debit leg names the account holder', () {
     const identityReconciler = Reconciler(
-      ownIdentity: OwnIdentity(names: {'Abdullah Naseem'}),
+      ownIdentity: OwnIdentity(names: {'Your Full Name'}),
     );
     final debit = candidate(
       id: 'debit',
       account: 'ubl',
       direction: EntryDirection.debit,
-      counterparty: 'ABDULLAH NASEEM',
+      counterparty: 'YOUR FULL NAME',
     );
     // The receiving bank's alert does not name the sender at all, so the
     // counterparty-overlap bonus cannot apply -- the own-name signal is
@@ -343,7 +343,7 @@ void main() {
       id: 'debit',
       account: 'ubl',
       direction: EntryDirection.debit,
-      counterparty: 'ABDULLAH NASEEM',
+      counterparty: 'YOUR FULL NAME',
     );
     final credit = candidate(
       id: 'credit',

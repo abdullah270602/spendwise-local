@@ -7,7 +7,7 @@ final class OwnIdentity {
   const OwnIdentity({this.names = const {}, this.accountSuffixes = const {}});
 
   /// The user's own name variants, as they might appear as a counterparty in
-  /// bank/wallet SMS or notification text (e.g. "ABDULLAH NASEEM").
+  /// bank/wallet SMS or notification text (e.g. "YOUR FULL NAME").
   final Set<String> names;
 
   /// accountId -> digits-only account-number suffix used to recognize a debit

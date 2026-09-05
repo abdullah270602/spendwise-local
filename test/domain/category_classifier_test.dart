@@ -31,7 +31,7 @@ void main() {
 
   test('classifies broader everyday statement merchants', () {
     const cases = {
-      'IMTIAZ SUPERMARKET': 'groceries',
+      'SAMPLE SUPERMARKET': 'groceries',
       'CITY PHARMACY': 'health',
       'UNIVERSITY FEE': 'education',
       'AIRBLUE TICKET': 'travel',

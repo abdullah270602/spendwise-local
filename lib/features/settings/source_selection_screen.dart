@@ -61,7 +61,7 @@ class _SourceSelectionScreenState extends State<SourceSelectionScreen> {
       body: CustomScrollView(
         slivers: [
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(18, 8, 18, 14),
+            padding: const EdgeInsets.fromLTRB(SpendWiseTheme.gutter, 8, SpendWiseTheme.gutter, 14),
             sliver: SliverList.list(
               children: [
                 Text(
@@ -163,7 +163,7 @@ class _SourceSelectionScreenState extends State<SourceSelectionScreen> {
             )
           else
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+              padding: const EdgeInsets.fromLTRB(SpendWiseTheme.gutter, 0, SpendWiseTheme.gutter, 18),
               sliver: SliverList.separated(
                 itemCount: visible.length,
                 separatorBuilder: (_, _) =>
@@ -172,7 +172,7 @@ class _SourceSelectionScreenState extends State<SourceSelectionScreen> {
               ),
             ),
           const SliverPadding(
-            padding: EdgeInsets.fromLTRB(18, 4, 18, 28),
+            padding: EdgeInsets.fromLTRB(SpendWiseTheme.gutter, 4, SpendWiseTheme.gutter, 48),
             sliver: SliverToBoxAdapter(child: PrivacyBanner(compact: true)),
           ),
         ],

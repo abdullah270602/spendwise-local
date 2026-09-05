@@ -3,17 +3,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:spendwise/app/theme.dart';
 import 'package:spendwise/features/accounts/accounts_screen.dart';
+import 'package:spendwise/features/dashboard/dashboard_screen.dart';
 import 'package:spendwise/features/insights/insights_screen.dart';
 import 'package:spendwise/features/shell/spendwise_shell.dart';
 import 'package:spendwise/features/shell/spendwise_view_model.dart';
 import 'package:spendwise/features/onboarding/onboarding_screen.dart';
-import 'package:spendwise/features/review/review_inbox_screen.dart';
 import 'package:spendwise/features/settings/export_screen.dart';
 import 'package:spendwise/features/settings/settings_screen.dart';
 import 'package:spendwise/features/transactions/transaction_details_screen.dart';
 
 void main() {
-  testWidgets('shell renders cash-flow dashboard and local privacy state', (
+  testWidgets('home states the month as a shape, not a stack of cards', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -23,21 +23,18 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Private. Local. Yours.'), findsOneWidget);
-    expect(find.byTooltip('Open settings'), findsNothing);
-    expect(find.text('Available to spend'), findsOneWidget);
-    expect(find.text('Net cash flow'), findsOneWidget);
-    expect(find.text('12.0% of income retained'), findsOneWidget);
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
-    await tester.pumpAndSettle();
-    expect(find.text('Spending by category'), findsOneWidget);
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
-    await tester.pumpAndSettle();
-    expect(find.text('Account balances'), findsOneWidget);
+    expect(find.textContaining('WHAT HAPPENED TO IT'), findsOneWidget);
+    expect(find.text('RECEIVED 4,000'), findsOneWidget);
+    // 4,000 arrived, 1,500 left, so 2,500 is still yours.
+    expect(find.text('STILL YOURS'), findsOneWidget);
+    expect(find.text('2,500'), findsOneWidget);
+    expect(find.text('GONE'), findsOneWidget);
+    expect(find.text('1,500'), findsOneWidget);
+    expect(find.byTooltip('Settings and privacy'), findsOneWidget);
   });
 
   testWidgets(
-    'settings is a primary destination and manual entry is account-gated',
+    'settings sits on Home and manual entry stays account-gated',
     (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -47,10 +44,9 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.byType(FloatingActionButton), findsNothing);
-      await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
-      await tester.pumpAndSettle();
-      expect(find.text('Finish setup'), findsOneWidget);
-      await tester.tap(find.text('Settings'));
+      // The tab bar is five destinations of daily work; settings is a control.
+      expect(find.text('Settings'), findsNothing);
+      await tester.tap(find.byTooltip('Settings and privacy'));
       await tester.pumpAndSettle();
       expect(find.text('Settings & privacy'), findsOneWidget);
     },
@@ -73,7 +69,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('About SpendWise'), 400);
+    await tester.scrollUntilVisible(find.text('ABOUT SPENDWISE'), 400);
     await tester.pumpAndSettle();
     expect(find.text('v0.9.4 (19)'), findsOneWidget);
     expect(find.text('GitHub repository'), findsOneWidget);
@@ -181,27 +177,28 @@ void main() {
     expect(find.text('expense'), findsNothing);
   });
 
-  testWidgets('review can recover currently visible notifications', (
+  testWidgets('home can recover currently visible notifications', (
     tester,
   ) async {
     final model = _BatchImportViewModel();
     await tester.pumpWidget(
       MaterialApp(
         theme: SpendWiseTheme.dark,
-        home: ReviewInboxScreen(viewModel: model),
+        home: Scaffold(
+          body: DashboardScreen(
+            viewModel: model,
+            onSeeLedger: () {},
+            onOpenAccounts: () {},
+          ),
+        ),
       ),
     );
 
-    final scanButton = find.widgetWithIcon(IconButton, Icons.refresh_rounded);
-    expect(scanButton, findsOneWidget);
-    await tester.tap(scanButton);
+    await tester.tap(find.text('MISSING SOMETHING? SCAN THE TRAY'));
     await tester.pumpAndSettle();
 
     expect(model.trayScans, 1);
-    expect(
-      find.text('Recovered 2 new notifications from the tray.'),
-      findsOneWidget,
-    );
+    expect(find.text('Picked up 2 alerts from the tray.'), findsOneWidget);
   });
 
   testWidgets('first account accepts grouped balance and closes cleanly', (
@@ -211,21 +208,19 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: SpendWiseTheme.dark,
-        home: AnimatedBuilder(
-          animation: viewModel,
-          builder: (_, _) => AccountsScreen(viewModel: viewModel),
+        home: Scaffold(
+          body: AnimatedBuilder(
+            animation: viewModel,
+            builder: (_, _) => AccountsScreen(viewModel: viewModel),
+          ),
         ),
       ),
     );
 
-    expect(
-      find.ancestor(
-        of: find.text('Add your first account'),
-        matching: find.byType(Center),
-      ),
-      findsWidgets,
+    expect(find.text('No accounts yet.'), findsOneWidget);
+    await tester.tap(
+      find.widgetWithText(FilledButton, 'Add your first account'),
     );
-    await tester.tap(find.widgetWithText(FilledButton, 'Add account'));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Account name'),
@@ -241,7 +236,8 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('UBL'), findsOneWidget);
-    expect(find.text('PKR 477,379'), findsWidgets);
+    // The map prints bare figures; the currency is stated once per screen.
+    expect(find.text('477,379'), findsWidgets);
   });
 
   testWidgets('account management exposes protected deletion', (tester) async {
@@ -249,7 +245,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: SpendWiseTheme.dark,
-        home: AccountsScreen(viewModel: viewModel),
+        home: Scaffold(body: AccountsScreen(viewModel: viewModel)),
       ),
     );
     expect(find.text('Enabled Bank'), findsNothing);
@@ -270,14 +266,18 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: SpendWiseTheme.dark,
-        home: AnimatedBuilder(
-          animation: viewModel,
-          builder: (_, _) => AccountsScreen(viewModel: viewModel),
+        home: Scaffold(
+          body: AnimatedBuilder(
+            animation: viewModel,
+            builder: (_, _) => AccountsScreen(viewModel: viewModel),
+          ),
         ),
       ),
     );
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Add account'));
+    await tester.tap(
+      find.widgetWithText(FilledButton, 'Add your first account'),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Bank').last);
     await tester.pumpAndSettle();
@@ -302,8 +302,10 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('Rainy day'), findsOneWidget);
-    expect(find.text('Everyday accounts'), findsNothing);
-    expect(find.text('PKR 200,000'), findsWidgets);
+    // Nothing spendable exists, so the map has no "available" zone at all.
+    expect(find.text('AVAILABLE TO SPEND'), findsNothing);
+    expect(find.text('HELD BACK · SAVINGS'), findsOneWidget);
+    expect(find.text('200,000'), findsWidgets);
   });
 
   testWidgets('savings stay visible but separate from spendable money', (
@@ -313,19 +315,20 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: SpendWiseTheme.dark,
-        home: AccountsScreen(viewModel: viewModel),
+        home: Scaffold(body: AccountsScreen(viewModel: viewModel)),
       ),
     );
 
-    expect(find.text('Available to spend'), findsOneWidget);
-    expect(find.text('PKR 25,000'), findsWidgets);
-    expect(find.text('Savings'), findsWidgets);
-    expect(find.text('PKR 100,000'), findsWidgets);
-    expect(find.text('Everyday accounts'), findsOneWidget);
+    expect(find.text('TOTAL TRACKED · PKR'), findsOneWidget);
+    expect(find.text('125,000'), findsOneWidget);
+    expect(find.text('AVAILABLE TO SPEND'), findsOneWidget);
+    expect(find.text('HELD BACK · SAVINGS'), findsOneWidget);
+    expect(find.text('25,000'), findsWidgets);
+    expect(find.text('100,000'), findsWidgets);
     expect(find.text('Emergency fund'), findsOneWidget);
   });
 
-  testWidgets('dashboard hides savings by default', (tester) async {
+  testWidgets('home answers what happened, not what is held', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: SpendWiseTheme.dark,
@@ -334,10 +337,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Available to spend'), findsOneWidget);
-    expect(find.text('PKR 25,000'), findsOneWidget);
-    expect(find.text('PKR 100,000 saved separately'), findsNothing);
+    // Balances belong to Accounts. Home is about the month that just passed,
+    // and this fixture has no movement in it.
+    expect(find.textContaining('Nothing has moved in'), findsOneWidget);
     expect(find.text('Emergency fund'), findsNothing);
+    expect(find.text('PKR 25,000'), findsNothing);
     expect(find.text('PKR 125,000'), findsNothing);
   });
 
@@ -347,9 +351,12 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: SpendWiseTheme.dark,
-        home: InsightsScreen(viewModel: _SavingsViewModel()),
+        home: Scaffold(body: InsightsScreen(viewModel: _SavingsViewModel())),
       ),
     );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('DETAIL'));
     await tester.pumpAndSettle();
 
     expect(find.text('Total tracked'), findsOneWidget);
@@ -467,6 +474,30 @@ class _BatchImportViewModel extends _FakeViewModel
   bool get showSavingsOnHome => false;
   @override
   List<String> get ownNames => const [];
+
+  final Map<String, String> viewPreferences = {};
+
+  @override
+  Future<void> applyReviewDecision(ReviewDecision decision) async {}
+
+  @override
+  List<AlertViewData> alerts({
+    String? packageName,
+    bool onlyUnresolved = true,
+  }) => const [];
+
+  @override
+  List<AlertViewData> get unroutedAlerts => const [];
+
+  @override
+  bool isSharedSource(String packageName) => false;
+
+  @override
+  String? viewPreference(String key) => viewPreferences[key];
+
+  @override
+  void setViewPreference(String key, String value) =>
+      viewPreferences[key] = value;
 
   @override
   Future<void> addDetailedAccount(AccountCreationDraft draft) async {}

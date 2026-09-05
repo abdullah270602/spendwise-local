@@ -41,7 +41,7 @@ class TransactionDetailsScreen extends StatelessWidget {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 10, 18, 32),
+        padding: const EdgeInsets.fromLTRB(SpendWiseTheme.gutter, 10, SpendWiseTheme.gutter, 48),
         children: [
           Card(
             child: Padding(

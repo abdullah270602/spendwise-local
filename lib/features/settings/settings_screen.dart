@@ -30,7 +30,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Settings & privacy')),
     body: ListView(
-      padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
+      padding: const EdgeInsets.fromLTRB(SpendWiseTheme.gutter, 8, SpendWiseTheme.gutter, 48),
       children: [
         const PrivacyBanner(),
         const SizedBox(height: 22),
@@ -272,7 +272,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             Text(
               'As they appear in bank or wallet SMS/notifications, e.g. '
-              '"ABDULLAH NASEEM". Used only to recognize transfers between '
+              '"YOUR FULL NAME". Used only to recognize transfers between '
               'your own accounts — separate multiple names with commas.',
               style: Theme.of(dialogContext).textTheme.bodySmall,
             ),
@@ -281,7 +281,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               controller: controller,
               autofocus: true,
               decoration: const InputDecoration(
-                hintText: 'Abdullah Naseem, A. Naseem',
+                hintText: 'Your Name, Y. Name',
               ),
             ),
           ],

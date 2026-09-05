@@ -38,6 +38,9 @@ final class SpendWiseController extends ChangeNotifier
   List<TransactionViewData>? _transactionsCache;
   DashboardViewData? _dashboardCache;
   List<ReviewViewData>? _reviewsCache;
+  // Read on every shell rebuild for the Review badge, so it is cached
+  // alongside the rest and invalidated by the same reload.
+  List<AlertViewData>? _unroutedAlertsCache;
 
   static Future<SpendWiseController> create() async {
     final ledger = await timedAsync('ledgerOpen', LocalLedger.open);
@@ -131,6 +134,7 @@ final class SpendWiseController extends ChangeNotifier
     _transactionsCache = null;
     _dashboardCache = null;
     _reviewsCache = null;
+    _unroutedAlertsCache = null;
     notifyListeners();
   }
 
@@ -771,6 +775,82 @@ final class SpendWiseController extends ChangeNotifier
   Future<void> setOwnNames(List<String> names) => _runBusy(() async {
     _ledger.setOwnNames(names);
   });
+
+  /// One Review rule, applied to every alert it covers, with a single
+  /// reconciliation pass at the end. The old screen ran one round-trip per
+  /// item, which is why clearing an inbox of six felt like work.
+  @override
+  Future<void> applyReviewDecision(ReviewDecision decision) => _runBusy(() async {
+    switch (decision.kind) {
+      case ReviewDecisionKind.confirm:
+        _ledger.confirmTransactions(decision.transactionIds);
+      case ReviewDecisionKind.categorize:
+        _ledger.categorizeTransactions(
+          decision.transactionIds,
+          _categoryId(decision.category ?? ''),
+        );
+      case ReviewDecisionKind.route:
+        final accountId = decision.accountId;
+        if (accountId == null) {
+          throw ArgumentError('Routing needs an account');
+        }
+        _ledger.routeTransactions(decision.transactionIds, accountId);
+      case ReviewDecisionKind.redirect:
+        _ledger.redirectTransactions(
+          decision.transactionIds,
+          expense: decision.expense,
+        );
+      case ReviewDecisionKind.routeAlerts:
+        final target = decision.accountId;
+        if (target == null) {
+          throw ArgumentError('Routing needs an account');
+        }
+        _ledger.routeAlerts(decision.alertIds, target);
+      case ReviewDecisionKind.dismissSource:
+        final package = decision.packageName;
+        _ledger.dismissUnparsed(
+          packageName: package == null || package.isEmpty ? null : package,
+        );
+    }
+  });
+
+  @override
+  List<AlertViewData> alerts({
+    String? packageName,
+    bool onlyUnresolved = true,
+  }) => _ledger
+      .alerts(packageName: packageName, onlyUnresolved: onlyUnresolved)
+      .map(_alertView)
+      .toList(growable: false);
+
+  @override
+  List<AlertViewData> get unroutedAlerts => _unroutedAlertsCache ??= _ledger
+      .unroutedAlerts()
+      .map(_alertView)
+      .toList(growable: false);
+
+  @override
+  bool isSharedSource(String packageName) =>
+      _ledger.isSharedSource(packageName);
+
+  static AlertViewData _alertView(StoredAlert alert) => AlertViewData(
+    id: alert.id,
+    observedAt: alert.observedAt.toLocal(),
+    title: alert.title,
+    body: alert.body,
+    sourceLabel: alert.sourceLabel,
+    packageName: alert.packageName,
+    status: alert.status,
+    reason: alert.reason,
+    accountName: alert.accountName,
+  );
+
+  @override
+  String? viewPreference(String key) => _ledger.viewPreference(key);
+
+  @override
+  void setViewPreference(String key, String value) =>
+      _ledger.setViewPreference(key, value);
 
   @override
   Future<void> exportData() async {

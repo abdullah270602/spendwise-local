@@ -185,6 +185,89 @@ class ReviewViewData {
   final List<TransactionViewData> transactions;
 }
 
+/// What one tap on a Review rule does. Review used to ask the user to clear
+/// alerts one at a time; a decision now names every alert it covers, so the
+/// same tap that fixes one fixes ten.
+enum ReviewDecisionKind {
+  /// Accept the parse as-is and lock it.
+  confirm,
+
+  /// Accept, but file everything under one category first.
+  categorize,
+
+  /// Accept, but attach everything to one account first.
+  route,
+
+  /// The parser read the direction backwards; flip it, then accept.
+  redirect,
+
+  /// These were never transactions. Drop the raw alerts.
+  dismissSource,
+
+  /// The alert was readable all along; it just had nowhere to go. File the
+  /// raw alerts onto an account and read them again.
+  routeAlerts,
+}
+
+@immutable
+class ReviewDecision {
+  const ReviewDecision({
+    required this.kind,
+    this.transactionIds = const [],
+    this.category,
+    this.accountId,
+    this.expense = true,
+    this.packageName,
+    this.alertIds = const [],
+  });
+
+  final ReviewDecisionKind kind;
+  final List<String> transactionIds;
+  final String? category;
+  final String? accountId;
+  final bool expense;
+  final String? packageName;
+
+  /// Raw observation ids, for decisions that act before parsing.
+  final List<String> alertIds;
+
+  int get count =>
+      alertIds.isEmpty ? transactionIds.length : alertIds.length;
+}
+
+/// One captured notification as it arrived. Review groups alerts into rules,
+/// but the raw text has to stay reachable -- a summary the user cannot check
+/// is just an assertion.
+@immutable
+class AlertViewData {
+  const AlertViewData({
+    required this.id,
+    required this.observedAt,
+    required this.title,
+    required this.body,
+    required this.sourceLabel,
+    required this.status,
+    this.packageName,
+    this.reason,
+    this.accountName,
+  });
+
+  final String id;
+  final DateTime observedAt;
+  final String title;
+  final String body;
+  final String sourceLabel;
+  final String? packageName;
+
+  /// 'parsed', 'review', 'error' or 'ignored'.
+  final String status;
+  final String? reason;
+  final String? accountName;
+
+  bool get reachedLedger => status == 'parsed';
+  bool get ignored => status == 'ignored';
+}
+
 @immutable
 class DashboardViewData {
   const DashboardViewData({
@@ -346,6 +429,19 @@ abstract class SpendWiseAdvancedViewModel implements SpendWiseViewModel {
   Future<void> archiveAccount(String id);
   Future<void> restoreAccount(String id);
   Future<NotificationTrayScanViewData> scanNotificationTray();
+  Future<void> applyReviewDecision(ReviewDecision decision);
+
+  /// Captured alerts, newest first. Defaults to the ones still unresolved.
+  List<AlertViewData> alerts({String? packageName, bool onlyUnresolved = true});
+
+  /// Alerts that read like money but reached no account.
+  List<AlertViewData> get unroutedAlerts;
+
+  /// Apps that carry more than one institution, so they are never bound to a
+  /// single account.
+  bool isSharedSource(String packageName);
+  String? viewPreference(String key);
+  void setViewPreference(String key, String value);
   void dismissError();
 }
 
@@ -419,5 +515,28 @@ extension SpendWiseAdvancedAccess on SpendWiseViewModel {
       Future.error(
         UnsupportedError('Notification tray recovery is not available'),
       );
+  List<AlertViewData> uiAlerts({
+    String? packageName,
+    bool onlyUnresolved = true,
+  }) =>
+      _advanced?.alerts(
+        packageName: packageName,
+        onlyUnresolved: onlyUnresolved,
+      ) ??
+      const [];
+  List<AlertViewData> get uiUnroutedAlerts =>
+      _advanced?.unroutedAlerts ?? const [];
+  bool uiIsSharedSource(String packageName) =>
+      _advanced?.isSharedSource(packageName) ?? false;
+  Future<void> uiApplyReviewDecision(ReviewDecision decision) =>
+      _advanced?.applyReviewDecision(decision) ??
+      Future.error(UnsupportedError('Review rules are not available'));
+
+  /// Sticky view choices (Ledger chart/plain, Accounts map/plain). Reads are
+  /// synchronous and writes are fire-and-forget so a toggle never waits on
+  /// storage -- these are preferences, not data.
+  String? uiViewPreference(String key) => _advanced?.viewPreference(key);
+  void uiSetViewPreference(String key, String value) =>
+      _advanced?.setViewPreference(key, value);
   void uiDismissError() => _advanced?.dismissError();
 }

@@ -54,7 +54,7 @@ void main() {
     final result = parser.parse(
       observation(
         'Dear NAME, an amount of Rs. 80 has been successfully sent to '
-        'Jane Doe of IBAN No: ****6642 on 2026-08-22 at 22:29:38. '
+        'Jane Doe of IBAN No: ****9005 on 2026-08-22 at 22:29:38. '
         'TID:721537571898 via RAAST',
       ),
     );

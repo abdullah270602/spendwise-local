@@ -47,7 +47,7 @@ without logcat next time.
 `flutter test` and `flutter build apk` previously failed during a "native
 assets" build-hook step for the `objective_c` package (pulled in transitively
 by `path_provider_foundation`, unused on this Android-only app), because the
-Flutter SDK was installed at `C:\Users\Abdullah Naseem\...` — a path
+Flutter SDK was installed at `C:\Users\Your Full Name\...` — a path
 containing a space — and the native-assets hook runner doesn't quote it when
 shelling out to `dart compile kernel`. `flutter analyze` was never affected
 (it doesn't build native assets).

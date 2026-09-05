@@ -5,18 +5,18 @@ void main() {
   test('empty identity matches nothing', () {
     const identity = OwnIdentity();
     expect(identity.isConfigured, isFalse);
-    expect(identity.matchesOwnName('Abdullah Naseem'), isFalse);
+    expect(identity.matchesOwnName('Your Full Name'), isFalse);
     expect(identity.matchesAccount('a/c 1234', 'meezan'), isFalse);
   });
 
   test('matches own name as a whole word inside counterparty text', () {
-    const identity = OwnIdentity(names: {'Abdullah Naseem'});
+    const identity = OwnIdentity(names: {'Your Full Name'});
     expect(identity.isConfigured, isTrue);
     expect(
-      identity.matchesOwnName('IBFT TO ABDULLAH NASEEM A/C XXXX1234'),
+      identity.matchesOwnName('IBFT TO YOUR FULL NAME A/C XXXX1234'),
       isTrue,
     );
-    expect(identity.matchesOwnName('IBFT TO ABDULLAH NASEEMA'), isFalse);
+    expect(identity.matchesOwnName('IBFT TO YOUR FULL NAMEX'), isFalse);
     expect(identity.matchesOwnName('IBFT TO SOMEONE ELSE'), isFalse);
     expect(identity.matchesOwnName(null), isFalse);
   });

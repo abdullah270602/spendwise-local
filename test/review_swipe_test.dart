@@ -13,24 +13,48 @@ void main() {
     kind: TransactionKind.income,
     occurredAt: DateTime.utc(2026, 8, 22, 22, 29),
     category: 'Income',
+    accountName: 'NayaPay',
     isReviewed: false,
   );
 
-  testWidgets('swiping right confirms the transaction and removes the card', (
+  Widget host(_FakeReviewViewModel model) => MaterialApp(
+    theme: SpendWiseTheme.dark,
+    home: Scaffold(
+      body: AnimatedBuilder(
+        animation: model,
+        builder: (context, child) => ReviewInboxScreen(viewModel: model),
+      ),
+    ),
+  );
+
+  testWidgets('one tap settles every alert a rule covers', (tester) async {
+    final model = _FakeReviewViewModel([
+      transaction('tx-1'),
+      transaction('tx-2'),
+      transaction('tx-3'),
+    ]);
+    await tester.pumpWidget(host(model));
+
+    // Three alerts, one question -- the whole point of the redesign.
+    expect(find.text('3 alerts, 1 decision.'), findsOneWidget);
+
+    await tester.tap(find.text('Confirm all 3'));
+    await tester.pumpAndSettle();
+
+    expect(model.confirmed, containsAll(['tx-1', 'tx-2', 'tx-3']));
+    expect(find.text('Nothing needs you.'), findsOneWidget);
+  });
+
+  testWidgets('swiping right in the one-by-one sheet confirms an alert', (
     tester,
   ) async {
-    final model = _FakeReviewViewModel(transaction('tx-1'));
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: SpendWiseTheme.dark,
-        home: AnimatedBuilder(
-          animation: model,
-          builder: (context, child) => ReviewInboxScreen(viewModel: model),
-        ),
-      ),
-    );
+    final model = _FakeReviewViewModel([transaction('tx-1')]);
+    await tester.pumpWidget(host(model));
 
-    expect(find.text('Cha-Ching!'), findsOneWidget);
+    await tester.tap(find.text('Check them one by one'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('review-tx-1')), findsOneWidget);
+
     await tester.drag(
       find.byKey(const ValueKey('review-tx-1')),
       const Offset(600, 0),
@@ -39,71 +63,80 @@ void main() {
 
     expect(model.confirmed, contains('tx-1'));
     expect(model.deleted, isNot(contains('tx-1')));
-    expect(find.text('Cha-Ching!'), findsNothing);
-    expect(find.text('You’re all caught up'), findsOneWidget);
   });
 
-  testWidgets(
-    'swiping left deletes the transaction, with an Undo snackbar that restores it',
-    (tester) async {
-      final model = _FakeReviewViewModel(transaction('tx-1'));
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: SpendWiseTheme.dark,
-          home: AnimatedBuilder(
-            animation: model,
-            builder: (context, child) => ReviewInboxScreen(viewModel: model),
-          ),
-        ),
-      );
+  testWidgets('swiping left deletes, with an Undo that restores it', (
+    tester,
+  ) async {
+    final model = _FakeReviewViewModel([transaction('tx-1')]);
+    await tester.pumpWidget(host(model));
 
-      await tester.drag(
-        find.byKey(const ValueKey('review-tx-1')),
-        const Offset(-600, 0),
-      );
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Check them one by one'));
+    await tester.pumpAndSettle();
 
-      expect(model.deleted, contains('tx-1'));
-      expect(find.text('Cha-Ching!'), findsNothing);
-      expect(find.text('Transaction deleted'), findsOneWidget);
-      expect(find.byKey(const ValueKey('review-tx-1')), findsNothing);
+    await tester.drag(
+      find.byKey(const ValueKey('review-tx-1')),
+      const Offset(-600, 0),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Undo'));
-      await tester.pumpAndSettle();
+    expect(model.deleted, contains('tx-1'));
+    expect(find.text('Transaction deleted'), findsOneWidget);
 
-      expect(model.deleted, isNot(contains('tx-1')));
-      expect(find.text('Cha-Ching!'), findsOneWidget);
-    },
-  );
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+
+    expect(model.deleted, isNot(contains('tx-1')));
+  });
 }
 
+/// Only the members Review actually reads are implemented; `noSuchMethod`
+/// covers the rest so growing the view model does not break this test.
 class _FakeReviewViewModel extends ChangeNotifier
-    implements SpendWiseViewModel {
-  _FakeReviewViewModel(this._transaction);
-  final TransactionViewData _transaction;
+    implements SpendWiseAdvancedViewModel {
+  _FakeReviewViewModel(this._transactions);
+
+  final List<TransactionViewData> _transactions;
   final Set<String> confirmed = {};
   final Set<String> deleted = {};
 
   @override
-  List<ReviewViewData> get reviews {
-    if (confirmed.contains(_transaction.id) ||
-        deleted.contains(_transaction.id)) {
-      return const [];
-    }
-    return [
-      ReviewViewData(
-        id: _transaction.id,
-        reason: ReviewReason.lowConfidence,
-        title: 'Review this transaction',
-        description: 'The evidence was parsed, but needs confirmation.',
-        transactions: [_transaction],
-      ),
-    ];
-  }
+  List<TransactionViewData> get transactions => _transactions
+      .where((item) => !deleted.contains(item.id))
+      .map(
+        (item) => confirmed.contains(item.id)
+            ? TransactionViewData(
+                id: item.id,
+                title: item.title,
+                subtitle: item.subtitle,
+                amount: item.amount,
+                kind: item.kind,
+                occurredAt: item.occurredAt,
+                category: item.category,
+                accountName: item.accountName,
+              )
+            : item,
+      )
+      .toList();
 
   @override
-  Future<void> resolveReview(String id, {required bool merge}) async {
-    confirmed.add(id);
+  List<ReviewViewData> get reviews => const [];
+
+  @override
+  List<AccountViewData> get accounts => const [];
+
+  @override
+  List<AlertViewData> get unroutedAlerts => const [];
+
+  @override
+  List<AlertViewData> alerts({
+    String? packageName,
+    bool onlyUnresolved = true,
+  }) => const [];
+
+  @override
+  Future<void> applyReviewDecision(ReviewDecision decision) async {
+    confirmed.addAll(decision.transactionIds);
     notifyListeners();
   }
 
@@ -120,38 +153,12 @@ class _FakeReviewViewModel extends ChangeNotifier
   }
 
   @override
-  bool get onboardingComplete => true;
+  bool get busy => false;
+
   @override
-  bool get notificationAccessGranted => true;
+  String? get errorMessage => null;
+
   @override
-  DashboardViewData get dashboard => const DashboardViewData(
-    netWorth: MoneyViewData(0),
-    incomeThisMonth: MoneyViewData(0),
-    spendingThisMonth: MoneyViewData(0),
-    monthlyChangePercent: 0,
-  );
-  @override
-  List<TransactionViewData> get transactions => const [];
-  @override
-  List<AccountViewData> get accounts => const [];
-  @override
-  List<SourceViewData> get sources => const [];
-  @override
-  Future<void> completeOnboarding() async {}
-  @override
-  Future<void> requestNotificationAccess() async {}
-  @override
-  Future<void> setSourceEnabled(String packageName, bool enabled) async {}
-  @override
-  Future<void> addAccount(
-    String name,
-    String type,
-    MoneyViewData openingBalance,
-  ) async {}
-  @override
-  Future<void> saveManualTransaction(ManualTransactionDraft draft) async {}
-  @override
-  Future<void> exportData() async {}
-  @override
-  Future<void> eraseAllData() async {}
+  dynamic noSuchMethod(Invocation invocation) =>
+      super.noSuchMethod(invocation);
 }

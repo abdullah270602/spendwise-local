@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="spendwise_background">#070B0E</color>
-    <color name="spendwise_green">#60D394</color>
+    <color name="spendwise_background">#0F1113</color>
+    <color name="spendwise_keep">#9FB2AC</color>
+    <color name="spendwise_spend">#C97A5A</color>
 </resources>

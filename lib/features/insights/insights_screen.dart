@@ -3,8 +3,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
+import '../../widgets/shape_kit.dart';
 import '../../widgets/spendwise_components.dart';
 import '../shell/spendwise_view_model.dart';
+import '../transactions/transaction_details_screen.dart';
+import 'river_view.dart';
 import 'spending_analytics.dart';
 
 class InsightsScreen extends StatefulWidget {
@@ -19,6 +22,10 @@ class InsightsScreen extends StatefulWidget {
 class _InsightsScreenState extends State<InsightsScreen> {
   AnalyticsResolution resolution = AnalyticsResolution.months;
   String? category;
+
+  /// River first: it is the only view where direction reads from position
+  /// rather than from a colour or a sign.
+  _InsightsView view = _InsightsView.river;
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
@@ -36,103 +43,183 @@ class _InsightsScreenState extends State<InsightsScreen> {
               .toSet()
               .toList()
             ..sort();
-      return Scaffold(
-        appBar: AppBar(title: const Text('Insights')),
-        body: Column(
+
+      return SafeArea(
+        bottom: false,
+        child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 4, 18, 14),
-              child: _BalanceSnapshot(accounts: widget.viewModel.accounts),
+              padding: const EdgeInsets.fromLTRB(
+                SpendWiseTheme.gutter,
+                16,
+                SpendWiseTheme.gutter,
+                12,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text('Insights', style: SpendWiseType.title),
+                  ),
+                  ViewToggle(
+                    options: const ['River', 'Flow', 'Detail'],
+                    selected: view.index,
+                    onSelected: (index) =>
+                        setState(() => view = _InsightsView.values[index]),
+                  ),
+                ],
+              ),
             ),
             Expanded(
               child: widget.viewModel.transactions.isEmpty
-                  ? const EmptyState(
-                      icon: Icons.insights_outlined,
-                      title: 'No trends yet',
-                      message: 'Once transactions reach your ledger, SpendWise will compare spending across days, months, years, and categories.',
+                  ? const RestState(
+                      headline: 'Nothing to compare yet.',
+                      detail:
+                          'Once transactions reach your ledger, this becomes '
+                          'the whole history of money in and out — by day, '
+                          'month, year, and category.',
                     )
                   : CustomScrollView(
                       slivers: [
-                        SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(18, 4, 18, 10),
-                          sliver: SliverToBoxAdapter(
-                            child: SegmentedButton<AnalyticsResolution>(
-                              showSelectedIcon: false,
-                              segments: const [
-                                ButtonSegment(
-                                  value: AnalyticsResolution.days,
-                                  label: Text('Days'),
+                        if (view != _InsightsView.river)
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(
+                              SpendWiseTheme.gutter,
+                              0,
+                              SpendWiseTheme.gutter,
+                              10,
+                            ),
+                            sliver: SliverToBoxAdapter(
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: ViewToggle(
+                                  options: const ['Days', 'Months', 'Years'],
+                                  selected: AnalyticsResolution.values.indexOf(
+                                    resolution,
+                                  ),
+                                  onSelected: (index) => setState(() {
+                                    resolution =
+                                        AnalyticsResolution.values[index];
+                                  }),
                                 ),
-                                ButtonSegment(
-                                  value: AnalyticsResolution.months,
-                                  label: Text('Months'),
-                                ),
-                                ButtonSegment(
-                                  value: AnalyticsResolution.years,
-                                  label: Text('Years'),
-                                ),
-                              ],
-                              selected: {resolution},
-                              onSelectionChanged: (value) => setState(() {
-                                resolution = value.first;
-                              }),
+                              ),
                             ),
                           ),
-                        ),
-                        SliverToBoxAdapter(
-                          child: SizedBox(
-                            height: 46,
-                            child: ListView.separated(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 18,
-                              ),
-                              scrollDirection: Axis.horizontal,
-                              itemCount: categories.length + 1,
-                              separatorBuilder: (_, _) =>
-                                  const SizedBox(width: 8),
-                              itemBuilder: (context, index) {
-                                final value = index == 0
-                                    ? null
-                                    : categories[index - 1];
-                                return ChoiceChip(
-                                  label: Text(value ?? 'All spending'),
-                                  selected: category == value,
-                                  onSelected: (_) =>
-                                      setState(() => category = value),
-                                );
-                              },
+                        if (view == _InsightsView.river) ...[
+                          SliverToBoxAdapter(
+                            child: RiverHeading(
+                              inTotal: analytics.totalIncomeMinor,
+                              outTotal: analytics.totalSpendingMinor,
                             ),
                           ),
-                        ),
-                        SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(18, 14, 18, 36),
-                          sliver: SliverList.list(
-                            children: [
-                              _SummaryBand(analytics),
-                              const SizedBox(height: 22),
-                              SectionHeading(
-                                category == null
-                                    ? 'Money moving over time'
-                                    : '$category spending over time',
+                          RiverView(
+                            transactions: widget.viewModel.transactions,
+                            onOpen: (item) => Navigator.push(
+                              context,
+                              MaterialPageRoute<void>(
+                                builder: (_) => TransactionDetailsScreen(
+                                  viewModel: widget.viewModel,
+                                  transaction: item,
+                                ),
                               ),
-                              const SizedBox(height: 8),
-                              _TrendChart(analytics),
-                              const SizedBox(height: 22),
-                              if (category == null) ...[
-                                const SectionHeading('Where your money went'),
-                                const SizedBox(height: 8),
-                                _CategoryBreakdown(analytics),
+                            ),
+                          ),
+                        ] else if (view == _InsightsView.flow) ...[
+                          SliverToBoxAdapter(
+                            child: FlowSpine(
+                              buckets: analytics.buckets,
+                              currency: analytics.currency,
+                            ),
+                          ),
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(
+                              SpendWiseTheme.gutter,
+                              20,
+                              SpendWiseTheme.gutter,
+                              36,
+                            ),
+                            sliver: SliverList.list(
+                              children: [
+                                _SummaryBand(analytics),
                                 const SizedBox(height: 22),
+                                Text(
+                                  'Every ${_resolutionWord(resolution)} you '
+                                  'have records for, in and out from one '
+                                  'spine. Scroll it sideways to walk back '
+                                  'through your whole history.',
+                                  style: SpendWiseType.body.copyWith(
+                                    fontSize: 12.5,
+                                  ),
+                                ),
                               ],
-                              const SizedBox(height: 18),
-                              Text(
-                                'Calculated only from your local ledger. Transfers are excluded from spending and income.',
-                                style: Theme.of(context).textTheme.bodySmall,
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
+                        ] else ...[
+                          SliverToBoxAdapter(
+                            child: SizedBox(
+                              height: 46,
+                              child: ListView.separated(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: SpendWiseTheme.gutter,
+                                ),
+                                scrollDirection: Axis.horizontal,
+                                itemCount: categories.length + 1,
+                                separatorBuilder: (_, _) =>
+                                    const SizedBox(width: 8),
+                                itemBuilder: (context, index) {
+                                  final value = index == 0
+                                      ? null
+                                      : categories[index - 1];
+                                  return ChoiceChip(
+                                    label: Text(value ?? 'All spending'),
+                                    selected: category == value,
+                                    onSelected: (_) =>
+                                        setState(() => category = value),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(
+                              SpendWiseTheme.gutter,
+                              14,
+                              SpendWiseTheme.gutter,
+                              36,
+                            ),
+                            sliver: SliverList.list(
+                              children: [
+                                _BalanceSnapshot(
+                                  accounts: widget.viewModel.accounts,
+                                ),
+                                const SizedBox(height: 22),
+                                _SummaryBand(analytics),
+                                const SizedBox(height: 22),
+                                Eyebrow(
+                                  category == null
+                                      ? 'Money moving over time'
+                                      : '$category spending over time',
+                                ),
+                                const SizedBox(height: 10),
+                                _TrendChart(analytics),
+                                const SizedBox(height: 22),
+                                if (category == null) ...[
+                                  const Eyebrow('Where your money went'),
+                                  const SizedBox(height: 10),
+                                  _CategoryBreakdown(analytics),
+                                  const SizedBox(height: 22),
+                                ],
+                                Text(
+                                  'Calculated only from your local ledger. '
+                                  'Moves between your own accounts are '
+                                  'excluded from both spending and income.',
+                                  style: SpendWiseType.body.copyWith(
+                                    fontSize: 12.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
             ),
@@ -140,6 +227,204 @@ class _InsightsScreenState extends State<InsightsScreen> {
         ),
       );
     },
+  );
+
+  static String _resolutionWord(AnalyticsResolution value) => switch (value) {
+    AnalyticsResolution.days => 'day',
+    AnalyticsResolution.months => 'month',
+    AnalyticsResolution.years => 'year',
+  };
+}
+
+enum _InsightsView { river, flow, detail }
+
+/// The in/out spine: one horizontal time axis with money in growing upward and
+/// money out growing downward, drawn to a shared scale so the two sides are
+/// directly comparable. This is the whole history in one object -- scroll it
+/// sideways and you walk back through every period you have records for.
+class FlowSpine extends StatelessWidget {
+  const FlowSpine({
+    super.key,
+    required this.buckets,
+    required this.currency,
+    this.height = 252,
+  });
+
+  final List<AnalyticsBucket> buckets;
+  final String currency;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    if (buckets.isEmpty) return SizedBox(height: height);
+    final peak = buckets.fold<int>(
+      1,
+      (best, bucket) => math.max(
+        best,
+        math.max(bucket.incomeMinor, bucket.spendingMinor),
+      ),
+    );
+    // Wide enough that a column is readable, narrow enough that a year of
+    // months does not need six swipes.
+    final columnWidth = buckets.length > 18 ? 34.0 : 46.0;
+
+    return SizedBox(
+      height: height,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        reverse: true,
+        padding: const EdgeInsets.symmetric(
+          horizontal: SpendWiseTheme.gutter,
+        ),
+        itemCount: buckets.length,
+        itemBuilder: (context, index) {
+          final bucket = buckets[buckets.length - 1 - index];
+          return _SpineColumn(
+            bucket: bucket,
+            peak: peak,
+            width: columnWidth,
+            latest: index == 0,
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _SpineColumn extends StatelessWidget {
+  const _SpineColumn({
+    required this.bucket,
+    required this.peak,
+    required this.width,
+    required this.latest,
+  });
+
+  final AnalyticsBucket bucket;
+  final int peak;
+  final double width;
+  final bool latest;
+
+  @override
+  Widget build(BuildContext context) {
+    // Fixed arm and tick heights: the column has to fit an exact budget, and a
+    // font that renders a hair taller than expected must clip a label rather
+    // than overflow the spine.
+    const armHeight = 84.0;
+    final inHeight = (bucket.incomeMinor / peak) * armHeight;
+    final outHeight = (bucket.spendingMinor / peak) * armHeight;
+    final net = bucket.incomeMinor - bucket.spendingMinor;
+    return Semantics(
+      label:
+          '${bucket.label}: '
+          '${formatMinor(bucket.incomeMinor)} in, '
+          '${formatMinor(bucket.spendingMinor)} out',
+      child: SizedBox(
+        width: width,
+        child: Column(
+          children: [
+            SizedBox(
+              height: armHeight + _Tick.height + 6,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (bucket.incomeMinor > 0)
+                    _Tick(
+                      text: formatMinor(bucket.incomeMinor, cents: false),
+                      color: latest
+                          ? SpendWiseColors.keep
+                          : SpendWiseColors.dim,
+                      padding: const EdgeInsets.only(bottom: 3),
+                    ),
+                  Container(
+                    width: width - 14,
+                    height: math.max(inHeight, bucket.incomeMinor > 0 ? 2 : 0),
+                    color: SpendWiseColors.keep.withValues(
+                      alpha: latest ? 1 : .58,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              width: width,
+              height: 1,
+              color: latest ? SpendWiseColors.fg : SpendWiseColors.edge,
+            ),
+            SizedBox(
+              height: armHeight + _Tick.height + 6,
+              child: Column(
+                children: [
+                  Container(
+                    width: width - 14,
+                    height: math.max(
+                      outHeight,
+                      bucket.spendingMinor > 0 ? 2 : 0,
+                    ),
+                    color: SpendWiseColors.spend.withValues(
+                      alpha: latest ? 1 : .58,
+                    ),
+                  ),
+                  if (bucket.spendingMinor > 0)
+                    _Tick(
+                      text: formatMinor(bucket.spendingMinor, cents: false),
+                      color: latest
+                          ? SpendWiseColors.spend
+                          : SpendWiseColors.dim,
+                      padding: const EdgeInsets.only(top: 3),
+                    ),
+                ],
+              ),
+            ),
+            const Spacer(),
+            _Tick(
+              text: bucket.label,
+              color: latest ? SpendWiseColors.fg : SpendWiseColors.dim,
+            ),
+            const SizedBox(height: 3),
+            _Tick(
+              text: formatMinor(net, signed: true, cents: false),
+              color: net >= 0 ? SpendWiseColors.keep : SpendWiseColors.spend,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+/// A one-line figure on the spine, in a box tall enough for exactly one line.
+class _Tick extends StatelessWidget {
+  const _Tick({
+    required this.text,
+    required this.color,
+    this.padding = EdgeInsets.zero,
+  });
+
+  static const height = 12.0;
+
+  final String text;
+  final Color color;
+  final EdgeInsets padding;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: padding,
+    child: SizedBox(
+      height: height,
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.clip,
+        softWrap: false,
+        style: SpendWiseType.metaTight.copyWith(
+          fontSize: 8.5,
+          letterSpacing: .2,
+          height: 1.15,
+          color: color,
+        ),
+      ),
+    ),
   );
 }
 
@@ -252,36 +537,32 @@ class _SummaryBand extends StatelessWidget {
       AnalyticsResolution.years => 'per year',
     };
     return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: SpendWiseColors.surfaceRaised,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: SpendWiseColors.border),
+      padding: const EdgeInsets.only(top: 14),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: SpendWiseColors.edge)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const Eyebrow('Spent in this view'),
+          const SizedBox(height: 6),
           Text(
-            'Spent in this view',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 5),
-          Text(
-            formatMoney(
+            formatAmount(
               MoneyViewData(
                 analytics.totalSpendingMinor,
                 currency: analytics.currency,
               ),
             ),
-            style: Theme.of(context).textTheme.headlineSmall,
+            style: SpendWiseType.figure.copyWith(fontSize: 30),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: _SummaryItem(
                   label: 'Average $cadence',
-                  value: formatMoney(
+                  value: formatAmount(
                     MoneyViewData(
                       analytics.averagePerBucketMinor,
                       currency: analytics.currency,
@@ -289,8 +570,6 @@ class _SummaryBand extends StatelessWidget {
                   ),
                 ),
               ),
-              Container(width: 1, height: 38, color: SpendWiseColors.border),
-              const SizedBox(width: 14),
               Expanded(
                 child: _SummaryItem(
                   label: change == null ? 'Previous period' : 'Spending rate',
