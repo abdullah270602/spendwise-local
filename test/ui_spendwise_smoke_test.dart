@@ -443,6 +443,10 @@ class _BatchImportViewModel extends _FakeViewModel
   ];
 
   @override
+  Future<List<String>> declaredPermissions() async => const [
+    'android.permission.USE_BIOMETRIC',
+  ];
+  @override
   bool get busy => false;
   @override
   bool get demoDataEnabled => false;

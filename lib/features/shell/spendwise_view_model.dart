@@ -547,6 +547,12 @@ abstract class SpendWiseAdvancedViewModel implements SpendWiseViewModel {
   /// Apps that carry more than one institution, so they are never bound to a
   /// single account.
   bool isSharedSource(String packageName);
+
+  /// Every permission this build declares, read back from the installed
+  /// package. Shown in the guide so the privacy claim can be checked
+  /// rather than believed.
+  Future<List<String>> declaredPermissions();
+
   String? viewPreference(String key);
   void setViewPreference(String key, String value);
   void dismissError();
@@ -635,6 +641,8 @@ extension SpendWiseAdvancedAccess on SpendWiseViewModel {
       _advanced?.unroutedAlerts ?? const [];
   bool uiIsSharedSource(String packageName) =>
       _advanced?.isSharedSource(packageName) ?? false;
+  Future<List<String>> uiDeclaredPermissions() =>
+      _advanced?.declaredPermissions() ?? Future.value(const []);
   HomePeriod get uiHomePeriod =>
       _advanced?.homePeriod ?? HomePeriod.calendarMonth;
   void uiSetHomePeriod(HomePeriod period) => _advanced?.setHomePeriod(period);

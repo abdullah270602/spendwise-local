@@ -75,6 +75,22 @@ final class NotificationBridge {
   Future<void> openAccessSettings() =>
       _channel.invokeMethod<void>('openNotificationAccessSettings');
 
+  /// Every permission this build declares, read back out of the installed
+  /// package. The app's central claim is that it cannot reach the network;
+  /// something the app checks against itself and shows you beats a sentence
+  /// asking to be believed.
+  Future<List<String>> declaredPermissions() async {
+    try {
+      final names =
+          await _channel.invokeListMethod<String>('listDeclaredPermissions');
+      return (names ?? const <String>[])..sort();
+    } on PlatformException {
+      return const [];
+    } on MissingPluginException {
+      return const [];
+    }
+  }
+
   Future<List<NotificationSource>> listSources() async {
     final rows =
         await _channel.invokeListMethod<Object?>('listNotificationSources') ??

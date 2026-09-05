@@ -959,6 +959,10 @@ final class SpendWiseController extends ChangeNotifier
   }
 
   @override
+  Future<List<String>> declaredPermissions() =>
+      _bridge.declaredPermissions();
+
+  @override
   String? viewPreference(String key) => _ledger.viewPreference(key);
 
   @override

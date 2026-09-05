@@ -3,170 +3,163 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:spendwise/app/theme.dart';
 import 'package:spendwise/features/onboarding/onboarding_screen.dart';
 import 'package:spendwise/features/shell/spendwise_view_model.dart';
-import 'package:spendwise/security/app_lock.dart';
 
 /// First run is the only screen every single person sees, and the only one
-/// they see before they trust the app with anything. These walk the whole
-/// thing at the smallest screen the app supports, because a nine-page flow is
-/// exactly the sort of thing that lays out beautifully on the phone it was
-/// written on and overflows on everyone else's.
+/// they see before they trust the app with anything. It is also the easiest
+/// place in an app for prose to creep back in, so the word budget is a test
+/// rather than an intention.
 void main() {
-  Future<_Recorder> pumpOnboarding(
+  Future<_Recorder> pump(
     WidgetTester tester, {
     Size size = const Size(360, 640),
+    _Recorder? model,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
-    final model = _Recorder();
+    final viewModel = model ?? _Recorder();
     await tester.pumpWidget(
       MaterialApp(
         theme: SpendWiseTheme.dark,
-        home: AppLockScope(
-          lock: AppLockController(preferences: MapLockPreferences()),
-          child: OnboardingScreen(viewModel: model),
-        ),
+        home: OnboardingScreen(viewModel: viewModel),
       ),
     );
-    return model;
+    return viewModel;
   }
 
-  /// Advances by the button rather than by swiping, which is the path that
-  /// has to work; swiping is a shortcut for people who already know.
   Future<void> tapOn(WidgetTester tester, String label) async {
     await tester.tap(find.text(label));
     await tester.pumpAndSettle();
   }
 
-  testWidgets('it explains the app before it asks for anything', (
-    tester,
-  ) async {
-    await pumpOnboarding(tester);
+  testWidgets('it opens by showing the app doing its job', (tester) async {
+    await pump(tester);
 
-    // The opening claim, and no permission request anywhere near it.
+    // No welcome, no mission statement, no privacy essay: the demo is the
+    // pitch. The three cut explainer pages must not have crept back.
     expect(
-      find.text('Every payment you make already sends you a message.'),
-      findsOneWidget,
-    );
-    expect(find.text('Turn on notification access'), findsNothing);
-
-    await tapOn(tester, 'Show me');
-    expect(find.text('It reads the alert, not just its number.'), findsOneWidget);
-
-    await tapOn(tester, 'Good');
-    expect(
-      find.text('It cannot go online. Not "does not" — cannot.'),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('the worked example shows the trap, not just the answer', (
-    tester,
-  ) async {
-    await pumpOnboarding(tester);
-    await tapOn(tester, 'Show me');
-
-    // The balance printed beside the amount is the single most common way to
-    // read one of these alerts wrongly, so the example has to name it.
-    expect(
-      find.textContaining('Avl Bal Rs 61,300.00 is your balance'),
+      find.text('Your bank already tells you everything.'),
       findsOneWidget,
     );
     expect(find.text('Valley Mart'), findsOneWidget);
-    expect(find.text('−2,450.00'), findsOneWidget);
+    expect(find.textContaining('cannot go online'), findsNothing);
   });
 
-  testWidgets('every page lays out on a small screen', (tester) async {
-    await pumpOnboarding(tester, size: const Size(320, 560));
+  testWidgets('it is four cards, and each one changes something', (
+    tester,
+  ) async {
+    await pump(tester);
+    await tapOn(tester, 'Set it up');
+    expect(find.text('Done. It can see your alerts.'), findsOneWidget);
 
-    const labels = [
-      'Show me',
-      'Good',
-      'Set it up',
-      'Next',
-      'Next',
-      'Next',
-      'Next',
-      'Next',
-    ];
-    for (final label in labels) {
+    await tapOn(tester, 'Next');
+    expect(find.text('Which apps talk about money?'), findsOneWidget);
+
+    await tapOn(tester, 'Next');
+    expect(find.text('That is everything.'), findsOneWidget);
+
+    // Four cards and then out: nothing further to page to.
+    expect(find.text('Next'), findsNothing);
+    expect(find.text('Open SpendWise'), findsOneWidget);
+  });
+
+  testWidgets('the permission card names the warning before Android does', (
+    tester,
+  ) async {
+    await pump(tester, model: _Recorder(access: false));
+    await tapOn(tester, 'Set it up');
+
+    expect(find.text('Android is about to warn you.'), findsOneWidget);
+    expect(
+      find.textContaining('reads only the apps you pick next'),
+      findsOneWidget,
+    );
+    // Something checkable beside the promise.
+    expect(find.textContaining('No internet permission'), findsOneWidget);
+    // And the dead end a sideloaded build walks into.
+    expect(find.textContaining('Allow restricted settings'), findsOneWidget);
+  });
+
+  testWidgets('it ends on a result, not on a list of chores', (tester) async {
+    final model = await pump(tester);
+    for (final label in ['Set it up', 'Next', 'Next']) {
+      await tapOn(tester, label);
+    }
+
+    // The old last page enumerated five unfinished things. Nothing here may
+    // read as an unticked box.
+    expect(find.text('No app lock'), findsNothing);
+    expect(find.text('Your name is not set'), findsNothing);
+
+    expect(model.completed, isFalse);
+    await tester.tap(find.text('Open SpendWise'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(model.completed, isTrue);
+  });
+
+  testWidgets('nothing off the golden path is asked for', (tester) async {
+    await pump(tester);
+    for (final label in ['Set it up', 'Next', 'Next']) {
+      await tapOn(tester, label);
+    }
+    // A PIN and your own name matter, but not before the app has done
+    // anything for you. Both live in Settings now.
+    expect(find.textContaining('PIN'), findsNothing);
+    expect(find.textContaining('your bank writes it'), findsNothing);
+  });
+
+  testWidgets('every card lays out on a small screen', (tester) async {
+    await pump(tester, size: const Size(320, 560));
+    for (final label in ['Set it up', 'Next', 'Next']) {
       expect(tester.takeException(), isNull);
       await tapOn(tester, label);
     }
     expect(tester.takeException(), isNull);
-    expect(find.text('Open SpendWise'), findsOneWidget);
   });
 
-  testWidgets('the last page reports what is actually set up', (tester) async {
-    final model = await pumpOnboarding(tester);
-    for (final label in [
-      'Show me',
-      'Good',
-      'Set it up',
-      'Next',
-      'Next',
-      'Next',
-      'Next',
-      'Next',
-    ]) {
-      await tapOn(tester, label);
-    }
-
-    // The fake grants access and has one account, but no sources, no name and
-    // no lock, so the summary must not claim a clean sweep.
-    expect(find.text('Notification access on'), findsOneWidget);
-    expect(find.text('1 account'), findsOneWidget);
-    expect(find.text('No apps chosen'), findsOneWidget);
-    expect(find.text('Your name is not set'), findsOneWidget);
-    expect(find.text('No app lock'), findsOneWidget);
-
-    expect(model.completed, isFalse);
-    // Not pumpAndSettle: the button stays in its busy state because in the
-    // real app the shell replaces this screen the moment onboarding is done,
-    // and nothing here does that.
-    await tester.tap(find.text('Open SpendWise'));
-    await tester.pump();
-    expect(model.completed, isTrue);
-  });
-
-  testWidgets('a tap on a summary line goes back to that step', (
-    tester,
-  ) async {
-    await pumpOnboarding(tester);
-    for (final label in [
-      'Show me',
-      'Good',
-      'Set it up',
-      'Next',
-      'Next',
-      'Next',
-      'Next',
-      'Next',
-    ]) {
-      await tapOn(tester, label);
-    }
-
-    await tapOn(tester, 'No apps chosen');
-    expect(find.text('Which apps talk about money.'), findsOneWidget);
-  });
-
-  testWidgets('the permission step says what Android is about to warn about', (
-    tester,
-  ) async {
-    await pumpOnboarding(tester);
-    await tapOn(tester, 'Show me');
-    await tapOn(tester, 'Good');
-    await tapOn(tester, 'Set it up');
-
-    // Access is already granted in the fake, so it should be reporting that
-    // rather than asking again.
-    expect(find.text('Notification access is on.'), findsOneWidget);
-    expect(find.text('Turn on notification access'), findsNothing);
+  test('the whole flow stays inside its word budget', () {
+    // Elite consumer onboarding is often longer than this in screens and an
+    // order of magnitude shorter in words; people read roughly a fifth of
+    // what is on a screen. The previous version carried about 660 words,
+    // which is close to three minutes of reading before any value at all.
+    final words = _onboardingCopy
+        .expand((line) => line.split(RegExp(r'\s+')))
+        .where((word) => word.isNotEmpty)
+        .length;
+    expect(
+      words,
+      lessThanOrEqualTo(140),
+      reason: 'onboarding prose has crept back up to $words words',
+    );
   });
 }
 
+/// Every headline and sentence the four cards can show, kept here so the
+/// budget is checkable. Labels on buttons and fields are not prose.
+const _onboardingCopy = [
+  'Your bank already tells you everything.',
+  'Android is about to warn you.',
+  'It will say SpendWise can read every notification. It reads only the apps '
+      'you pick next.',
+  'No internet permission, which the guide will show you',
+  'Nothing syncs, uploads or backs up',
+  'Toggle greyed out? App info, then the menu, then Allow restricted '
+      'settings.',
+  'Done. It can see your alerts.',
+  'Which apps talk about money?',
+  'Everything else on your phone stays invisible.',
+  'Where should it all land?',
+  'The last digits are how an alert finds the right account.',
+  'That is everything.',
+  'Nothing waiting yet. The next alert lands on its own.',
+];
+
 class _Recorder extends ChangeNotifier implements SpendWiseViewModel {
+  _Recorder({this.access = true});
+
+  final bool access;
   bool completed = false;
 
   @override
@@ -178,14 +171,14 @@ class _Recorder extends ChangeNotifier implements SpendWiseViewModel {
   @override
   bool get onboardingComplete => false;
   @override
-  bool get notificationAccessGranted => true;
+  bool get notificationAccessGranted => access;
   @override
   List<AccountViewData> get accounts => const [
     AccountViewData(
       id: 'bank',
       name: 'Everyday',
       type: 'Bank',
-      balance: MoneyViewData(2500000),
+      balance: MoneyViewData(0),
       suffix: '4821',
     ),
   ];

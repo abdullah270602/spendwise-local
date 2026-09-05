@@ -143,16 +143,25 @@ class AlertExample {
 
 /// Draws the example. Static by default; the onboarding animates it in.
 class AlertDemo extends StatelessWidget {
-  const AlertDemo({super.key, required this.example, this.showResult = true});
+  const AlertDemo({
+    super.key,
+    required this.example,
+    this.showResult = true,
+    this.compact = false,
+  });
 
   final AlertExample example;
   final bool showResult;
+
+  /// Drops the aside about what was ignored. True in onboarding, where the
+  /// budget is a couple of dozen words for the whole screen.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      _AlertCard(example: example),
+      _AlertCard(example: example, compact: compact),
       if (showResult) ...[
         const SizedBox(height: 14),
         const _Arrow(),
@@ -186,9 +195,10 @@ class AlertDemo extends StatelessWidget {
 }
 
 class _AlertCard extends StatelessWidget {
-  const _AlertCard({required this.example});
+  const _AlertCard({required this.example, this.compact = false});
 
   final AlertExample example;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -238,7 +248,7 @@ class _AlertCard extends StatelessWidget {
               ],
             ),
           ),
-        if (example.ignored case final note?) ...[
+        if (example.ignored case final note? when !compact) ...[
           const SizedBox(height: 7),
           Container(
             padding: const EdgeInsets.only(left: 11),

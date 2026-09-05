@@ -2,6 +2,8 @@ package com.spendwise.app
 
 import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Rect
@@ -53,12 +55,11 @@ class MainActivity : FlutterFragmentActivity() {
         try {
             when (call.method) {
                 "openNotificationAccessSettings" -> {
-                    val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    startActivity(intent)
+                    startActivity(notificationAccessIntent())
                     result.success(true)
                 }
                 "isNotificationAccessGranted" -> result.success(isNotificationAccessGranted())
+                "listDeclaredPermissions" -> result.success(declaredPermissions())
                 "setScreenPrivacy" -> {
                     val enabled = call.argument<Boolean>("enabled") ?: false
                     // FLAG_SECURE must be set on the UI thread, and this channel
@@ -116,6 +117,37 @@ class MainActivity : FlutterFragmentActivity() {
         } catch (error: Exception) {
             result.error("notification_bridge_error", error.message, null)
         }
+    }
+
+    /// Every permission this build declares, read back out of the installed
+    /// package rather than from a list typed into the UI. The app's central
+    /// claim is that it cannot reach the network; a claim the app can check
+    /// against itself and show you is worth more than a sentence.
+    private fun declaredPermissions(): List<String> = runCatching {
+        packageManager
+            .getPackageInfo(packageName, PackageManager.GET_PERMISSIONS)
+            .requestedPermissions
+            ?.toList()
+            .orEmpty()
+    }.getOrDefault(emptyList())
+
+    /// Straight to this app's own toggle where Android supports it, instead
+    /// of a list of two hundred apps the user then has to find us in. The
+    /// detail screen is API 30+, and some OEM builds ship without it, so the
+    /// list remains the fallback.
+    private fun notificationAccessIntent(): Intent {
+        val component = ComponentName(this, SpendWiseNotificationListenerService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val direct = Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
+                .putExtra(
+                    Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME,
+                    component.flattenToString(),
+                )
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (direct.resolveActivity(packageManager) != null) return direct
+        }
+        return Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
 
     private fun isNotificationAccessGranted(): Boolean {

@@ -14,16 +14,14 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
-    final topics = helpTopics();
+    final topics = helpTopics(_Stub());
     expect(topics, isNotEmpty);
 
     for (final topic in topics) {
       await tester.pumpWidget(
         MaterialApp(
           theme: SpendWiseTheme.dark,
-          home: Scaffold(
-            body: ListView(children: topic.body()),
-          ),
+          home: Scaffold(body: ListView(children: topic.body())),
         ),
       );
       await tester.pumpAndSettle();
@@ -45,8 +43,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // Capture comes before what to do about it, which comes before privacy.
-    expect(find.text('How an alert becomes a line'), findsOneWidget);
-    expect(find.text('Review: decisions, not alerts'), findsOneWidget);
+    expect(find.text('Reading an alert'), findsOneWidget);
+    expect(find.text('Review'), findsOneWidget);
 
     // Below the fold: the list is lazy, so it has to be scrolled into being.
     await tester.scrollUntilVisible(
@@ -66,7 +64,8 @@ void main() {
     );
     await tester.tap(find.text('Lent and borrowed'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('cannot tell a loan from a purchase'), findsOneWidget);
+    expect(find.text('Lent to a friend'), findsOneWidget);
+    expect(find.text('Say what it was'), findsOneWidget);
   });
 }
 
