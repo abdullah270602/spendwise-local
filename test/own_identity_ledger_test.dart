@@ -49,7 +49,11 @@ void main() {
     return {'ubl': ubl, 'meezan': meezan};
   }
 
-  void ingestTransferLegs(LocalLedger ledger, DateTime start) {
+  void ingestTransferLegs(
+    LocalLedger ledger,
+    DateTime start, {
+    Duration gap = const Duration(minutes: 4),
+  }) {
     ledger.ingestNotification({
       'notificationKey': 'ubl:1',
       'snapshotHash': 'snap:ubl:1',
@@ -62,51 +66,63 @@ void main() {
       'notificationKey': 'meezan:1',
       'snapshotHash': 'snap:meezan:1',
       'packageName': 'pk.example.meezan',
-      // 20 hours later: well past the default 10-minute transfer window.
-      'postedAt': start.add(const Duration(hours: 20)).millisecondsSinceEpoch,
+      'postedAt': start.add(gap).millisecondsSinceEpoch,
       'title': 'Credit alert',
       'text': 'PKR 5,000.00 credited to your account',
     });
   }
 
-  test(
-    'without a registered own name, a delayed cross-bank transfer stays as '
-    'two separate legs',
-    () {
-      final ledger = LocalLedger.openInMemoryForTests();
-      addTearDown(ledger.close);
-      setUpUblAndMeezan(ledger);
-      ingestTransferLegs(ledger, DateTime.utc(2026, 8, 22, 9));
+  test('without a registered own name, the two legs stay separate', () {
+    final ledger = LocalLedger.openInMemoryForTests();
+    addTearDown(ledger.close);
+    setUpUblAndMeezan(ledger);
+    ingestTransferLegs(ledger, DateTime.utc(2026, 8, 22, 9));
 
-      final transactions = ledger.snapshot().transactions;
-      expect(transactions, hasLength(2));
-      expect(
-        transactions.every((item) => item.kind != TransactionKind.transfer),
-        isTrue,
-      );
-    },
-  );
+    final transactions = ledger.snapshot().transactions;
+    expect(transactions, hasLength(2));
+    expect(
+      transactions.every((item) => item.kind != TransactionKind.transfer),
+      isTrue,
+    );
+  });
 
-  test(
-    'once the sender\'s own name is registered, the same delayed cross-bank '
-    'transfer merges into one "Between your accounts" transaction',
-    () {
-      final ledger = LocalLedger.openInMemoryForTests();
-      addTearDown(ledger.close);
-      final accounts = setUpUblAndMeezan(ledger);
-      ledger.setOwnNames(['Abdullah Naseem']);
-      ingestTransferLegs(ledger, DateTime.utc(2026, 8, 22, 9));
+  test('once the sender\'s own name is registered, the cross-bank transfer '
+      'merges into one "Between your accounts" transaction', () {
+    final ledger = LocalLedger.openInMemoryForTests();
+    addTearDown(ledger.close);
+    final accounts = setUpUblAndMeezan(ledger);
+    ledger.setOwnNames(['Abdullah Naseem']);
+    ingestTransferLegs(ledger, DateTime.utc(2026, 8, 22, 9));
 
-      final transactions = ledger.snapshot().transactions;
-      expect(transactions, hasLength(1));
-      final transaction = transactions.single;
-      expect(transaction.kind, TransactionKind.transfer);
-      expect(transaction.fromAccountId, accounts['ubl']);
-      expect(transaction.toAccountId, accounts['meezan']);
-      expect(
-        ledger.transactionCategories()[transaction.id],
-        'Between your accounts',
-      );
-    },
-  );
+    final transactions = ledger.snapshot().transactions;
+    expect(transactions, hasLength(1));
+    final transaction = transactions.single;
+    expect(transaction.kind, TransactionKind.transfer);
+    expect(transaction.fromAccountId, accounts['ubl']);
+    expect(transaction.toAccountId, accounts['meezan']);
+    expect(
+      ledger.transactionCategories()[transaction.id],
+      'Between your accounts',
+    );
+  });
+
+  test('a registered name alone never merges legs that are hours apart -- only '
+      'a counterparty naming the destination account may settle that late', () {
+    final ledger = LocalLedger.openInMemoryForTests();
+    addTearDown(ledger.close);
+    setUpUblAndMeezan(ledger);
+    ledger.setOwnNames(['Abdullah Naseem']);
+    ingestTransferLegs(
+      ledger,
+      DateTime.utc(2026, 8, 22, 9),
+      gap: const Duration(hours: 20),
+    );
+
+    final transactions = ledger.snapshot().transactions;
+    expect(
+      transactions,
+      hasLength(2),
+      reason: 'same amount a day apart is a coincidence, not a transfer',
+    );
+  });
 }

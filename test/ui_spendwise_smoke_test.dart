@@ -210,10 +210,7 @@ void main() {
       ),
     );
 
-    final scanButton = find.widgetWithIcon(
-      IconButton,
-      Icons.refresh_rounded,
-    );
+    final scanButton = find.widgetWithIcon(IconButton, Icons.refresh_rounded);
     expect(scanButton, findsOneWidget);
     await tester.tap(scanButton);
     await tester.pumpAndSettle();

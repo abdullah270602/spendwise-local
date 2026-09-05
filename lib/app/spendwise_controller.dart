@@ -99,23 +99,29 @@ final class SpendWiseController extends ChangeNotifier
     final queued = await _bridge.peek();
     debugPrint('SpendWiseNotif: drain peeked ${queued.length} queued event(s)');
     final acknowledged = <int>[];
-    for (var index = 0; index < queued.length; index++) {
-      final event = queued[index];
-      final ingested = _ledger.ingestNotification(event);
-      debugPrint(
-        'SpendWiseNotif: drain pkg=${event['packageName']} ingested=$ingested',
+    var ingestedAny = false;
+    // Store every notification first and reconcile once at the end.
+    // Reconciliation rebuilds the whole ledger, so folding it into each
+    // notification made a backlog quadratic and froze the app. Inserts still
+    // yield periodically so even the storing pass can't hold the UI isolate
+    // for one unbroken stretch.
+    for (var start = 0; start < queued.length; start += _drainYieldBatchSize) {
+      final chunk = queued.sublist(
+        start,
+        (start + _drainYieldBatchSize).clamp(0, queued.length),
       );
-      if (ingested) {
-        final id = (event['id'] as num?)?.toInt();
+      final results = _ledger.ingestNotifications(chunk, reconcile: false);
+      for (var index = 0; index < chunk.length; index++) {
+        if (!results[index]) continue;
+        ingestedAny = true;
+        final id = (chunk[index]['id'] as num?)?.toInt();
         if (id != null) acknowledged.add(id);
       }
-      // Ingestion is synchronous SQLite work; yield periodically so a large
-      // backlog (e.g. from a prior failed drain) can't hold the UI isolate
-      // for one unbroken stretch and freeze the app on cold start.
-      if (index % _drainYieldBatchSize == _drainYieldBatchSize - 1) {
+      if (start + _drainYieldBatchSize < queued.length) {
         await Future<void>.delayed(Duration.zero);
       }
     }
+    if (ingestedAny) _ledger.reconcilePendingEvidence();
     if (acknowledged.isNotEmpty) await _bridge.acknowledge(acknowledged);
     debugPrint(
       'SpendWiseNotif: drain acknowledged ${acknowledged.length} event(s)',

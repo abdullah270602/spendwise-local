@@ -42,6 +42,18 @@ final class NotificationParser {
     r'\bat\s+([A-Za-z][A-Za-z0-9.\s&\x27-]{1,40}?)' + _counterpartyStop,
     caseSensitive: false,
   );
+  // Marketing copy reads exactly like a transaction alert -- one amount, one
+  // direction word ("PKR 5,000 cashback will be credited"). Deliberately
+  // narrow: only phrases that never appear in a real settlement alert, so a
+  // genuine transaction is never held back. "available balance" must keep
+  // parsing, hence no bare "avail"/"offer".
+  static final RegExp _promotionalPattern = RegExp(
+    r'\b(cashback|discount|voucher|promo(?:tion|tional)?|congratulations|'
+    r'prize|lucky draw|limited time|special offer|offer valid|t&c|'
+    r'terms and conditions|apply now|activate now|subscribe now|'
+    r'refer a friend|referral bonus)\b',
+    caseSensitive: false,
+  );
 
   /// Returns null unless there is exactly one explicit PKR amount and a clear
   /// debit/credit signal. This intentionally prefers review over guessing.
@@ -111,6 +123,17 @@ final class NotificationParser {
         ?.toUpperCase();
     final counterparty = _counterparty(text, direction);
 
+    // Exactly one explicit amount plus exactly one direction signal, against a
+    // known account, is a deterministic read -- strong enough to post without
+    // asking. Corroborating detail lifts it further; marketing copy keeps the
+    // old review-first confidence so it can never post unseen.
+    final promotional = _promotionalPattern.hasMatch(text);
+    final confidence = promotional
+        ? 0.75
+        : 0.8 +
+              (reference != null ? 0.05 : 0.0) +
+              (counterparty != null ? 0.05 : 0.0);
+
     final candidate = EventCandidate(
       id: 'candidate:${observation.id}',
       observation: observation,
@@ -128,8 +151,11 @@ final class NotificationParser {
           : CandidateType.income,
       parserId: 'pk.generic.fallback',
       parserVersion: 1,
-      confidence: 0.75,
-      reasons: const ['One amount and one direction signal matched.'],
+      confidence: confidence,
+      reasons: [
+        'One amount and one direction signal matched.',
+        if (promotional) 'Text reads as promotional; confirm before posting.',
+      ],
     );
     return ParserResult(
       status: ParseStatus.parsed,

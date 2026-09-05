@@ -223,13 +223,13 @@ class DashboardScreen extends StatelessWidget {
                         )
                       : Column(
                           children: [
-                            for (final (index, item) in categories
-                                .take(5)
-                                .indexed)
+                            for (final (index, item)
+                                in categories.take(5).indexed)
                               _CategoryBar(
                                 item,
-                                color: _categoryColors[index %
-                                    _categoryColors.length],
+                                color:
+                                    _categoryColors[index %
+                                        _categoryColors.length],
                               ),
                           ],
                         ),

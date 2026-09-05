@@ -672,4 +672,3 @@ class _DonutPainter extends CustomPainter {
   bool shouldRepaint(covariant _DonutPainter oldDelegate) =>
       oldDelegate.fractions != fractions || oldDelegate.colors != colors;
 }
-

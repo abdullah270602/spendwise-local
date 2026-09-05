@@ -26,11 +26,15 @@ final class Reconciler {
   final Duration duplicateWindow;
   final Duration transferWindow;
 
-  /// The user's own name(s) and per-account number suffixes. When a leg's
-  /// counterparty text matches one of these, the opposing leg is treated as
-  /// a confident transfer between the user's own accounts even across a much
-  /// wider [ownAccountTransferWindow] — interbank settlement can take far
-  /// longer than the default [transferWindow].
+  /// The user's own name(s) and per-account number suffixes.
+  ///
+  /// A counterparty naming another tracked account (by its registered number
+  /// suffix) identifies the destination, so that pair may settle across the
+  /// much wider [ownAccountTransferWindow] — interbank settlement can take
+  /// far longer than the default [transferWindow]. A counterparty that only
+  /// matches the account holder's name is weaker: it marks the leg as
+  /// self-directed without saying where the money landed, so it raises
+  /// confidence within the normal window only.
   final OwnIdentity ownIdentity;
   final Duration ownAccountTransferWindow;
 
@@ -40,21 +44,39 @@ final class Reconciler {
   }) {
     final sorted = candidates.toList()
       ..sort((a, b) => _candidateKey(a).compareTo(_candidateKey(b)));
+    // Both passes below compare every leg against every other, which turns
+    // quadratic on a real ledger and stalls the isolate. Duplicates require
+    // an identical account, direction, and amount, and transfers require an
+    // identical amount, so bucketing on those first skips the comparisons
+    // that could only ever score zero. Same output, far fewer comparisons.
     final legs = <_Leg>[];
+    final duplicateBuckets = <String, List<_Leg>>{};
     for (final candidate in sorted) {
-      final duplicate = legs
+      final bucket = duplicateBuckets.putIfAbsent(
+        _duplicateBucketKey(candidate),
+        () => <_Leg>[],
+      );
+      final duplicate = bucket
           .where((leg) => _isDuplicate(leg, candidate))
           .toList();
       if (duplicate.length == 1) {
         duplicate.single.candidates.add(candidate);
       } else {
-        legs.add(_Leg([candidate]));
+        final leg = _Leg([candidate]);
+        legs.add(leg);
+        bucket.add(leg);
       }
     }
 
+    final amountBuckets = <String, List<_Leg>>{};
+    for (final leg in legs) {
+      amountBuckets
+          .putIfAbsent(_amountBucketKey(leg.primary), () => <_Leg>[])
+          .add(leg);
+    }
     final transferOptions = <_Leg, List<_Leg>>{
       for (final leg in legs)
-        leg: legs
+        leg: (amountBuckets[_amountBucketKey(leg.primary)] ?? const <_Leg>[])
             .where(
               (other) =>
                   other != leg && _isTransferPair(leg.primary, other.primary),
@@ -184,12 +206,16 @@ final class Reconciler {
         a.amount != b.amount) {
       return 0;
     }
-    final identityMatch = _matchesOwnIdentity(a, b);
+    final namesOppositeAccount = _namesOppositeAccount(a, b);
+    final ownNameLegs = _ownNameLegs(a, b);
     final age = _difference(a.occurredAt, b.occurredAt);
     final lateCsv =
         a.observation.kind == ObservationKind.csvImport ||
         b.observation.kind == ObservationKind.csvImport;
-    final window = identityMatch
+    // Only naming the opposite account earns the wider settlement window.
+    // An own-name match says "this leg was mine" but not where it landed, so
+    // widening on it would merge any two same-amount legs a day apart.
+    final window = namesOppositeAccount
         ? (ownAccountTransferWindow > transferWindow
               ? ownAccountTransferWindow
               : transferWindow)
@@ -207,15 +233,26 @@ final class Reconciler {
         (ac.contains(bc) || bc.contains(ac))) {
       score += 0.15;
     }
-    if (identityMatch) score += 0.35;
+    if (namesOppositeAccount) {
+      score += 0.35;
+    } else if (ownNameLegs > 0) {
+      score += ownNameLegs == 2 ? 0.3 : 0.2;
+    }
     return score.clamp(0, 1);
   }
 
-  bool _matchesOwnIdentity(EventCandidate a, EventCandidate b) =>
+  /// Strong signal: one leg's counterparty carries the *other* account's
+  /// registered number suffix, which names the destination outright.
+  bool _namesOppositeAccount(EventCandidate a, EventCandidate b) =>
       ownIdentity.matchesAccount(a.counterparty, b.accountId) ||
-      ownIdentity.matchesAccount(b.counterparty, a.accountId) ||
-      ownIdentity.matchesOwnName(a.counterparty) ||
-      ownIdentity.matchesOwnName(b.counterparty);
+      ownIdentity.matchesAccount(b.counterparty, a.accountId);
+
+  /// Weak signal: how many legs name the account holder themselves. Enough to
+  /// lift a genuine self-transfer over the threshold inside the normal
+  /// window, never enough to widen that window.
+  int _ownNameLegs(EventCandidate a, EventCandidate b) =>
+      (ownIdentity.matchesOwnName(a.counterparty) ? 1 : 0) +
+      (ownIdentity.matchesOwnName(b.counterparty) ? 1 : 0);
 
   CanonicalTransaction _single(_Leg leg, {required bool needsReview}) {
     final item = leg.primary;
@@ -285,6 +322,16 @@ final class Reconciler {
           ..sort();
     return identities.join(',');
   }
+
+  /// Cheapest necessary conditions for [_isDuplicate], used to bucket legs so
+  /// only plausible pairs are compared.
+  String _duplicateBucketKey(EventCandidate item) =>
+      '${item.accountId}|${item.direction.name}|${_amountBucketKey(item)}';
+
+  /// Cheapest necessary condition for [_transferScore] — an unequal amount
+  /// always scores zero.
+  String _amountBucketKey(EventCandidate item) =>
+      '${item.amount.minorUnits}|${item.amount.currency}';
 
   String _candidateKey(EventCandidate item) => [
     item.occurredAt.toUtc().microsecondsSinceEpoch.toString().padLeft(20, '0'),

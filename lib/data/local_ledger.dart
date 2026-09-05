@@ -204,6 +204,11 @@ final class LocalLedger {
     "DELETE FROM app_settings WHERE key = 'dedup_ranking_volatile_v1'",
   );
 
+  @visibleForTesting
+  void resetEvidenceRefreshForTests() => _db.execute(
+    "DELETE FROM app_settings WHERE key = 'refresh_stored_evidence_v1'",
+  );
+
   T runAtomic<T>(T Function() operation) {
     _db.execute('BEGIN IMMEDIATE');
     try {
@@ -538,7 +543,42 @@ final class LocalLedger {
     ''');
     _recategorizeAutomaticTransactions();
     _dedupeRankingVolatileNotificationDuplicates();
+    _refreshStoredEvidence();
     _db.execute('PRAGMA user_version = 3');
+  }
+
+  /// One-time refresh of stored evidence with the current parser.
+  ///
+  /// A candidate's confidence is recorded when it is first parsed, so parser
+  /// improvements never reached evidence already captured. Everything taken
+  /// in by the earlier generic parser was recorded just below the threshold
+  /// that posts a transaction without asking, which sent every single capture
+  /// to the Review inbox. Re-deriving those candidates applies the current
+  /// reading — including counterparty and reference extraction the earlier
+  /// parser lacked, which also helps transfer matching. Confirmed work is
+  /// safe: reconciliation preserves locked and manual transactions.
+  void _refreshStoredEvidence() {
+    final done = _db.select(
+      "SELECT 1 FROM app_settings WHERE key = 'refresh_stored_evidence_v1'",
+    );
+    if (done.isNotEmpty) return;
+    var refreshed = 0;
+    for (final row in _db.select('''
+      SELECT * FROM raw_observations
+      WHERE kind = 'notification' AND parse_status = 'parsed'
+        AND account_id IS NOT NULL
+      ''')) {
+      final candidate = const NotificationParser()
+          .parseDetailed(_rawFromRow(row))
+          .candidate;
+      if (candidate == null) continue;
+      _insertCandidate(candidate);
+      refreshed++;
+    }
+    _db.execute(
+      "INSERT OR REPLACE INTO app_settings(key,value) VALUES ('refresh_stored_evidence_v1','done')",
+    );
+    if (refreshed > 0) _reconcile();
   }
 
   /// One-time cleanup for a fixed bug: the native capture path used to hash
@@ -1357,7 +1397,37 @@ final class LocalLedger {
     }
   }
 
-  bool ingestNotification(Map<String, Object?> envelope) {
+  bool ingestNotification(Map<String, Object?> envelope) =>
+      _ingestNotification(envelope, reconcile: true);
+
+  /// Ingests a batch, reconciling once at the end instead of once per
+  /// notification.
+  ///
+  /// Reconciliation rebuilds every automatic transaction from all stored
+  /// evidence and compares every leg against every other, so doing it per
+  /// notification made draining a queued backlog cost roughly
+  /// `backlog x ledger²` and locked the UI isolate. Returns one flag per
+  /// envelope, in order, so the caller can acknowledge exactly what landed.
+  List<bool> ingestNotifications(
+    List<Map<String, Object?>> envelopes, {
+    bool reconcile = true,
+  }) {
+    final results = [
+      for (final envelope in envelopes)
+        _ingestNotification(envelope, reconcile: false),
+    ];
+    if (reconcile && results.contains(true)) _reconcile();
+    return results;
+  }
+
+  /// Rebuilds automatic transactions from the evidence stored so far. Only
+  /// needed after [ingestNotifications] was told to defer it.
+  void reconcilePendingEvidence() => _reconcile();
+
+  bool _ingestNotification(
+    Map<String, Object?> envelope, {
+    required bool reconcile,
+  }) {
     final stablePayload = Map<String, Object?>.from(envelope)
       ..remove('id')
       ..remove('capturedAt')
@@ -1458,7 +1528,7 @@ final class LocalLedger {
         [_now, _now, sourceId],
       );
     }
-    _reconcile();
+    if (reconcile) _reconcile();
     return true;
   }
 
@@ -1717,14 +1787,14 @@ final class LocalLedger {
       "SELECT value FROM app_settings WHERE key = 'own_names_json'",
     );
     if (rows.isEmpty) return const [];
-    return (jsonDecode(rows.first['value'] as String) as List)
-        .cast<String>();
+    return (jsonDecode(rows.first['value'] as String) as List).cast<String>();
   }
 
   void setOwnNames(List<String> names) {
-    final cleaned = names.map((name) => name.trim()).where(
-      (name) => name.isNotEmpty,
-    ).toList();
+    final cleaned = names
+        .map((name) => name.trim())
+        .where((name) => name.isNotEmpty)
+        .toList();
     _db.execute(
       "INSERT OR REPLACE INTO app_settings(key,value) VALUES ('own_names_json',?)",
       [jsonEncode(cleaned)],
@@ -2156,10 +2226,8 @@ final class LocalLedger {
         )
         .map(_transactionFromRow)
         .toList();
-    final result = Reconciler(ownIdentity: _ownIdentity()).reconcile(
-      candidates,
-      existing: existingLocked,
-    );
+    final result = Reconciler(ownIdentity: _ownIdentity())
+        .reconcile(candidates, existing: existingLocked);
     if (manageTransaction) _db.execute('BEGIN IMMEDIATE');
     try {
       _db.execute(
