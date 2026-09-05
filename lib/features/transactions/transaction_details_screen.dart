@@ -118,7 +118,7 @@ class TransactionDetailsScreen extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.layers_outlined,
                     color: SpendWiseColors.accent,
                   ),
@@ -206,6 +206,7 @@ class TransactionDetailsScreen extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
+      useSafeArea: true,
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setModalState) => SafeArea(
           top: false,
@@ -440,7 +441,7 @@ class _EvidenceCard extends StatelessWidget {
             Container(
               width: 12,
               height: 12,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: SpendWiseColors.accent,
                 shape: BoxShape.circle,
               ),

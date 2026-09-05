@@ -161,11 +161,11 @@ class _LedgerScreenState extends State<LedgerScreen> {
             )
           else
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(
+              padding: EdgeInsets.fromLTRB(
                 SpendWiseTheme.gutter,
                 6,
                 SpendWiseTheme.gutter,
-                96,
+                96 + MediaQuery.viewPaddingOf(context).bottom,
               ),
               sliver: SliverList.builder(
                 itemCount: days.length,
@@ -452,6 +452,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
+      useSafeArea: true,
       builder: (sheetContext) => StatefulBuilder(
         builder: (sheetContext, refresh) => SafeArea(
           child: Padding(

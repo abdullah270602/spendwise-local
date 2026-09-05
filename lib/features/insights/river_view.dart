@@ -50,12 +50,12 @@ class RiverView extends StatelessWidget {
     }
 
     return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(
-        SpendWiseTheme.gutter,
-        0,
-        SpendWiseTheme.gutter,
-        100,
-      ),
+      padding: EdgeInsets.fromLTRB(
+                SpendWiseTheme.gutter,
+                0,
+                SpendWiseTheme.gutter,
+                96 + MediaQuery.viewPaddingOf(context).bottom,
+              ),
       sliver: SliverList.builder(
         itemCount: rows.length,
         itemBuilder: (context, index) {
@@ -100,7 +100,7 @@ class RiverHeading extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Eyebrow('In', color: SpendWiseColors.keep),
+                Eyebrow('In', color: SpendWiseColors.keep),
                 const SizedBox(height: 3),
                 Text(
                   formatMinor(inTotal, cents: false),
@@ -116,7 +116,7 @@ class RiverHeading extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                const Eyebrow('Out', color: SpendWiseColors.spend),
+                Eyebrow('Out', color: SpendWiseColors.spend),
                 const SizedBox(height: 3),
                 Text(
                   formatMinor(outTotal, cents: false),
@@ -195,6 +195,12 @@ class _Branch extends StatelessWidget {
   Widget build(BuildContext context) {
     final own = transaction.kind == TransactionKind.transfer;
     final incoming = transaction.kind == TransactionKind.income;
+    // A transfer's subtitle is already "From → To"; a crossing should name
+    // both banks rather than saying "here", which is exactly the word a map
+    // is supposed to replace.
+    final legs = own ? transaction.subtitle.split('→') : const <String>[];
+    final fromName = legs.length == 2 ? legs.first.trim() : '';
+    final toName = legs.length == 2 ? legs.last.trim() : '';
     final tone = own
         ? SpendWiseColors.mine
         : incoming
@@ -213,7 +219,10 @@ class _Branch extends StatelessWidget {
                       transaction: transaction,
                       tone: tone,
                       alignEnd: true,
-                      label: own ? 'left this account' : null,
+                      title: own && fromName.isNotEmpty
+                          ? fromName
+                          : transaction.title,
+                      label: own ? 'left' : null,
                     )
                   : const SizedBox(),
             ),
@@ -227,7 +236,10 @@ class _Branch extends StatelessWidget {
                       transaction: transaction,
                       tone: tone,
                       alignEnd: false,
-                      label: own ? 'arrived here' : null,
+                      title: own && toName.isNotEmpty
+                          ? toName
+                          : transaction.title,
+                      label: own ? 'arrived' : null,
                     )
                   : const SizedBox(),
             ),
@@ -312,12 +324,17 @@ class _Side extends StatelessWidget {
     required this.transaction,
     required this.tone,
     required this.alignEnd,
+    this.title,
     this.label,
   });
 
   final TransactionViewData transaction;
   final Color tone;
   final bool alignEnd;
+
+  /// Overrides the transaction's own name. A crossing between two of your
+  /// accounts names the account on each side instead.
+  final String? title;
   final String? label;
 
   @override
@@ -335,7 +352,7 @@ class _Side extends StatelessWidget {
           : CrossAxisAlignment.start,
       children: [
         Text(
-          transaction.title,
+          title ?? transaction.title,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           textAlign: alignEnd ? TextAlign.right : TextAlign.left,

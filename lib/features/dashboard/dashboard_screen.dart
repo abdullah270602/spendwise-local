@@ -219,7 +219,11 @@ class DashboardScreen extends StatelessWidget {
               child: _TrayScan(viewModel: viewModel),
             ),
           ],
-          const SliverToBoxAdapter(child: SizedBox(height: 96)),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 96 + MediaQuery.viewPaddingOf(context).bottom,
+            ),
+          ),
         ],
       ),
     );
@@ -453,7 +457,7 @@ class _OwnMovesNote extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(right: 8, top: 1),
                 child: Text(
                   '⇄',

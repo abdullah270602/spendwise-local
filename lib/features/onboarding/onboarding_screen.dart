@@ -65,7 +65,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 children: [
                   const SpendWiseMark(size: 42),
                   const SizedBox(width: 12),
-                  const Column(
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
@@ -78,6 +78,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       Text(
                         'Private. Local. Yours.',
                         style: TextStyle(
+                          // ignore: prefer_const_constructors
                           fontSize: 10,
                           color: SpendWiseColors.accent,
                           fontWeight: FontWeight.w600,

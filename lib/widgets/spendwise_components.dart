@@ -171,7 +171,7 @@ class PrivacyBanner extends StatelessWidget {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
+        Padding(
           padding: EdgeInsets.only(top: 2),
           child: Icon(
             Icons.lock_outline_rounded,

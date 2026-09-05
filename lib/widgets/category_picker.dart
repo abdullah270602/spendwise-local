@@ -5,10 +5,10 @@ import '../features/shell/spendwise_view_model.dart';
 import 'shape_kit.dart';
 
 /// One way to choose a category, everywhere. Filing something is the most
-/// common correction in the app, so it opens as a full list with the user's
-/// own categories first — and lets them add one without leaving the flow,
-/// because the moment you need a category that does not exist is the moment
-/// you are trying to file something.
+/// common correction in the app, so it opens as a searchable, grouped list
+/// with the user's own categories first — and lets them add one without
+/// leaving the flow, because the moment you need a category that does not
+/// exist is the moment you are trying to file something.
 Future<String?> pickCategory(
   BuildContext context, {
   required SpendWiseViewModel viewModel,
@@ -18,12 +18,36 @@ Future<String?> pickCategory(
   context: context,
   isScrollControlled: true,
   showDragHandle: true,
+  useSafeArea: true,
   builder: (sheetContext) => _CategorySheet(
     viewModel: viewModel,
     kind: kind,
     current: current,
   ),
 );
+
+/// Twenty categories in one alphabetical column is a list you read; grouped by
+/// what the money was for, it becomes a list you skim. The groups are stated
+/// here rather than stored, so adding a seeded category never needs a
+/// migration to stay organised.
+const _groups = <String, List<String>>{
+  'Day to day': ['groceries', 'food', 'transport', 'bills', 'home'],
+  'Life': [
+    'shopping',
+    'entertainment',
+    'subscriptions',
+    'travel',
+    'personal-care',
+  ],
+  'Health & obligations': [
+    'health',
+    'education',
+    'insurance',
+    'government-tax',
+    'gifts-charity',
+  ],
+  'Money moving': ['income', 'transfer', 'cash', 'fees', 'other'],
+};
 
 class _CategorySheet extends StatefulWidget {
   const _CategorySheet({
@@ -41,28 +65,51 @@ class _CategorySheet extends StatefulWidget {
 }
 
 class _CategorySheetState extends State<_CategorySheet> {
-  final controller = TextEditingController();
+  final search = TextEditingController();
+  final draft = TextEditingController();
   bool adding = false;
   bool saving = false;
 
   @override
   void dispose() {
-    controller.dispose();
+    search.dispose();
+    draft.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final all = widget.viewModel.uiCategories;
-    final usable = all.where((item) => item.suits(widget.kind)).toList();
-    // The user's own first: they added them because the built-ins did not fit.
+    final query = search.text.trim().toLowerCase();
+    final usable = widget.viewModel.uiCategories
+        .where((item) => item.suits(widget.kind))
+        .where((item) => query.isEmpty || item.name.toLowerCase().contains(query))
+        .toList();
+
     final mine = usable.where((item) => !item.isSystem).toList();
     final builtIn = usable.where((item) => item.isSystem).toList();
 
+    final sections = <_Section>[
+      if (mine.isNotEmpty) _Section('Yours', mine),
+      for (final entry in _groups.entries)
+        if (builtIn.any((item) => entry.value.contains(item.id)))
+          _Section(entry.key, [
+            for (final id in entry.value)
+              ...builtIn.where((item) => item.id == id),
+          ]),
+      // Anything seeded later that no group claims still has to appear.
+      if (builtIn.any(
+        (item) => !_groups.values.any((ids) => ids.contains(item.id)),
+      ))
+        _Section('Other categories', [
+          for (final item in builtIn)
+            if (!_groups.values.any((ids) => ids.contains(item.id))) item,
+        ]),
+    ];
+
     return DraggableScrollableSheet(
       expand: false,
-      initialChildSize: .72,
-      maxChildSize: .94,
+      initialChildSize: .78,
+      maxChildSize: .96,
       builder: (context, scrollController) => Column(
         children: [
           Padding(
@@ -70,7 +117,7 @@ class _CategorySheetState extends State<_CategorySheet> {
               SpendWiseTheme.gutter,
               0,
               SpendWiseTheme.gutter,
-              12,
+              10,
             ),
             child: Row(
               children: [
@@ -80,74 +127,95 @@ class _CategorySheetState extends State<_CategorySheet> {
                 if (!adding)
                   TextButton(
                     onPressed: () => setState(() => adding = true),
-                    child: const Text('New category'),
+                    child: const Text('New'),
                   ),
               ],
             ),
           ),
-          if (adding)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                SpendWiseTheme.gutter,
-                0,
-                SpendWiseTheme.gutter,
-                14,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: controller,
-                      autofocus: true,
-                      textCapitalization: TextCapitalization.sentences,
-                      style: SpendWiseType.row,
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        hintText: 'Rent, Zakat, Gym…',
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              SpendWiseTheme.gutter,
+              0,
+              SpendWiseTheme.gutter,
+              10,
+            ),
+            child: adding
+                ? Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: draft,
+                          autofocus: true,
+                          textCapitalization: TextCapitalization.sentences,
+                          style: SpendWiseType.row,
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            hintText: 'Rent, Zakat, Gym…',
+                          ),
+                          onSubmitted: (_) => _create(),
+                        ),
                       ),
-                      onSubmitted: (_) => _create(),
+                      const SizedBox(width: 10),
+                      FilledButton(
+                        onPressed: saving ? null : _create,
+                        child: Text(saving ? 'Adding…' : 'Add'),
+                      ),
+                    ],
+                  )
+                : TextField(
+                    controller: search,
+                    style: SpendWiseType.row,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      hintText: 'Search categories',
+                      prefixIcon: const Icon(Icons.search_rounded, size: 18),
+                      suffixIcon: search.text.isEmpty
+                          ? null
+                          : IconButton(
+                              onPressed: () => setState(search.clear),
+                              icon: const Icon(Icons.close_rounded, size: 18),
+                            ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  FilledButton(
-                    onPressed: saving ? null : _create,
-                    child: Text(saving ? 'Adding…' : 'Add'),
-                  ),
-                ],
-              ),
-            ),
+          ),
           Expanded(
-            child: ListView(
-              controller: scrollController,
-              padding: const EdgeInsets.fromLTRB(
-                SpendWiseTheme.gutter,
-                0,
-                SpendWiseTheme.gutter,
-                28,
-              ),
-              children: [
-                if (mine.isNotEmpty) ...[
-                  const Eyebrow('Yours'),
-                  const SizedBox(height: 4),
-                  for (final item in mine)
-                    _CategoryRow(
-                      category: item,
-                      selected: item.name == widget.current,
-                      onTap: () => Navigator.pop(context, item.name),
-                      onRemove: () => _remove(item),
+            child: sections.isEmpty
+                ? _NoMatch(
+                    query: search.text.trim(),
+                    onCreate: () => setState(() {
+                      draft.text = search.text.trim();
+                      adding = true;
+                    }),
+                  )
+                : ListView(
+                    controller: scrollController,
+                    // The sheet floats above the gesture bar, so the last row
+                    // needs to clear it or it reads as cut in half.
+                    padding: EdgeInsets.fromLTRB(
+                      SpendWiseTheme.gutter,
+                      0,
+                      SpendWiseTheme.gutter,
+                      24 + MediaQuery.viewPaddingOf(context).bottom,
                     ),
-                  const SizedBox(height: 18),
-                ],
-                const Eyebrow('Built in'),
-                const SizedBox(height: 4),
-                for (final item in builtIn)
-                  _CategoryRow(
-                    category: item,
-                    selected: item.name == widget.current,
-                    onTap: () => Navigator.pop(context, item.name),
+                    children: [
+                      for (final section in sections) ...[
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(0, 14, 0, 4),
+                          child: Eyebrow(section.title),
+                        ),
+                        for (final item in section.items)
+                          _CategoryRow(
+                            category: item,
+                            selected: item.name == widget.current,
+                            onTap: () => Navigator.pop(context, item.name),
+                            onRemove: item.isSystem
+                                ? null
+                                : () => _remove(item),
+                          ),
+                      ],
+                    ],
                   ),
-              ],
-            ),
           ),
         ],
       ),
@@ -155,7 +223,7 @@ class _CategorySheetState extends State<_CategorySheet> {
   }
 
   Future<void> _create() async {
-    final name = controller.text.trim();
+    final name = draft.text.trim();
     if (name.isEmpty) return;
     setState(() => saving = true);
     try {
@@ -179,6 +247,37 @@ class _CategorySheetState extends State<_CategorySheet> {
   }
 }
 
+class _Section {
+  const _Section(this.title, this.items);
+  final String title;
+  final List<CategoryViewData> items;
+}
+
+class _NoMatch extends StatelessWidget {
+  const _NoMatch({required this.query, required this.onCreate});
+
+  final String query;
+  final VoidCallback onCreate;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(SpendWiseTheme.gutter, 30, 24, 24),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('No category called "$query".', style: SpendWiseType.lead),
+        const SizedBox(height: 10),
+        Text(
+          'You can make one — it will be there next time too.',
+          style: SpendWiseType.body.copyWith(fontSize: 13),
+        ),
+        const SizedBox(height: 16),
+        OutlinedButton(onPressed: onCreate, child: Text('Add "$query"')),
+      ],
+    ),
+  );
+}
+
 class _CategoryRow extends StatelessWidget {
   const _CategoryRow({
     required this.category,
@@ -199,21 +298,22 @@ class _CategoryRow extends StatelessWidget {
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: SpendWiseColors.line)),
       ),
-      padding: const EdgeInsets.symmetric(vertical: 13),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         children: [
           Expanded(
             child: Text(
               category.name,
-              style: selected
-                  ? SpendWiseType.rowStrong
-                  : SpendWiseType.row,
+              style: selected ? SpendWiseType.rowStrong : SpendWiseType.row,
             ),
           ),
           if (selected)
-            const Text(
-              '✓',
-              style: TextStyle(color: SpendWiseColors.keep, fontSize: 15),
+            Padding(
+              padding: EdgeInsets.only(right: 4),
+              child: Text(
+                '✓',
+                style: TextStyle(color: SpendWiseColors.keep, fontSize: 15),
+              ),
             ),
           if (onRemove != null)
             IconButton(

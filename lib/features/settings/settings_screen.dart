@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../app/palette.dart';
 import '../../app/theme.dart';
+import '../../main.dart';
 import '../../widgets/spendwise_components.dart';
 import '../shell/spendwise_view_model.dart';
 import 'source_selection_screen.dart';
+import '../reports/report_screen.dart';
 import 'export_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -95,6 +98,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             children: [
               ListTile(
+                leading: const Icon(Icons.picture_as_pdf_outlined),
+                title: const Text('Spending report'),
+                subtitle: const Text('A PDF of a month, a quarter, a year'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => ReportScreen(viewModel: viewModel),
+                  ),
+                ),
+              ),
+              const Divider(height: 1, indent: 56),
+              ListTile(
                 leading: const Icon(Icons.download_outlined),
                 title: const Text('Export data'),
                 subtitle: const Text('CSV or JSON with precise filters'),
@@ -123,6 +139,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: changingSavingsVisibility ? null : _setSavingsVisibility,
           ),
         ),
+        const SizedBox(height: 22),
+        const SectionHeading('Colour'),
+        const SizedBox(height: 8),
+        _PalettePicker(viewModel: viewModel),
         const SizedBox(height: 22),
         const SectionHeading('Sample data'),
         const SizedBox(height: 8),
@@ -177,7 +197,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Card(
           child: Column(
             children: [
-              const ListTile(
+              ListTile(
                 leading: Icon(
                   Icons.wifi_off_rounded,
                   color: SpendWiseColors.accent,
@@ -189,11 +209,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const Divider(height: 1, indent: 56),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.delete_forever_outlined,
                   color: SpendWiseColors.expense,
                 ),
-                title: const Text(
+                title: Text(
                   'Erase all local data',
                   style: TextStyle(color: SpendWiseColors.expense),
                 ),
@@ -368,4 +388,97 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
+}
+
+/// Five palettes, not a colour wheel. The ground, the type and the layout are
+/// the app's identity; what a person gets to choose is the temperament of the
+/// three colours that carry meaning. Every option is checked against the same
+/// dark ground, so none of them can make the app look worse than the default.
+class _PalettePicker extends StatefulWidget {
+  const _PalettePicker({required this.viewModel});
+
+  final SpendWiseViewModel viewModel;
+
+  @override
+  State<_PalettePicker> createState() => _PalettePickerState();
+}
+
+class _PalettePickerState extends State<_PalettePicker> {
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Column(
+      children: [
+        for (final palette in SpendWisePalette.all) ...[
+          if (palette != SpendWisePalette.all.first)
+            const Divider(height: 1, indent: 16),
+          InkWell(
+            onTap: () => _choose(palette),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
+              child: Row(
+                children: [
+                  _Swatch(palette: palette),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(palette.name, style: SpendWiseType.row),
+                        const SizedBox(height: 2),
+                        Text(
+                          palette.blurb,
+                          style: SpendWiseType.body.copyWith(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (palette.id == SpendWiseColors.palette.id)
+                    Text(
+                      '✓',
+                      style: TextStyle(
+                        color: SpendWiseColors.keep,
+                        fontSize: 16,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
+
+  void _choose(SpendWisePalette palette) {
+    if (palette.id == SpendWiseColors.palette.id) return;
+    SpendWiseColors.apply(palette);
+    widget.viewModel.uiSetViewPreference('palette', palette.id);
+    // Repaint from the root: ThemeData itself carries these colours.
+    paletteRevision.value++;
+    setState(() {});
+  }
+}
+
+/// The three tones that carry meaning, in the order the app uses them:
+/// kept, moved between your own accounts, gone.
+class _Swatch extends StatelessWidget {
+  const _Swatch({required this.palette});
+
+  final SpendWisePalette palette;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 46,
+    height: 26,
+    // Stretch, or a childless ColoredBox inside Expanded gets a tight width
+    // and zero height, and the swatch renders as nothing at all.
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(flex: 5, child: ColoredBox(color: palette.keep)),
+        Expanded(flex: 2, child: ColoredBox(color: palette.mine)),
+        Expanded(flex: 3, child: ColoredBox(color: palette.spend)),
+      ],
+    ),
+  );
 }

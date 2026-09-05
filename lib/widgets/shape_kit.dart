@@ -221,19 +221,24 @@ class BalanceLine extends StatelessWidget {
     super.key,
     required this.points,
     this.height = 84,
-    this.color = SpendWiseColors.keep,
+    this.color,
   });
 
   /// Running balance in minor units, one entry per day, oldest first.
   final List<int> points;
   final double height;
-  final Color color;
+
+  /// Defaults to the palette's "kept" tone, which is not a compile-time
+  /// constant because the palette is a user choice.
+  final Color? color;
 
   @override
   Widget build(BuildContext context) => SizedBox(
     height: height,
     width: double.infinity,
-    child: CustomPaint(painter: _BalanceLinePainter(points, color)),
+    child: CustomPaint(
+      painter: _BalanceLinePainter(points, color ?? SpendWiseColors.keep),
+    ),
   );
 }
 
@@ -422,8 +427,8 @@ class RegisterRow extends StatelessWidget {
                 Row(
                   children: [
                     if (ownTransfer)
-                      const Padding(
-                        padding: EdgeInsets.only(right: 5),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 5),
                         child: Text(
                           '⇄',
                           style: TextStyle(
@@ -445,7 +450,7 @@ class RegisterRow extends StatelessWidget {
                         margin: const EdgeInsets.only(left: 6),
                         width: 5,
                         height: 5,
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           color: SpendWiseColors.spend,
                           shape: BoxShape.circle,
                         ),
@@ -512,7 +517,7 @@ class ProportionBlock extends StatelessWidget {
                 : SpendWiseColors.keep.withValues(alpha: .11),
             border: filled
                 ? null
-                : const Border(
+                : Border(
                     left: BorderSide(color: SpendWiseColors.keep, width: 2),
                     top: BorderSide(color: SpendWiseColors.edge),
                     right: BorderSide(color: SpendWiseColors.edge),

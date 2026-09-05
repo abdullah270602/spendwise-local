@@ -93,12 +93,12 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  SpendWiseTheme.gutter,
-                  22,
-                  SpendWiseTheme.gutter,
-                  100,
-                ),
+                padding: EdgeInsets.fromLTRB(
+                SpendWiseTheme.gutter,
+                22,
+                SpendWiseTheme.gutter,
+                96 + MediaQuery.viewPaddingOf(context).bottom,
+              ),
                 child: Container(
                   padding: const EdgeInsets.only(top: 13),
                   decoration: const BoxDecoration(
@@ -182,6 +182,7 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
+      useSafeArea: true,
       builder: (sheetContext) => DraggableScrollableSheet(
         expand: false,
         initialChildSize: .7,
@@ -309,6 +310,7 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
+      useSafeArea: true,
       builder: (sheetContext) => DraggableScrollableSheet(
         expand: false,
         initialChildSize: .78,
@@ -402,6 +404,7 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
     return showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
+      useSafeArea: true,
       builder: (sheetContext) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -455,12 +458,12 @@ class _Swipeable extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Dismissible(
     key: ValueKey('review-$id'),
-    background: const _SwipeHint(
+    background: _SwipeHint(
       label: 'CONFIRM',
       tone: SpendWiseColors.keep,
       alignment: Alignment.centerLeft,
     ),
-    secondaryBackground: const _SwipeHint(
+    secondaryBackground: _SwipeHint(
       label: 'DELETE',
       tone: SpendWiseColors.spend,
       alignment: Alignment.centerRight,
@@ -718,7 +721,7 @@ class _Evidence extends StatelessWidget {
       spans.add(
         TextSpan(
           text: match.group(0),
-          style: const TextStyle(color: SpendWiseColors.spend),
+          style: TextStyle(color: SpendWiseColors.spend),
         ),
       );
       cursor = match.end;

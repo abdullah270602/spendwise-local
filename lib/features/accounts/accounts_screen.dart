@@ -169,12 +169,12 @@ class _AccountsScreenState extends State<AccountsScreen> {
               ),
             ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(
-              SpendWiseTheme.gutter,
-              0,
-              SpendWiseTheme.gutter,
-              100,
-            ),
+            padding: EdgeInsets.fromLTRB(
+                SpendWiseTheme.gutter,
+                0,
+                SpendWiseTheme.gutter,
+                96 + MediaQuery.viewPaddingOf(context).bottom,
+              ),
             sliver: SliverList.list(
               children: [
                 if (everyday.isNotEmpty) ...[
@@ -276,7 +276,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            const Text(
+            Text(
               '→',
               style: TextStyle(fontSize: 14, color: SpendWiseColors.spend),
             ),
@@ -539,6 +539,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
+      useSafeArea: true,
       builder: (sheetContext) => _ControllerDisposalScope(
         controllers: [name, institution, suffix],
         child: StatefulBuilder(
@@ -758,6 +759,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
+      useSafeArea: true,
       builder: (sheetContext) => _ControllerDisposalScope(
         controllers: [name, balance, institution, suffix, smsSender],
         child: StatefulBuilder(
@@ -1096,7 +1098,7 @@ class _SavingsExplanation extends StatelessWidget {
       color: SpendWiseColors.accentMuted,
       borderRadius: BorderRadius.circular(12),
     ),
-    child: const Row(
+    child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(Icons.savings_outlined, size: 19, color: SpendWiseColors.accent),

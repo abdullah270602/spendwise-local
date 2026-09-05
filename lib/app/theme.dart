@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'palette.dart';
 
 /// The palette is the one signed off in `design/shape.html`: a graphite ground
 /// with three semantic hues that each answer a single question -- did the money
@@ -21,27 +22,31 @@ abstract final class SpendWiseColors {
   static const edge = Color(0xFF282D31);
 
   /// Money that stayed: income, balances, the kept share of the month.
-  static const keep = Color(0xFF9FB2AC);
+  /// Not const: these three are the one thing a user can restyle, and the
+  /// ground they sit on never changes, so the blast radius is exactly here.
+  static Color keep = SpendWisePalette.sage.keep;
 
   /// Money that left.
-  static const spend = Color(0xFFC97A5A);
+  static Color spend = SpendWisePalette.sage.spend;
 
   /// Money that moved between the user's own accounts.
-  static const mine = Color(0xFF6E8496);
+  static Color mine = SpendWisePalette.sage.mine;
+
+  /// The palette in force. Changing it repaints the whole app.
+  static SpendWisePalette palette = SpendWisePalette.sage;
+
+  static void apply(SpendWisePalette next) {
+    palette = next;
+    keep = next.keep;
+    spend = next.spend;
+    mine = next.mine;
+    categoryRamp = next.ramp;
+  }
 
   /// Ordered ramp for spending categories. Read in order; index wraps.
   /// Deliberately low-chroma so a chart of eight categories still reads as one
   /// object rather than a bag of highlighter pens.
-  static const categoryRamp = <Color>[
-    Color(0xFFC97A5A), // clay
-    Color(0xFFA98D6B), // sand
-    Color(0xFF6E8496), // slate
-    Color(0xFF7E7A96), // mauve
-    Color(0xFF9FB2AC), // sage
-    Color(0xFFB08A7E), // rose clay
-    Color(0xFF8A9A7B), // olive
-    Color(0xFF4A5054), // graphite
-  ];
+  static List<Color> categoryRamp = SpendWisePalette.sage.ramp;
 
   static Color category(int index) =>
       categoryRamp[index.abs() % categoryRamp.length];
@@ -53,10 +58,10 @@ abstract final class SpendWiseColors {
   static const surface = bg;
   static const surfaceRaised = Color(0xFF15181B);
   static const border = edge;
-  static const accent = keep;
+  static Color get accent => keep;
   static const accentMuted = Color(0xFF1A2321);
-  static const income = keep;
-  static const expense = spend;
+  static Color get income => keep;
+  static Color get expense => spend;
   static const warning = Color(0xFFC9A45A);
   static const textSecondary = dim;
 }
@@ -166,7 +171,7 @@ abstract final class SpendWiseTheme {
   static const gutter = 22.0;
 
   static ThemeData get dark {
-    const scheme = ColorScheme.dark(
+    final scheme = ColorScheme.dark(
       primary: SpendWiseColors.fg,
       onPrimary: SpendWiseColors.bg,
       secondary: SpendWiseColors.keep,
@@ -386,7 +391,7 @@ abstract final class SpendWiseTheme {
         ),
         trackOutlineColor: const WidgetStatePropertyAll(SpendWiseColors.edge),
       ),
-      progressIndicatorTheme: const ProgressIndicatorThemeData(
+      progressIndicatorTheme: ProgressIndicatorThemeData(
         color: SpendWiseColors.keep,
         linearTrackColor: SpendWiseColors.line,
       ),

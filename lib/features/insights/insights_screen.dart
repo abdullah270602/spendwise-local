@@ -670,7 +670,7 @@ class _TrendChartState extends State<_TrendChart> {
                 if (analytics.category == null)
                   _LegendDot(label: 'Income', color: SpendWiseColors.income),
                 const SizedBox(width: 12),
-                const _LegendDot(
+                _LegendDot(
                   label: 'Spent',
                   color: SpendWiseColors.expense,
                 ),
@@ -830,14 +830,9 @@ class _CategoryBreakdown extends StatelessWidget {
 
   final SpendingAnalytics analytics;
 
-  static const colors = [
-    SpendWiseColors.accent,
-    SpendWiseColors.warning,
-    SpendWiseColors.expense,
-    Color(0xFF7AB8FF),
-    Color(0xFFB89CFF),
-    Color(0xFF65C7C1),
-  ];
+  /// The one ramp, so the donut, the bar on Home and the category rows all
+  /// agree about which colour a category is.
+  static List<Color> get colors => SpendWiseColors.categoryRamp;
 
   @override
   Widget build(BuildContext context) {
