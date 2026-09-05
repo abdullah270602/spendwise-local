@@ -119,6 +119,28 @@ void main() {
     expect(candidate!.direction, EntryDirection.debit);
   });
 
+  test('takes the credited amount, not the balance quoted after it', () {
+    // The amount comes first and the balance last. An institution rule that
+    // scans forward from "credited" lands on the balance, which would file
+    // this as PKR 20,000 received instead of PKR 5,000.
+    final candidate = parse(
+      'An amount of PKR 5,000 has been credited to your account. '
+      'Avl Bal PKR 20,000',
+    );
+    expect(candidate, isNotNull);
+    expect(candidate!.direction, EntryDirection.credit);
+    expect(candidate.amount.minorUnits, 500000);
+  });
+
+  test('money credited to someone else is never booked as income', () {
+    // Reading "credited" as money-in here would record an outgoing payment
+    // as earnings. Contradictory wording is worth a person's judgement.
+    expect(
+      parse('PKR 80 has been credited to ALI RAZA from your account'),
+      isNull,
+    );
+  });
+
   test('a lone amount is unaffected', () {
     final candidate = parse('Your account was debited PKR 1,500 at SHOP');
     expect(candidate, isNotNull);

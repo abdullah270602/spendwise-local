@@ -233,7 +233,7 @@ final class LocalLedger {
 
   @visibleForTesting
   void resetEvidenceRefreshForTests() => _db.execute(
-    "DELETE FROM app_settings WHERE key = 'refresh_stored_evidence_v8'",
+    "DELETE FROM app_settings WHERE key = 'refresh_stored_evidence_v9'",
   );
 
   T runAtomic<T>(T Function() operation) {
@@ -589,7 +589,7 @@ final class LocalLedger {
 
   void _refreshStoredEvidenceInner() {
     final done = _db.select(
-      "SELECT 1 FROM app_settings WHERE key = 'refresh_stored_evidence_v8'",
+      "SELECT 1 FROM app_settings WHERE key = 'refresh_stored_evidence_v9'",
     );
     if (done.isNotEmpty) return;
     var refreshed = 0;
@@ -632,7 +632,7 @@ final class LocalLedger {
       refreshed++;
     }
     _db.execute(
-      "INSERT OR REPLACE INTO app_settings(key,value) VALUES ('refresh_stored_evidence_v8','done')",
+      "INSERT OR REPLACE INTO app_settings(key,value) VALUES ('refresh_stored_evidence_v9','done')",
     );
     if (refreshed > 0) _reconcile();
   }

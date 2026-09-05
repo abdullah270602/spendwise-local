@@ -23,7 +23,11 @@ final class NotificationParser {
   );
   static final RegExp _debitWords = RegExp(
     r'\b(?:debit(?:ed)?|paid|sent|spent|purchase(?:d)?|withdrawn?|withdrawal|'
-    r'deducted|charged|transfer(?:red)?\s+to|used\s+(?:at|for|on))\b',
+    r'deducted|charged|transfer(?:red)?\s+to|used\s+(?:at|for|on)|'
+    // "credited to <someone> from your account" is money leaving. Marking
+    // the source side as a debit signal makes such wording read as
+    // contradictory, so it goes to review instead of being booked as income.
+    r'from\s+your\s+(?:account|a\/?c))\b',
     caseSensitive: false,
   );
   // "Credit Card" names the instrument, not the direction. Counting it as
@@ -110,7 +114,11 @@ final class NotificationParser {
     }
     final configured = registry ?? ParserRegistry(pakistanParserDefinitions);
     for (final definition in configured.matching(observation)) {
-      final result = _applyDefinition(definition, observation);
+      final result = _applyDefinition(
+        definition,
+        observation,
+        amountMatches.single.group(0)!,
+      );
       if (result != null) return result;
     }
 
@@ -232,6 +240,7 @@ final class NotificationParser {
   ParserResult? _applyDefinition(
     ParserDefinition definition,
     RawObservation observation,
+    String transactionAmountText,
   ) {
     final text =
         observation.snapshot?.combinedText ??
@@ -247,8 +256,14 @@ final class NotificationParser {
         }
       }
 
-      final amountText = named(rule.amountGroup);
-      final amount = amountText == null ? null : Money.tryParsePkr(amountText);
+      // An institution rule locates the amount by scanning forward from its
+      // keyword, which lands on the balance when the wording puts the figure
+      // first ("PKR 5,000 has been credited to your account. Avl Bal PKR
+      // 20,000"). The prescreen already set balance figures aside and left
+      // exactly one plausible transaction amount, so that value wins; the
+      // rule still supplies direction, counterparty, and reference.
+      final ruleAmount = Money.tryParsePkr(named(rule.amountGroup) ?? '');
+      final amount = Money.tryParsePkr(transactionAmountText) ?? ruleAmount;
       if (amount == null || amount.isZero) continue;
       final candidate = EventCandidate(
         id: 'candidate:${observation.id}',
