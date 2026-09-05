@@ -1,5 +1,8 @@
 import 'package:flutter/foundation.dart';
 
+import '../../app/home_period.dart';
+export '../../app/home_period.dart';
+
 enum TransactionKind { expense, income, transfer }
 
 enum ReviewReason {
@@ -500,6 +503,10 @@ abstract class SpendWiseAdvancedViewModel implements SpendWiseViewModel {
   Future<NotificationTrayScanViewData> scanNotificationTray();
   Future<void> applyReviewDecision(ReviewDecision decision);
 
+  /// What stretch of time Home is a picture of.
+  HomePeriod get homePeriod;
+  void setHomePeriod(HomePeriod period);
+
   /// Loans made and taken, newest first.
   List<DebtViewData> get debts;
 
@@ -628,6 +635,9 @@ extension SpendWiseAdvancedAccess on SpendWiseViewModel {
       _advanced?.unroutedAlerts ?? const [];
   bool uiIsSharedSource(String packageName) =>
       _advanced?.isSharedSource(packageName) ?? false;
+  HomePeriod get uiHomePeriod =>
+      _advanced?.homePeriod ?? HomePeriod.calendarMonth;
+  void uiSetHomePeriod(HomePeriod period) => _advanced?.setHomePeriod(period);
   List<DebtViewData> get uiDebts => _advanced?.debts ?? const [];
   Future<void> uiOpenDebt({
     required String transactionId,

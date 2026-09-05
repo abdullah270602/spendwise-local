@@ -1483,9 +1483,14 @@ final class LocalLedger {
       )
       .toList(growable: false);
 
-  Map<String, int> spendingByCategory({required DateTime month}) {
-    final start = DateTime.utc(month.year, month.month);
-    final end = DateTime.utc(month.year, month.month + 1);
+  Map<String, int> spendingByCategory({
+    DateTime? month,
+    DateTime? from,
+    DateTime? to,
+  }) {
+    // Either a month, or any window Home's period setting resolves to.
+    final start = from ?? DateTime(month!.year, month.month);
+    final end = to ?? DateTime(month!.year, month.month + 1);
     return {
       for (final row in _db.select(
         '''
@@ -1497,7 +1502,10 @@ final class LocalLedger {
           AND t.occurred_at >= ? AND t.occurred_at < ?
         GROUP BY COALESCE(c.name,t.category,'Other') ORDER BY total DESC
         ''',
-        [start.millisecondsSinceEpoch, end.millisecondsSinceEpoch],
+        [
+          start.toUtc().millisecondsSinceEpoch,
+          end.toUtc().millisecondsSinceEpoch,
+        ],
       ))
         row['category_name'] as String: row['total'] as int,
     };

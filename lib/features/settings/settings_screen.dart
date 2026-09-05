@@ -9,6 +9,7 @@ import '../../widgets/spendwise_components.dart';
 import '../shell/spendwise_view_model.dart';
 import 'source_selection_screen.dart';
 import '../reports/report_screen.dart';
+import 'home_period_screen.dart';
 import 'export_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -129,14 +130,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SectionHeading('Home'),
         const SizedBox(height: 8),
         Card(
-          child: SwitchListTile(
-            secondary: const Icon(Icons.savings_outlined),
-            title: const Text('Show savings on Home'),
+          child: Column(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.date_range_outlined),
+                title: const Text('What Home covers'),
+                subtitle: Text(viewModel.uiHomePeriod.title),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => HomePeriodScreen(viewModel: viewModel),
+                    ),
+                  );
+                  if (mounted) setState(() {});
+                },
+              ),
+              const Divider(height: 1, indent: 56),
+              SwitchListTile(
+                secondary: const Icon(Icons.savings_outlined),
+                title: const Text('Show savings on Home'),
             subtitle: const Text(
               'Savings always remain available in Accounts and Insights',
             ),
-            value: viewModel.uiShowSavingsOnHome,
-            onChanged: changingSavingsVisibility ? null : _setSavingsVisibility,
+                value: viewModel.uiShowSavingsOnHome,
+                onChanged: changingSavingsVisibility
+                    ? null
+                    : _setSavingsVisibility,
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 22),

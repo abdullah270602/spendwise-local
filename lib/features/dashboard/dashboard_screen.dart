@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../../app/theme.dart';
 import '../../widgets/shape_kit.dart';
@@ -25,12 +24,17 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final data = viewModel.dashboard;
     final now = DateTime.now();
-    final month = DateFormat('MMMM').format(now);
+    final period = viewModel.uiHomePeriod;
+    final month = period.label(now);
 
     final received = data.incomeThisMonth.minorUnits;
     final spent = data.spendingThisMonth.minorUnits;
     final kept = received - spent;
     final anything = received != 0 || spent != 0;
+    // A share of nothing is not a share. Before any income lands in the
+    // window the ribbon would split |kept| against |spent| and draw a
+    // confident 50/50 that means nothing at all, with "0%" beside it.
+    final hasShare = received > 0;
 
     final categories = [...data.categorySpending]
       ..sort((a, b) => b.amount.minorUnits.compareTo(a.amount.minorUnits));
@@ -39,11 +43,12 @@ class DashboardScreen extends StatelessWidget {
       (sum, item) => sum + item.amount.minorUnits,
     );
 
+    final (windowFrom, windowTo) = period.resolve(now);
     final ownMoves = viewModel.transactions.where((item) {
       final local = item.occurredAt.toLocal();
       return item.kind == TransactionKind.transfer &&
-          local.year == now.year &&
-          local.month == now.month;
+          !local.isBefore(windowFrom) &&
+          local.isBefore(windowTo);
     }).toList();
 
     return SafeArea(
@@ -119,23 +124,28 @@ class DashboardScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'RECEIVED ${formatMinor(received)}',
+                      hasShare
+                          ? 'RECEIVED ${formatMinor(received)}'
+                          : 'NOTHING RECEIVED YET',
                       style: SpendWiseType.metaTight,
                     ),
                     const SizedBox(height: 6),
-                    Semantics(
-                      label:
-                          'Of ${formatMinor(received)} received, '
-                          '${formatMinor(kept)} is still yours and '
-                          '${formatMinor(spent)} was spent.',
-                      child: FlowShape(
-                        receivedMinor: received,
-                        keptMinor: kept,
-                        spentMinor: spent,
+                    if (hasShare) ...[
+                      Semantics(
+                        label:
+                            'Of ${formatMinor(received)} received, '
+                            '${formatMinor(kept)} is still yours and '
+                            '${formatMinor(spent)} was spent.',
+                        child: FlowShape(
+                          receivedMinor: received,
+                          keptMinor: kept,
+                          spentMinor: spent,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 14),
-                    _Legend(received: received, kept: kept, spent: spent),
+                      const SizedBox(height: 14),
+                      _Legend(received: received, kept: kept, spent: spent),
+                    ] else
+                      _SpentOnly(spent: spent, period: month),
                   ],
                 ),
               ),
@@ -669,4 +679,33 @@ class _TrayScanState extends State<_TrayScan> {
       if (mounted) setState(() => running = false);
     }
   }
+}
+
+
+/// What Home says before any money has arrived in the window. It states the
+/// one true thing -- this much has gone out -- instead of drawing a
+/// proportion of nothing.
+class _SpentOnly extends StatelessWidget {
+  const _SpentOnly({required this.spent, required this.period});
+
+  final int spent;
+  final String period;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const SizedBox(height: 6),
+      Text(
+        formatMinor(spent, cents: false),
+        style: SpendWiseType.figure.copyWith(color: SpendWiseColors.spend),
+      ),
+      const SizedBox(height: 6),
+      Text(
+        'has gone out in $period, against nothing received yet. '
+        'The share appears once money arrives.',
+        style: SpendWiseType.body.copyWith(fontSize: 13),
+      ),
+    ],
+  );
 }

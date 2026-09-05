@@ -43,6 +43,7 @@ final class SpendWiseController extends ChangeNotifier
   List<AlertViewData>? _unroutedAlertsCache;
   List<CategoryViewData>? _categoriesCache;
   List<DebtViewData>? _debtsCache;
+  HomePeriod? _homePeriodCache;
 
   static Future<SpendWiseController> create() async {
     final ledger = await timedAsync('ledgerOpen', LocalLedger.open);
@@ -305,10 +306,11 @@ final class SpendWiseController extends ChangeNotifier
     final cached = _dashboardCache;
     if (cached != null) return cached;
     final now = DateTime.now();
+    final (from, to) = homePeriod.resolve(now);
     var income = 0, spending = 0;
     for (final item in _snapshot.transactions) {
       final local = item.occurredAt.toLocal();
-      if (local.year != now.year || local.month != now.month) continue;
+      if (local.isBefore(from) || !local.isBefore(to)) continue;
       // Money lent out is still yours and money borrowed is not: neither
       // belongs in the month's income or spending. They get their own line.
       if (item.debtId != null) continue;
@@ -322,7 +324,7 @@ final class SpendWiseController extends ChangeNotifier
     final change = income == 0
         ? (spending == 0 ? 0.0 : -100.0)
         : ((income - spending) / income) * 100;
-    final categoryTotals = _ledger.spendingByCategory(month: now);
+    final categoryTotals = _ledger.spendingByCategory(from: from, to: to);
     final maxCategory = categoryTotals.values.fold<int>(
       0,
       (a, b) => a > b ? a : b,
@@ -942,6 +944,18 @@ final class SpendWiseController extends ChangeNotifier
     _ledger.removeCategory(id);
     _categoriesCache = null;
     _reload();
+  }
+
+  @override
+  HomePeriod get homePeriod =>
+      _homePeriodCache ??= HomePeriod.decode(_ledger.viewPreference('home_period'));
+
+  @override
+  void setHomePeriod(HomePeriod period) {
+    _ledger.setViewPreference('home_period', period.encode());
+    _homePeriodCache = period;
+    _dashboardCache = null;
+    notifyListeners();
   }
 
   @override

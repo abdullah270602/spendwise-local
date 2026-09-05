@@ -529,6 +529,17 @@ class _BatchImportViewModel extends _FakeViewModel
   @override
   Future<void> removeDebt(String id) async {}
 
+  HomePeriod _homePeriod = HomePeriod.calendarMonth;
+
+  @override
+  HomePeriod get homePeriod => _homePeriod;
+
+  @override
+  void setHomePeriod(HomePeriod period) {
+    _homePeriod = period;
+    notifyListeners();
+  }
+
   @override
   String? viewPreference(String key) => viewPreferences[key];
 
