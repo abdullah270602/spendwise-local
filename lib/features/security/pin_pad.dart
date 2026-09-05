@@ -38,15 +38,15 @@ class PinDots extends StatelessWidget {
             duration: const Duration(milliseconds: 140),
             curve: Curves.easeOut,
             margin: const EdgeInsets.symmetric(horizontal: 7),
-            width: 13,
-            height: 13,
+            width: 15,
+            height: 15,
             decoration: BoxDecoration(
               color: index < filled
                   ? tone.withValues(alpha: muted ? .45 : 1)
                   : Colors.transparent,
               border: Border.all(
-                color: index < filled ? tone : SpendWiseColors.edge,
-                width: 1.2,
+                color: index < filled ? tone : SpendWiseColors.dim,
+                width: 1.4,
               ),
             ),
           ),
@@ -194,7 +194,7 @@ class _PadKey extends StatelessWidget {
       child: Opacity(
         opacity: enabled ? 1 : .35,
         child: SizedBox(
-          height: 66,
+          height: 72,
           child: Center(child: child),
         ),
       ),

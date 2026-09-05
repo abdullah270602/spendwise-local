@@ -145,7 +145,7 @@ class _PinSetupScreenState extends State<PinSetupScreen>
         bottom: false,
         child: Column(
           children: [
-            const Spacer(flex: 2),
+            const SizedBox(height: 44),
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: SpendWiseTheme.gutter,
@@ -195,7 +195,7 @@ class _PinSetupScreenState extends State<PinSetupScreen>
                     )
                   : const SizedBox.shrink(),
             ),
-            const Spacer(flex: 2),
+            const Spacer(),
             Padding(
               padding: EdgeInsets.fromLTRB(
                 SpendWiseTheme.gutter,

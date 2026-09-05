@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/palette.dart';
 import '../../security/app_lock.dart';
+import '../help/help_screen.dart';
 import '../../app/theme.dart';
 import '../../main.dart';
 import '../../widgets/spendwise_components.dart';
@@ -39,6 +40,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
       padding: const EdgeInsets.fromLTRB(SpendWiseTheme.gutter, 8, SpendWiseTheme.gutter, 48),
       children: [
         const PrivacyBanner(),
+        const SizedBox(height: 22),
+        // First, above everything a person might come here to change: the
+        // place that explains what any of it does.
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.menu_book_outlined),
+            title: const Text('How SpendWise works'),
+            subtitle: const Text(
+              'Worked examples, step by step, and what it never does',
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => HelpScreen(viewModel: viewModel),
+              ),
+            ),
+          ),
+        ),
         const SizedBox(height: 22),
         const SectionHeading('Capture'),
         const SizedBox(height: 8),

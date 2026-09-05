@@ -53,13 +53,16 @@ class SpendWiseApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ValueListenableBuilder<int>(
     valueListenable: paletteRevision,
-    builder: (context, _, _) => MaterialApp(
-      title: 'SpendWise',
-      debugShowCheckedModeBanner: false,
-      theme: SpendWiseTheme.dark,
-      home: AppLockScope(
-        lock: lock,
-        child: AppLockGate(
+    // Above MaterialApp, not inside its `home`: pushed routes are siblings of
+    // home under the app's Navigator, so a scope down there is invisible to
+    // every screen the user actually navigates to.
+    builder: (context, _, _) => AppLockScope(
+      lock: lock,
+      child: MaterialApp(
+        title: 'SpendWise',
+        debugShowCheckedModeBanner: false,
+        theme: SpendWiseTheme.dark,
+        home: AppLockGate(
           lock: lock,
           child: SpendWiseShell(viewModel: controller),
         ),

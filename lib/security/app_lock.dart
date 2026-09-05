@@ -109,9 +109,33 @@ class AppLockController extends ChangeNotifier with WidgetsBindingObserver {
   bool _authInProgress = false;
   DateTime? _leftAt;
 
-  /// Blank counts as unset: the ledger key/value store has no delete, so
-  /// turning the lock off writes an empty string.
-  bool get enabled => (_prefs.read(pinKey) ?? '').isNotEmpty;
+  String? _cachedRaw;
+  PinHash? _cachedHash;
+
+  /// The stored hash, decoded once per distinct stored value.
+  PinHash? get _storedHash {
+    final raw = _prefs.read(pinKey);
+    if (raw == null || raw.isEmpty) {
+      _cachedRaw = null;
+      _cachedHash = null;
+      return null;
+    }
+    if (raw != _cachedRaw) {
+      _cachedRaw = raw;
+      _cachedHash = PinHash.decode(raw);
+    }
+    return _cachedHash;
+  }
+
+  /// On means there is a hash that can actually be checked against.
+  ///
+  /// Not merely "something is stored". If the stored value were unreadable,
+  /// a lock defined by non-emptiness would show a keypad it could never
+  /// verify anything against, and the only sane answer at that point is to
+  /// let the owner in -- which is a silent bypass. Defining it this way
+  /// makes the bad state read as "the lock is off", which is true, visible
+  /// in Settings, and fixable by setting a PIN again.
+  bool get enabled => _storedHash != null;
   bool get locked => _locked && enabled;
   bool get biometricsEnabled =>
       enabled && _biometricsAvailable && _prefs.read(biometricsKey) == 'true';
@@ -240,7 +264,10 @@ class AppLockController extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<UnlockOutcome> submit(String pin) async {
     if (lockoutRemaining > Duration.zero) return UnlockOutcome.lockedOut;
-    final stored = PinHash.decode(_prefs.read(pinKey));
+    final stored = _storedHash;
+    // Only reachable when the lock is already off, since `enabled` is defined
+    // as having a usable hash. There is nothing to prove, so nothing to prove
+    // it against.
     if (stored == null) {
       _locked = false;
       notifyListeners();
@@ -264,7 +291,7 @@ class AppLockController extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Checks a PIN without unlocking, for changing or removing it.
   Future<bool> verify(String pin) async {
-    final stored = PinHash.decode(_prefs.read(pinKey));
+    final stored = _storedHash;
     if (stored == null) return false;
     return Isolate.run(() => stored.matches(pin));
   }

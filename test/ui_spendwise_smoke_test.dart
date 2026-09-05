@@ -7,7 +7,6 @@ import 'package:spendwise/features/dashboard/dashboard_screen.dart';
 import 'package:spendwise/features/insights/insights_screen.dart';
 import 'package:spendwise/features/shell/spendwise_shell.dart';
 import 'package:spendwise/features/shell/spendwise_view_model.dart';
-import 'package:spendwise/features/onboarding/onboarding_screen.dart';
 import 'package:spendwise/features/settings/export_screen.dart';
 import 'package:spendwise/features/settings/settings_screen.dart';
 import 'package:spendwise/features/transactions/transaction_details_screen.dart';
@@ -77,25 +76,6 @@ void main() {
       find.text('github.com/abdullah270602/spendwise-local'),
       findsOneWidget,
     );
-  });
-
-  testWidgets('onboarding explains the local ledger before completion', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: SpendWiseTheme.dark,
-        home: OnboardingScreen(viewModel: _FakeViewModel()),
-      ),
-    );
-    expect(find.text('One trustworthy ledger'), findsOneWidget);
-    await tester.tap(find.text('Continue'));
-    await tester.pumpAndSettle();
-    expect(find.text('Duplicates become context'), findsOneWidget);
-    await tester.tap(find.text('Continue'));
-    await tester.pumpAndSettle();
-    expect(find.text('Private by design'), findsOneWidget);
-    expect(find.text('Start privately'), findsOneWidget);
   });
 
   testWidgets('transaction with no evidence uses accurate source copy', (

@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spendwise/security/app_lock.dart';
 import 'package:spendwise/security/pin_codec.dart';
@@ -219,6 +219,9 @@ void main() {
     });
   });
 
+  _scopeReach();
+  _corruptPin();
+
   group('when it decides to re-lock', () {
     // An app that has just been opened and unlocked, which is the only state
     // from which re-locking is a question at all.
@@ -278,6 +281,71 @@ void main() {
       }
       expect(LockDelayCopy.decode(null), LockDelay.oneMinute);
       expect(LockDelayCopy.decode('wat'), LockDelay.oneMinute);
+    });
+  });
+}
+
+/// A pushed route is a sibling of `home` under the app's Navigator, not a
+/// descendant of it. A scope placed inside `home` is therefore invisible to
+/// every screen the user navigates to -- which is all of them, including the
+/// settings screen that turns the lock on. It has to wrap MaterialApp.
+void _scopeReach() {
+  testWidgets('a pushed route can still reach the lock', (tester) async {
+    final lock = AppLockController(preferences: MapLockPreferences());
+    await tester.pumpWidget(
+      AppLockScope(
+        lock: lock,
+        child: MaterialApp(
+          home: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute(
+                  builder: (routeContext) => Text(
+                    AppLockScope.maybeOf(routeContext) == null
+                        ? 'unreachable'
+                        : 'reachable',
+                    textDirection: TextDirection.ltr,
+                  ),
+                ),
+              ),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    expect(find.text('reachable'), findsOneWidget);
+  });
+}
+
+/// A stored PIN that cannot be decoded is the one state where a lock can fail
+/// in either direction: refuse its owner forever, or open for anybody. It has
+/// to read as "off" -- true, visible in Settings, and fixable.
+void _corruptPin() {
+  group('an unreadable stored PIN', () {
+    for (final junk in ['x', 'pbkdf2-sha256:oops', 'pbkdf2-sha256:1:!!:!!']) {
+      test('"$junk" leaves the lock off rather than open', () async {
+        final lock = AppLockController(
+          preferences: MapLockPreferences({AppLockController.pinKey: junk}),
+        );
+        expect(lock.enabled, isFalse);
+        expect(lock.locked, isFalse, reason: 'no keypad it cannot verify');
+        lock.lockNow();
+        expect(lock.locked, isFalse);
+      });
+    }
+
+    test('a good PIN still works after one has been repaired', () async {
+      final storage = MapLockPreferences({AppLockController.pinKey: 'junk'});
+      final lock = AppLockController(preferences: storage);
+      expect(lock.enabled, isFalse);
+      await lock.enable('4821');
+      expect(lock.enabled, isTrue);
+      expect(await lock.submit('0000'), UnlockOutcome.wrong);
+      expect(await lock.submit('4821'), UnlockOutcome.unlocked);
     });
   });
 }
