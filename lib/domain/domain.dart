@@ -3,7 +3,6 @@ export 'models/account.dart';
 export 'models/category.dart';
 export 'models/canonical_transaction.dart';
 export 'models/event_candidate.dart';
-export 'models/import_batch.dart';
 export 'models/own_identity.dart';
 export 'models/raw_observation.dart';
 export 'models/source.dart';

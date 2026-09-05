@@ -4,7 +4,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/theme.dart';
 import '../../widgets/spendwise_components.dart';
-import '../import/import_csv_screen.dart';
 import '../shell/spendwise_view_model.dart';
 import 'source_selection_screen.dart';
 import 'export_screen.dart';
@@ -95,21 +94,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Card(
           child: Column(
             children: [
-              ListTile(
-                leading: const Icon(Icons.upload_file_outlined),
-                title: const Text('Import statement'),
-                subtitle: const Text(
-                  'CSV or Excel · preview before anything is saved',
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ImportCsvScreen(viewModel: viewModel),
-                  ),
-                ),
-              ),
-              const Divider(height: 1, indent: 56),
               ListTile(
                 leading: const Icon(Icons.download_outlined),
                 title: const Text('Export data'),

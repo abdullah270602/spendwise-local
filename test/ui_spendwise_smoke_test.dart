@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:spendwise/app/theme.dart';
 import 'package:spendwise/features/accounts/accounts_screen.dart';
-import 'package:spendwise/features/import/import_csv_screen.dart';
 import 'package:spendwise/features/insights/insights_screen.dart';
 import 'package:spendwise/features/shell/spendwise_shell.dart';
 import 'package:spendwise/features/shell/spendwise_view_model.dart';
@@ -182,23 +181,6 @@ void main() {
     expect(find.text('expense'), findsNothing);
   });
 
-  testWidgets('statement import advertises CSV and Excel support', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: SpendWiseTheme.dark,
-        home: ImportCsvScreen(viewModel: _FakeViewModel()),
-      ),
-    );
-
-    expect(find.text('Choose CSV or Excel files'), findsOneWidget);
-    expect(
-      find.text('CSV, XLSX, or XLS · read only on this device'),
-      findsNothing,
-    );
-  });
-
   testWidgets('review can recover currently visible notifications', (
     tester,
   ) async {
@@ -220,28 +202,6 @@ void main() {
       find.text('Recovered 2 new notifications from the tray.'),
       findsOneWidget,
     );
-  });
-
-  testWidgets('statement import selects every valid worksheet at once', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: SpendWiseTheme.dark,
-        home: ImportCsvScreen(viewModel: _BatchImportViewModel()),
-      ),
-    );
-
-    await tester.tap(find.text('Choose CSV or Excel files'));
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('2 of 3 sheets'), findsOneWidget);
-    expect(find.text('2 selected'), findsOneWidget);
-    expect(find.text('Current account'), findsOneWidget);
-    expect(find.text('Wallet'), findsWidgets);
-    expect(find.text('Summary'), findsOneWidget);
-    expect(find.textContaining('No transaction table'), findsOneWidget);
-    expect(find.text('Suggested from statement details'), findsNWidgets(2));
   });
 
   testWidgets('first account accepts grouped balance and closes cleanly', (
@@ -509,40 +469,9 @@ class _BatchImportViewModel extends _FakeViewModel
   List<String> get ownNames => const [];
 
   @override
-  Future<StatementFileViewData?> pickStatementFile() async =>
-      const StatementFileViewData(
-        fileName: 'accounts.xlsx',
-        sheets: [
-          StatementSheetViewData(
-            name: 'Current account',
-            csvText: 'Date,Description,Debit,Credit\n2026-08-20,Food,100,\n',
-            suggestedAccountId: 'bank',
-            accountInferenceReason: 'Matched account name',
-            accountInferenceConfidence: .9,
-          ),
-          StatementSheetViewData(
-            name: 'Wallet',
-            csvText:
-                'Date,Description,Debit,Credit\n2026-08-20,Transfer,,100\n',
-            suggestedAccountId: 'wallet',
-            accountInferenceReason: 'Matched NayaPay',
-            accountInferenceConfidence: .9,
-          ),
-          StatementSheetViewData(
-            name: 'Summary',
-            csvText: 'Monthly summary',
-            importable: false,
-            detectionError: 'No transaction table found',
-          ),
-        ],
-      );
-
-  @override
   Future<void> addDetailedAccount(AccountCreationDraft draft) async {}
   @override
   Future<void> archiveAccount(String id) async {}
-  @override
-  Future<void> commitCsvImport(CsvImportDraft draft) async {}
   @override
   Future<void> correctTransaction(
     String id,
@@ -552,16 +481,6 @@ class _BatchImportViewModel extends _FakeViewModel
   void dismissError() {}
   @override
   Future<void> exportLedger(ExportRequest request) async {}
-  @override
-  Future<CsvImportPreviewViewData> previewCsvImport(
-    CsvImportDraft draft,
-  ) async => const CsvImportPreviewViewData(
-    rows: [],
-    validCount: 0,
-    errorCount: 0,
-    duplicateCount: 0,
-    sameFileAlreadyImported: false,
-  );
   @override
   Future<void> restoreAccount(String id) async {}
   @override
@@ -650,10 +569,6 @@ class _FakeViewModel extends ChangeNotifier implements SpendWiseViewModel {
   Future<void> eraseAllData() async {}
   @override
   Future<void> exportData() async {}
-  @override
-  Future<void> importCsv(String csvText) async {}
-  @override
-  Future<String?> pickCsvFile() async => null;
   @override
   Future<void> requestNotificationAccess() async {}
   @override

@@ -1,0 +1,440 @@
+<title>Two Screens, Not Lists</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+
+<style>
+:root {
+  --ground:#EFEEEA; --ink:#17191A; --ink-muted:#5F666B; --rule:#D7D6D0; --accent:#1F5F4E;
+  --shadow:0 18px 40px -24px rgba(20,26,24,.55);
+}
+@media (prefers-color-scheme:dark) {
+  :root:not([data-theme="light"]) {
+    --ground:#0E1011; --ink:#E9EAE6; --ink-muted:#8B9197; --rule:#23272A; --accent:#58AF92;
+    --shadow:0 18px 44px -22px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"] {
+  --ground:#0E1011; --ink:#E9EAE6; --ink-muted:#8B9197; --rule:#23272A; --accent:#58AF92;
+  --shadow:0 18px 44px -22px rgba(0,0,0,.8);
+}
+* { box-sizing:border-box; }
+body {
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:Archivo,"Helvetica Neue",Arial,sans-serif; font-size:16px; line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap { max-width:1180px; margin:0 auto; padding:52px 28px 80px; }
+.eyebrow {
+  font-family:"JetBrains Mono",monospace; font-size:11px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--accent); margin:0 0 16px;
+}
+h1 { font-size:clamp(30px,4.4vw,44px); line-height:1.08; font-weight:700; letter-spacing:-.03em; margin:0 0 16px; max-width:22ch; }
+.lede { font-size:17px; color:var(--ink-muted); max-width:64ch; margin:0 0 40px; }
+.rail { overflow-x:auto; padding:4px 2px 14px; }
+.rail-inner { display:flex; gap:30px; min-width:min-content; align-items:start; }
+.col { display:grid; gap:12px; justify-items:center; width:272px; }
+.cap { font-size:13px; color:var(--ink-muted); line-height:1.5; }
+.cap b { color:var(--ink); font-weight:600; }
+.screen-label {
+  font-family:"JetBrains Mono",monospace; font-size:10px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-muted);
+}
+.ok { color:var(--accent); }
+.phone {
+  width:272px; height:588px; flex:none; background:#000; border-radius:34px; padding:7px;
+  box-shadow:var(--shadow);
+}
+.glass {
+  width:100%; height:100%; border-radius:27px; overflow:hidden; display:flex; flex-direction:column;
+  --bg:#0F1113; --fg:#E9E7E2; --dim:#767C80; --line:#1C2023; --edge:#282D31;
+  --keep:#9FB2AC; --spend:#C97A5A; --mine:#6E8496;
+  background:var(--bg); color:var(--fg); font-family:Archivo,sans-serif;
+}
+.statusbar {
+  display:flex; justify-content:space-between; align-items:center; flex:none;
+  padding:10px 17px 2px; font-size:10.5px; font-weight:600;
+}
+.statusbar .sig { letter-spacing:.1em; opacity:.75; }
+.body { flex:1; overflow:hidden; padding:0 17px; }
+.tabbar {
+  flex:none; display:grid; grid-template-columns:repeat(5,1fr);
+  border-top:1px solid var(--line); padding:9px 4px 11px; gap:1px;
+}
+.tab { display:grid; justify-items:center; gap:4px; font-size:7.5px; color:var(--dim); }
+.tab .ic { width:13px; height:13px; border:1.3px solid currentColor; border-radius:3px; }
+.tab.on { color:var(--fg); }
+.tab.on .ic { background:var(--fg); border-color:var(--fg); }
+.tab .badge { position:relative; }
+.tab .badge::after {
+  content:attr(data-n); position:absolute; top:-5px; right:-8px; background:var(--spend);
+  color:#0F1113; font-size:7px; font-weight:700; line-height:1; padding:2px 4px; border-radius:6px;
+}
+.num { font-variant-numeric:tabular-nums; }
+
+/* toggle used on ledger + accounts */
+.viewtog { display:flex; gap:0; border:1px solid var(--edge); }
+.viewtog span { font-size:8.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); padding:4px 8px; }
+.viewtog span.on { background:var(--fg); color:var(--bg); font-weight:700; }
+
+/* ---------- HOME ---------- */
+.h-lab { font-size:8.5px; letter-spacing:.24em; text-transform:uppercase; color:var(--dim); padding-top:14px; }
+.h-sank { margin:6px -4px 0; }
+.h-legend { display:flex; justify-content:space-between; align-items:flex-start; margin-top:2px; }
+.h-leg { display:grid; gap:2px; }
+.h-leg .k { font-size:8.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--dim); }
+.h-leg .v { font-size:19px; font-weight:700; letter-spacing:-.025em; }
+.h-leg .p { font-size:9.5px; color:var(--dim); }
+.h-leg.r { text-align:right; }
+.h-zoom {
+  font-size:8.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--dim);
+  border-top:1px solid var(--line); padding-top:11px; margin-top:18px;
+  display:flex; justify-content:space-between;
+}
+.h-catbar { display:flex; height:26px; margin-top:10px; gap:2px; }
+.h-catbar i { display:block; }
+.h-cats { margin-top:12px; }
+.h-cat { display:grid; grid-template-columns:8px 1fr auto; gap:10px; align-items:center; padding:6px 0; }
+.h-cat i { width:8px; height:8px; }
+.h-cat .n { font-size:11.5px; }
+.h-cat .a { font-size:11.5px; font-weight:600; }
+
+/* ---------- LEDGER: balance line + dense register ---------- */
+.g-head { display:flex; justify-content:space-between; align-items:center; padding:14px 0 0; }
+.g-title { font-size:17px; font-weight:700; letter-spacing:-.025em; }
+.g-bal { display:flex; justify-content:space-between; align-items:baseline; margin-top:12px; }
+.g-bal .k { font-size:8.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--dim); }
+.g-bal .v { font-size:15px; font-weight:700; letter-spacing:-.02em; }
+.g-chart { margin:8px -2px 0; }
+.g-axis {
+  display:flex; justify-content:space-between; font-family:"JetBrains Mono",monospace;
+  font-size:7.5px; letter-spacing:.1em; color:var(--dim); padding-top:3px;
+}
+/* the register is deliberately dense: more rows visible, no per-row ornament */
+.reg { margin-top:14px; border-top:1px solid var(--edge); }
+.reg-day {
+  display:flex; justify-content:space-between; align-items:baseline;
+  font-family:"JetBrains Mono",monospace; font-size:8px; letter-spacing:.16em; color:var(--dim);
+  padding:9px 0 4px;
+}
+.reg-row {
+  display:grid; grid-template-columns:minmax(0,1fr) 74px; gap:9px; align-items:baseline;
+  padding:5px 0; border-bottom:1px solid var(--line);
+}
+.reg-row .n { font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.reg-row .m {
+  font-family:"JetBrains Mono",monospace; font-size:8px; color:var(--dim); letter-spacing:.04em;
+}
+.reg-row .a { text-align:right; font-size:12px; font-variant-numeric:tabular-nums; font-weight:600; }
+.reg-row .a.in { color:var(--keep); }
+.reg-row .a.out { color:var(--spend); }
+.reg-row .a.own { color:var(--mine); }
+.reg-row.own .n::before {
+  content:"⇄ "; color:var(--mine);
+}
+
+/* ---------- ACCOUNTS ---------- */
+.a-head { padding:14px 0 0; display:flex; justify-content:space-between; align-items:center; }
+.a-lab { font-size:8.5px; letter-spacing:.24em; text-transform:uppercase; color:var(--dim); }
+.a-fig { font-size:25px; font-weight:700; letter-spacing:-.03em; margin-top:8px; }
+.a-split {
+  display:flex; justify-content:space-between; font-size:9.5px; color:var(--dim);
+  border-bottom:1px solid var(--line); padding-bottom:10px; margin-top:8px;
+}
+.a-zone {
+  font-size:8.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--dim);
+  display:flex; justify-content:space-between; align-items:baseline; margin:14px 0 8px;
+}
+.a-zone b { font-size:11px; color:var(--fg); letter-spacing:0; }
+.blk { display:flex; justify-content:space-between; align-items:center; padding:0 11px; margin-bottom:4px; overflow:hidden; }
+.blk .n { font-size:11.5px; font-weight:500; }
+.blk .s { font-size:8.5px; opacity:.7; margin-top:1px; }
+.blk .a { font-size:12px; font-weight:600; font-variant-numeric:tabular-nums; }
+.blk.live { background:var(--keep); color:#0F1113; }
+.blk.held { border:1px solid var(--edge); color:var(--fg); background:rgba(159,178,172,.07); }
+.blk.tiny .n { font-size:10px; }
+.blk.tiny .a { font-size:10.5px; }
+.blk.off { border:1px dashed var(--spend); color:var(--spend); height:40px; margin-top:11px; background:none; }
+.blk.off .s { color:var(--dim); opacity:1; }
+
+/* ---------- REVIEW: rules, not items ---------- */
+.v-head { padding:15px 0 0; }
+.v-big { font-size:20px; font-weight:700; letter-spacing:-.025em; line-height:1.2; text-wrap:balance; }
+.v-sub { font-size:10.5px; color:var(--dim); margin-top:5px; }
+.rule { border-top:1px solid var(--edge); padding:15px 0 0; margin-top:16px; }
+.rule-n {
+  display:flex; align-items:baseline; gap:9px;
+}
+.rule-n .c { font-size:27px; font-weight:800; letter-spacing:-.04em; line-height:1; }
+.rule-n .u { font-size:10px; color:var(--dim); }
+.rule-t { font-size:13px; font-weight:600; margin-top:8px; line-height:1.35; }
+.rule-e {
+  font-family:"JetBrains Mono",monospace; font-size:8.5px; line-height:1.6; color:var(--dim);
+  border-left:2px solid var(--edge); padding-left:9px; margin-top:9px;
+}
+.rule-e mark { background:transparent; color:var(--spend); }
+.rule-act {
+  display:flex; justify-content:space-between; align-items:center;
+  background:var(--fg); color:var(--bg); padding:10px 12px; margin-top:11px;
+}
+.rule-act .t { font-size:11.5px; font-weight:700; }
+.rule-act .g { font-size:13px; }
+.rule-alt {
+  display:flex; justify-content:space-between; font-size:10px; color:var(--dim); margin-top:8px;
+}
+.rule-alt u { text-decoration:none; border-bottom:1px solid var(--edge); padding-bottom:1px; }
+.v-foot {
+  border-top:1px solid var(--line); margin-top:18px; padding-top:11px;
+  font-size:9.5px; color:var(--dim); line-height:1.5;
+}
+</style>
+
+<div class="wrap">
+
+  <p class="eyebrow">Round two on the two you rejected</p>
+  <h1>Ledger gets denser. Review stops asking one at a time.</h1>
+  <p class="lede">
+    The Ledger was airy rows with a bar stuck under each one — decoration on a list. Review asked
+    you to clear six items individually, which is the opposite of saving you time. Both rebuilt.
+    Accounts now has the toggle you asked for.
+  </p>
+
+  <div class="rail"><div class="rail-inner">
+
+    <!-- ===== HOME ===== -->
+    <div class="col">
+      <div class="phone"><div class="glass">
+        <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+        <div class="body">
+          <p class="h-lab">September · what happened to it</p>
+          <div class="h-sank">
+            <svg viewBox="0 0 240 152" width="100%" height="152" role="img"
+                 aria-label="Of 176,800 received, 156,875 was kept and 19,925 was spent">
+              <rect x="65" y="14" width="110" height="9" fill="#E9E7E2"></rect>
+              <path d="M65,23 C65,56 20,72 20,104 L117.6,104 C117.6,72 162.6,56 162.6,23 Z" fill="#9FB2AC" opacity=".38"></path>
+              <path d="M162.6,23 C162.6,56 207,72 207,104 L219.4,104 C219.4,72 175,56 175,23 Z" fill="#C97A5A" opacity=".55"></path>
+              <rect x="20" y="104" width="97.6" height="9" fill="#9FB2AC"></rect>
+              <rect x="207" y="104" width="12.4" height="9" fill="#C97A5A"></rect>
+              <text x="120" y="9" fill="#767C80" font-size="8" font-family="Archivo" text-anchor="middle" letter-spacing="1.6">RECEIVED 176,800</text>
+            </svg>
+          </div>
+          <div class="h-legend">
+            <div class="h-leg">
+              <span class="k">Still yours</span>
+              <span class="v num">156,875</span>
+              <span class="p">88.7% of what came in</span>
+            </div>
+            <div class="h-leg r">
+              <span class="k">Gone</span>
+              <span class="v num" style="color:var(--spend)">19,925</span>
+              <span class="p">11.3%</span>
+            </div>
+          </div>
+          <div class="h-zoom"><span>The 11.3%, up close</span><span>5 categories</span></div>
+          <div class="h-catbar">
+            <i style="flex:8420;background:#C97A5A"></i>
+            <i style="flex:4215;background:#A98D6B"></i>
+            <i style="flex:3100;background:#6E8496"></i>
+            <i style="flex:2090;background:#7E7A96"></i>
+            <i style="flex:2100;background:#4A5054"></i>
+          </div>
+          <div class="h-cats">
+            <div class="h-cat"><i style="background:#C97A5A"></i><span class="n">Groceries</span><span class="a num">8,420</span></div>
+            <div class="h-cat"><i style="background:#A98D6B"></i><span class="n">Food &amp; dining</span><span class="a num">4,215</span></div>
+            <div class="h-cat"><i style="background:#6E8496"></i><span class="n">Transport</span><span class="a num">3,100</span></div>
+            <div class="h-cat"><i style="background:#7E7A96"></i><span class="n">Bills</span><span class="a num">2,090</span></div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab on"><span class="ic"></span>Home</div>
+          <div class="tab"><span class="ic"></span>Ledger</div>
+          <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+          <div class="tab"><span class="ic"></span>Insights</div>
+          <div class="tab"><span class="ic"></span>Accounts</div>
+        </div>
+      </div></div>
+      <p class="screen-label ok">Home · settled</p>
+      <p class="cap"><b>A shape.</b> Unchanged.</p>
+    </div>
+
+    <!-- ===== LEDGER ===== -->
+    <div class="col">
+      <div class="phone"><div class="glass">
+        <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+        <div class="body">
+          <div class="g-head">
+            <span class="g-title">September</span>
+            <span class="viewtog"><span class="on">Chart</span><span>Plain</span></span>
+          </div>
+          <div class="g-bal">
+            <span class="k">Balance now</span>
+            <span class="v num">186,961.62</span>
+          </div>
+          <div class="g-chart">
+            <svg viewBox="0 0 240 66" width="100%" height="66" role="img"
+                 aria-label="Balance through September: low until salary landed on the 2nd, stepping down since">
+              <line x1="0" y1="16" x2="240" y2="16" stroke="#1C2023" stroke-width="1"></line>
+              <line x1="0" y1="58" x2="240" y2="58" stroke="#1C2023" stroke-width="1"></line>
+              <polyline points="0,55 26,55 26,56 38,56 38,14 96,14 96,14 128,14 128,18 150,18 150,21 190,21 190,22 240,22"
+                        fill="none" stroke="#9FB2AC" stroke-width="1.6" stroke-linejoin="round"></polyline>
+              <circle cx="240" cy="22" r="2.8" fill="#9FB2AC"></circle>
+              <circle cx="38" cy="14" r="2.2" fill="#E9E7E2"></circle>
+            </svg>
+            <div class="g-axis"><span>01</span><span>05</span><span>10</span><span>20</span><span>30</span></div>
+          </div>
+
+          <div class="reg">
+            <div class="reg-day"><span>THU 04</span><span>−3,146.20</span></div>
+            <div class="reg-row">
+              <span><span class="n">Jenpharm Retail</span><span class="m">HEALTH · UBL</span></span>
+              <span class="a out num">2,086.20</span>
+            </div>
+            <div class="reg-row">
+              <span><span class="n">Imtiaz Supermarket</span><span class="m">GROCERIES · MEEZAN</span></span>
+              <span class="a out num">1,060.00</span>
+            </div>
+            <div class="reg-day"><span>TUE 02</span><span>+176,800.00</span></div>
+            <div class="reg-row">
+              <span><span class="n">Salary</span><span class="m">INCOME · MEEZAN</span></span>
+              <span class="a in num">176,800.00</span>
+            </div>
+            <div class="reg-row own">
+              <span><span class="n">Meezan → NayaPay</span><span class="m">YOUR OWN ACCOUNTS</span></span>
+              <span class="a own num">10,000.00</span>
+            </div>
+            <div class="reg-day"><span>MON 01</span><span>−80.00</span></div>
+            <div class="reg-row">
+              <span><span class="n">Raast payment</span><span class="m">TRANSFER · JAZZCASH</span></span>
+              <span class="a out num">80.00</span>
+            </div>
+            <div class="reg-row">
+              <span><span class="n">Careem</span><span class="m">TRANSPORT · NAYAPAY</span></span>
+              <span class="a out num">640.00</span>
+            </div>
+            <div class="reg-row">
+              <span><span class="n">K-Electric</span><span class="m">BILLS · MEEZAN</span></span>
+              <span class="a out num">2,090.00</span>
+            </div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><span class="ic"></span>Home</div>
+          <div class="tab on"><span class="ic"></span>Ledger</div>
+          <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+          <div class="tab"><span class="ic"></span>Insights</div>
+          <div class="tab"><span class="ic"></span>Accounts</div>
+        </div>
+      </div></div>
+      <p class="screen-label">Ledger · v3</p>
+      <p class="cap"><b>Balance line, then a register.</b> The chart is the month's shape — you can see salary land. Below it rows are tight and tabular so more fits on screen, with no ornament per row. <i>Chart / Plain</i> toggles the graph away.</p>
+    </div>
+
+    <!-- ===== REVIEW ===== -->
+    <div class="col">
+      <div class="phone"><div class="glass">
+        <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+        <div class="body">
+          <div class="v-head">
+            <p class="v-big">14 alerts, 2 decisions.</p>
+            <p class="v-sub">Answer once and SpendWise applies it to the rest — and to future ones.</p>
+          </div>
+
+          <div class="rule">
+            <div class="rule-n"><span class="c num">10</span><span class="u">alerts from Meezan</span></div>
+            <p class="rule-t">Money “credited to” someone else, from your account.</p>
+            <p class="rule-e">“PKR 5,000 <mark>credited to</mark> ALI RAZA <mark>from your account</mark>”</p>
+            <div class="rule-act">
+              <span class="t">Treat all 10 as money out</span>
+              <span class="g">→</span>
+            </div>
+            <div class="rule-alt">
+              <span>Wrong? <u>Review them one by one</u></span>
+              <span>10</span>
+            </div>
+          </div>
+
+          <div class="rule">
+            <div class="rule-n"><span class="c num">4</span><span class="u">alerts from UBL</span></div>
+            <p class="rule-t">No account matched — UBL Current has no last digits saved.</p>
+            <p class="rule-e">“UBL: PKR 2,086.20 debited at JENPHARM RETAIL”</p>
+            <div class="rule-act">
+              <span class="t">Route all 4 to UBL Current</span>
+              <span class="g">→</span>
+            </div>
+            <div class="rule-alt">
+              <span>Or <u>pick a different account</u></span>
+              <span>4</span>
+            </div>
+          </div>
+
+          <p class="v-foot">
+            Answering both clears the inbox and stops these two from coming back.
+          </p>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><span class="ic"></span>Home</div>
+          <div class="tab"><span class="ic"></span>Ledger</div>
+          <div class="tab on"><span class="ic badge" data-n="2"></span>Review</div>
+          <div class="tab"><span class="ic"></span>Insights</div>
+          <div class="tab"><span class="ic"></span>Accounts</div>
+        </div>
+      </div></div>
+      <p class="screen-label">Review · v3</p>
+      <p class="cap"><b>Rules, not items.</b> 14 alerts collapse into 2 decisions. One tap fixes ten at once and teaches the parser, so the same thing stops arriving. One-by-one is still there if you want it.</p>
+    </div>
+
+    <!-- ===== ACCOUNTS ===== -->
+    <div class="col">
+      <div class="phone"><div class="glass">
+        <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+        <div class="body">
+          <div class="a-head">
+            <span class="a-lab">Total tracked</span>
+            <span class="viewtog"><span class="on">Map</span><span>Plain</span></span>
+          </div>
+          <p class="a-fig num">556,961.62</p>
+          <div class="a-split">
+            <span>Available <b style="color:var(--fg)">33.6%</b></span>
+            <span>Held back <b style="color:var(--fg)">66.4%</b></span>
+          </div>
+
+          <div class="a-zone"><span>Available to spend</span><b class="num">186,961.62</b></div>
+          <div class="blk live" style="height:78px">
+            <span><span class="n">Meezan Debit</span><span class="s">••4821 · SMS + app</span></span>
+            <span class="a num">177,641.13</span>
+          </div>
+          <div class="blk live tiny" style="height:17px">
+            <span class="n">NayaPay</span>
+            <span class="a num">9,320.49</span>
+          </div>
+
+          <div class="a-zone"><span>Held back · savings</span><b class="num">370,000.00</b></div>
+          <div class="blk held" style="height:110px">
+            <span><span class="n">Meezan Savings</span><span class="s">••7734</span></span>
+            <span class="a num">250,000.00</span>
+          </div>
+          <div class="blk held" style="height:53px">
+            <span><span class="n">HBL Term Deposit</span><span class="s">••1180</span></span>
+            <span class="a num">120,000.00</span>
+          </div>
+
+          <div class="blk off">
+            <span><span class="n">UBL Current</span><span class="s">No last digits — 4 alerts unrouted</span></span>
+            <span class="a">?</span>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><span class="ic"></span>Home</div>
+          <div class="tab"><span class="ic"></span>Ledger</div>
+          <div class="tab"><span class="ic badge" data-n="2"></span>Review</div>
+          <div class="tab"><span class="ic"></span>Insights</div>
+          <div class="tab on"><span class="ic"></span>Accounts</div>
+        </div>
+      </div></div>
+      <p class="screen-label ok">Accounts · settled</p>
+      <p class="cap"><b>A map, now optional.</b> <i>Map / Plain</i> in the header switches to a straight list for a clean view. Map is the default; the choice sticks.</p>
+    </div>
+
+  </div></div>
+
+</div>

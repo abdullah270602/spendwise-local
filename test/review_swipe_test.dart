@@ -151,10 +151,6 @@ class _FakeReviewViewModel extends ChangeNotifier
   @override
   Future<void> saveManualTransaction(ManualTransactionDraft draft) async {}
   @override
-  Future<void> importCsv(String csvText) async {}
-  @override
-  Future<String?> pickCsvFile() async => null;
-  @override
   Future<void> exportData() async {}
   @override
   Future<void> eraseAllData() async {}

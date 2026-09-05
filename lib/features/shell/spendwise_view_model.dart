@@ -20,21 +20,6 @@ final class ExportCancelledException implements Exception {
   const ExportCancelledException();
 }
 
-enum ImportField {
-  date,
-  description,
-  amount,
-  debit,
-  credit,
-  direction,
-  balance,
-  merchant,
-  currency,
-  reference,
-  ignore,
-}
-
-@immutable
 class MoneyViewData {
   const MoneyViewData(this.minorUnits, {this.currency = 'PKR'});
   final int minorUnits;
@@ -239,131 +224,6 @@ class TransactionCorrectionDraft {
 }
 
 @immutable
-class CsvImportDraft {
-  const CsvImportDraft({
-    required this.csvText,
-    required this.accountId,
-    required this.mapping,
-    this.sourceLabel = 'Statement import',
-    this.fileName = 'statement.csv',
-    this.sheets = const [],
-  });
-  final String csvText;
-  final String accountId;
-  final String sourceLabel;
-  final String fileName;
-  final Map<ImportField, String> mapping;
-  final List<StatementSheetImportDraft> sheets;
-
-  List<StatementSheetImportDraft> get effectiveSheets => sheets.isNotEmpty
-      ? sheets
-      : [
-          StatementSheetImportDraft(
-            sheetName: 'Statement',
-            csvText: csvText,
-            accountId: accountId,
-            mapping: mapping,
-          ),
-        ];
-}
-
-@immutable
-class StatementSheetImportDraft {
-  const StatementSheetImportDraft({
-    required this.sheetName,
-    required this.csvText,
-    required this.accountId,
-    required this.mapping,
-  });
-
-  final String sheetName;
-  final String csvText;
-  final String accountId;
-  final Map<ImportField, String> mapping;
-}
-
-@immutable
-class StatementSheetViewData {
-  const StatementSheetViewData({
-    required this.name,
-    required this.csvText,
-    this.suggestedAccountId,
-    this.accountInferenceReason = '',
-    this.accountInferenceConfidence = 0,
-    this.detectedInstitution = '',
-    this.detectedSuffix = '',
-    this.importable = true,
-    this.detectionError = '',
-  });
-
-  final String name;
-  final String csvText;
-  final String? suggestedAccountId;
-  final String accountInferenceReason;
-  final double accountInferenceConfidence;
-  final String detectedInstitution;
-  final String detectedSuffix;
-  final bool importable;
-  final String detectionError;
-}
-
-@immutable
-class StatementFileViewData {
-  const StatementFileViewData({required this.fileName, required this.sheets});
-
-  final String fileName;
-  final List<StatementSheetViewData> sheets;
-}
-
-@immutable
-class CsvPreviewRowViewData {
-  const CsvPreviewRowViewData({
-    required this.rowNumber,
-    required this.date,
-    required this.description,
-    required this.amount,
-    required this.valid,
-    required this.duplicate,
-    this.sheetName = 'Statement',
-    this.accountName = '',
-    this.category = 'Other',
-    this.duplicateReason = '',
-    this.error,
-  });
-  final int rowNumber;
-  final String date;
-  final String description;
-  final String amount;
-  final bool valid;
-  final bool duplicate;
-  final String sheetName;
-  final String accountName;
-  final String category;
-  final String duplicateReason;
-  final String? error;
-}
-
-@immutable
-class CsvImportPreviewViewData {
-  const CsvImportPreviewViewData({
-    required this.rows,
-    required this.validCount,
-    required this.errorCount,
-    required this.duplicateCount,
-    required this.sameFileAlreadyImported,
-    this.sheetCount = 1,
-    this.reimportedSheetCount = 0,
-  });
-  final List<CsvPreviewRowViewData> rows;
-  final int validCount;
-  final int errorCount;
-  final int duplicateCount;
-  final bool sameFileAlreadyImported;
-  final int sheetCount;
-  final int reimportedSheetCount;
-}
-
-@immutable
 class AccountCreationDraft {
   const AccountCreationDraft({
     required this.name,
@@ -464,8 +324,6 @@ abstract class SpendWiseViewModel implements Listenable {
   Future<void> deleteTransaction(String id);
   Future<void> restoreTransaction(String id);
   Future<void> resolveReview(String id, {required bool merge});
-  Future<void> importCsv(String csvText);
-  Future<String?> pickCsvFile();
   Future<void> exportData();
   Future<void> eraseAllData();
 }
@@ -478,9 +336,6 @@ abstract class SpendWiseAdvancedViewModel implements SpendWiseViewModel {
   List<String> get ownNames;
   DeletedAccountViewData? get lastDeletedAccount;
   Future<void> correctTransaction(String id, TransactionCorrectionDraft draft);
-  Future<StatementFileViewData?> pickStatementFile();
-  Future<CsvImportPreviewViewData> previewCsvImport(CsvImportDraft draft);
-  Future<void> commitCsvImport(CsvImportDraft draft);
   Future<void> exportLedger(ExportRequest request);
   Future<void> setDemoDataEnabled(bool enabled);
   Future<void> setShowSavingsOnHome(bool enabled);
@@ -536,22 +391,6 @@ extension SpendWiseAdvancedAccess on SpendWiseViewModel {
   ) =>
       _advanced?.correctTransaction(id, draft) ??
       Future.error(UnsupportedError('Transaction correction is not available'));
-  Future<StatementFileViewData?> uiPickStatementFile() async {
-    final advanced = _advanced;
-    if (advanced != null) return advanced.pickStatementFile();
-    final csv = await pickCsvFile();
-    if (csv == null) return null;
-    return StatementFileViewData(
-      fileName: 'statement.csv',
-      sheets: [StatementSheetViewData(name: 'Statement', csvText: csv)],
-    );
-  }
-
-  Future<void> uiCommitCsvImport(CsvImportDraft draft) =>
-      _advanced?.commitCsvImport(draft) ?? importCsv(draft.csvText);
-  Future<CsvImportPreviewViewData> uiPreviewCsvImport(CsvImportDraft draft) =>
-      _advanced?.previewCsvImport(draft) ??
-      Future.error(UnsupportedError('CSV preview is not available'));
   Future<void> uiExportLedger(ExportRequest request) =>
       _advanced?.exportLedger(request) ?? exportData();
   Future<void> uiSetDemoDataEnabled(bool enabled) =>

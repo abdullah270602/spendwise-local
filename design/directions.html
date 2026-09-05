@@ -1,0 +1,2853 @@
+<title>SpendWise Direction Study</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+<style>
+/* ---- Page tokens: light is the base, both dark states redefine only tokens ---- */
+:root {
+  --ground:      #EFEEEA;
+  --ground-2:    #E6E5E0;
+  --ink:         #17191A;
+  --ink-muted:   #5F666B;
+  --rule:        #D7D6D0;
+  --accent:      #1F5F4E;
+  --accent-soft: #DDE7E2;
+  --shadow:      0 18px 40px -24px rgba(20,26,24,.55);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #0E1011;
+    --ground-2:    #16191B;
+    --ink:         #E9EAE6;
+    --ink-muted:   #8B9197;
+    --rule:        #23272A;
+    --accent:      #58AF92;
+    --accent-soft: #16241F;
+    --shadow:      0 18px 44px -22px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"] {
+  --ground:      #0E1011;
+  --ground-2:    #16191B;
+  --ink:         #E9EAE6;
+  --ink-muted:   #8B9197;
+  --rule:        #23272A;
+  --accent:      #58AF92;
+  --accent-soft: #16241F;
+  --shadow:      0 18px 44px -22px rgba(0,0,0,.8);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: Archivo, "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 1180px; margin: 0 auto; padding: 56px 28px 96px; }
+
+/* ---- Masthead ---- */
+.eyebrow {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 18px;
+}
+h1 {
+  font-size: clamp(34px, 5.2vw, 58px);
+  line-height: 1.04;
+  font-weight: 700;
+  letter-spacing: -.03em;
+  text-wrap: balance;
+  margin: 0 0 20px;
+  max-width: 17ch;
+}
+.lede { font-size: 18px; color: var(--ink-muted); max-width: 60ch; margin: 0 0 34px; }
+
+.brief {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 72px;
+}
+.brief div { padding: 20px 22px 20px 0; border-right: 1px solid var(--rule); }
+.brief div:last-child { border-right: 0; }
+.brief dt {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-muted); margin-bottom: 7px;
+}
+.brief dd { margin: 0; font-size: 14.5px; line-height: 1.45; }
+
+/* ---- Round divider ---- */
+.round-two {
+  border-top: 2px solid var(--ink);
+  padding-top: 30px;
+  margin: 16px 0 56px;
+}
+.round-two h2 {
+  font-size: clamp(28px, 4vw, 42px); font-weight: 700; letter-spacing: -.028em;
+  margin: 0 0 14px; text-wrap: balance;
+}
+
+/* ---- Direction block ---- */
+.direction { margin-bottom: 88px; }
+.dir-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+  padding-bottom: 26px;
+  margin-bottom: 26px;
+  border-bottom: 1px solid var(--rule);
+}
+@media (min-width: 860px) { .dir-head { grid-template-columns: 320px minmax(0, 1fr); gap: 48px; } }
+
+.dir-id {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--ink-muted); margin-bottom: 10px;
+}
+.dir-name { font-size: 30px; font-weight: 700; letter-spacing: -.022em; margin: 0 0 12px; }
+.dir-thesis { font-size: 16px; color: var(--ink-muted); margin: 0; max-width: 46ch; }
+
+.tradeoffs { display: grid; gap: 14px; align-content: start; }
+.tradeoff { display: grid; grid-template-columns: 78px minmax(0,1fr); gap: 16px; align-items: baseline; }
+.tradeoff span:first-child {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--accent);
+}
+.tradeoff span:last-child { font-size: 14.5px; line-height: 1.5; }
+.tradeoff.cost span:first-child { color: var(--ink-muted); }
+
+.specimen {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10.5px; letter-spacing: .04em; color: var(--ink-muted);
+  margin-top: 4px;
+}
+.swatch {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--rule); border-radius: 2px; padding: 3px 8px 3px 4px;
+}
+.chip { width: 11px; height: 11px; border-radius: 1px; display: block; }
+
+/* ---- Phone rail ---- */
+.rail { overflow-x: auto; padding: 6px 2px 14px; }
+.rail-inner { display: flex; gap: 26px; min-width: min-content; }
+.screen-wrap { display: grid; gap: 10px; justify-items: center; }
+.screen-label {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-muted);
+}
+
+/* Device frame — supports the screen, never dominates it */
+.phone {
+  width: 272px; height: 588px; flex: none;
+  background: #000;
+  border-radius: 34px;
+  padding: 7px;
+  box-shadow: var(--shadow);
+}
+.glass {
+  width: 100%; height: 100%;
+  border-radius: 27px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  position: relative;
+  background: var(--s-bg);
+  color: var(--s-ink);
+}
+
+/* ---- Shared phone chrome ---- */
+.statusbar {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 16px 3px; font-size: 10.5px; font-weight: 600; color: var(--s-ink);
+  flex: none;
+}
+.statusbar .sig { letter-spacing: .1em; opacity: .85; }
+.body { flex: 1; overflow: hidden; padding: 0 16px; }
+.tabbar {
+  flex: none; display: grid; grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid var(--s-rule); padding: 7px 6px 9px; gap: 2px;
+}
+.tab { display: grid; justify-items: center; gap: 3px; font-size: 8.5px; color: var(--s-dim); }
+.tab .ic {
+  width: 15px; height: 15px; border: 1.4px solid currentColor; border-radius: 4px;
+}
+.tab.on { color: var(--s-accent); font-weight: 600; }
+.tab.on .ic { background: var(--s-accent); border-color: var(--s-accent); }
+.tab .badge {
+  position: relative;
+}
+.tab .badge::after {
+  content: attr(data-n);
+  position: absolute; top: -5px; right: -9px;
+  background: var(--s-warn); color: #fff;
+  font-size: 7.5px; font-weight: 700; line-height: 1;
+  padding: 2px 4px; border-radius: 6px;
+}
+
+.num { font-variant-numeric: tabular-nums; }
+.dim { color: var(--s-dim); }
+.up { color: var(--s-up); }
+.down { color: var(--s-down); }
+
+/* =====================================================================
+   DIRECTION A — LEDGER PAPER
+   Light, typographic, no cards at all. Hairlines and type do the work.
+   Screen palettes are committed literals: they depict the product's own
+   colours, so they must not shift with the viewer's theme.
+   ===================================================================== */
+.dir-a .glass {
+  --s-bg: #FBFAF7; --s-ink: #15181A; --s-dim: #7C848A;
+  --s-rule: #E4E2DC; --s-accent: #1F5F4E; --s-up: #1F5F4E;
+  --s-down: #A23A2E; --s-warn: #B5793A;
+  font-family: "Instrument Sans", Archivo, sans-serif;
+}
+.dir-a .a-top { padding: 14px 0 10px; }
+.dir-a .a-kicker {
+  font-size: 9.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--s-dim);
+}
+.dir-a .a-balance {
+  font-size: 33px; font-weight: 600; letter-spacing: -.03em; margin: 7px 0 2px; line-height: 1;
+}
+.dir-a .a-balance small { font-size: 15px; font-weight: 500; color: var(--s-dim); margin-right: 5px; letter-spacing: 0; }
+.dir-a .a-sub { font-size: 11.5px; color: var(--s-up); font-weight: 500; }
+.dir-a .a-split {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+  border-top: 1px solid var(--s-rule); border-bottom: 1px solid var(--s-rule);
+  margin-top: 15px;
+}
+.dir-a .a-split div { padding: 11px 0; }
+.dir-a .a-split div + div { padding-left: 14px; border-left: 1px solid var(--s-rule); }
+.dir-a .a-split dt { font-size: 9px; letter-spacing: .15em; text-transform: uppercase; color: var(--s-dim); }
+.dir-a .a-split dd { margin: 4px 0 0; font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
+.dir-a .sec {
+  font-size: 9.5px; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--s-dim); margin: 18px 0 9px;
+}
+.dir-a .catrow { display: grid; gap: 5px; margin-bottom: 12px; }
+.dir-a .catline { display: flex; justify-content: space-between; font-size: 12.5px; }
+.dir-a .catline b { font-weight: 500; }
+.dir-a .bar { height: 2px; background: var(--s-rule); position: relative; }
+.dir-a .bar i { position: absolute; inset: 0 auto 0 0; background: var(--s-accent); display: block; }
+
+.dir-a .txn {
+  display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 3px 10px;
+  padding: 11px 0; border-bottom: 1px solid var(--s-rule);
+}
+.dir-a .txn b { font-weight: 500; font-size: 13px; }
+.dir-a .txn .meta { font-size: 10.5px; color: var(--s-dim); grid-column: 1; }
+.dir-a .txn .amt { font-size: 13px; font-weight: 600; text-align: right; grid-row: 1 / span 2; align-self: center; }
+.dir-a .daymark {
+  font-size: 9px; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--s-dim); padding: 14px 0 4px;
+}
+.dir-a .rev {
+  border-top: 2px solid var(--s-ink); padding: 13px 0 14px; border-bottom: 1px solid var(--s-rule);
+}
+.dir-a .rev h4 { margin: 0 0 3px; font-size: 13.5px; font-weight: 600; }
+.dir-a .rev p { margin: 0 0 11px; font-size: 11px; color: var(--s-dim); line-height: 1.45; }
+.dir-a .rev .line { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 12px; }
+.dir-a .acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.dir-a .btn {
+  text-align: center; font-size: 11.5px; font-weight: 500; padding: 8px 0; border-radius: 2px;
+}
+.dir-a .btn.p { background: var(--s-ink); color: #FBFAF7; }
+.dir-a .btn.s { border: 1px solid var(--s-rule); color: var(--s-ink); }
+.dir-a .hint { font-size: 9.5px; color: var(--s-dim); text-align: center; padding-top: 10px; letter-spacing: .04em; }
+
+/* =====================================================================
+   DIRECTION B — TERMINAL
+   Mono throughout, rigid columns, amber signal on deep charcoal.
+   ===================================================================== */
+.dir-b .glass {
+  --s-bg: #0B0C0D; --s-ink: #E4E2DA; --s-dim: #6E7377;
+  --s-rule: #212426; --s-accent: #D9A441; --s-up: #7FB08A;
+  --s-down: #C8705E; --s-warn: #D9A441;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+.dir-b .b-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  border-bottom: 1px solid var(--s-rule); padding: 10px 0 8px;
+  font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--s-dim);
+}
+.dir-b .b-head b { color: var(--s-accent); font-weight: 700; letter-spacing: .16em; }
+.dir-b .b-lock { color: var(--s-up); }
+.dir-b .b-block { padding: 15px 0 12px; border-bottom: 1px solid var(--s-rule); }
+.dir-b .b-lab { font-size: 9px; letter-spacing: .16em; text-transform: uppercase; color: var(--s-dim); }
+.dir-b .b-big {
+  font-size: 27px; font-weight: 700; letter-spacing: -.02em; margin-top: 6px; line-height: 1.05;
+}
+.dir-b .b-big span { font-size: 12px; color: var(--s-dim); font-weight: 500; margin-left: 5px; }
+.dir-b .b-flow { display: flex; gap: 18px; margin-top: 11px; font-size: 11px; }
+.dir-b .b-flow div { display: grid; gap: 2px; }
+.dir-b .b-flow .k { font-size: 8.5px; letter-spacing: .14em; color: var(--s-dim); text-transform: uppercase; }
+.dir-b .tablehead {
+  display: grid; grid-template-columns: 1fr 62px 42px; gap: 8px;
+  font-size: 8.5px; letter-spacing: .13em; text-transform: uppercase; color: var(--s-dim);
+  padding: 13px 0 6px; border-bottom: 1px solid var(--s-rule);
+}
+.dir-b .trow {
+  display: grid; grid-template-columns: 1fr 62px 42px; gap: 8px;
+  font-size: 11px; padding: 8px 0; border-bottom: 1px solid var(--s-rule);
+}
+.dir-b .trow .r { text-align: right; }
+.dir-b .trow .pct { text-align: right; color: var(--s-accent); }
+.dir-b .meta { font-size: 9px; color: var(--s-dim); }
+.dir-b .b-day {
+  font-size: 8.5px; letter-spacing: .14em; color: var(--s-accent);
+  padding: 12px 0 5px; text-transform: uppercase;
+}
+.dir-b .b-rev { border: 1px solid var(--s-accent); padding: 11px 12px; margin-top: 14px; }
+.dir-b .b-rev .t {
+  font-size: 8.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--s-accent);
+  margin-bottom: 8px;
+}
+.dir-b .b-rev .m { font-size: 12px; margin-bottom: 2px; }
+.dir-b .b-rev .s { font-size: 9.5px; color: var(--s-dim); margin-bottom: 11px; }
+.dir-b .b-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.dir-b .b-btn {
+  font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; text-align: center;
+  padding: 7px 0; border: 1px solid var(--s-rule); color: var(--s-dim);
+}
+.dir-b .b-btn.p { background: var(--s-accent); color: #0B0C0D; border-color: var(--s-accent); font-weight: 700; }
+.dir-b .b-note { font-size: 9px; color: var(--s-dim); padding-top: 11px; line-height: 1.5; }
+
+/* =====================================================================
+   DIRECTION C — EDITORIAL
+   Serif display, real category colour system, expressive surfaces.
+   ===================================================================== */
+.dir-c .glass {
+  --s-bg: #15171D; --s-ink: #F0EDE6; --s-dim: #8D8FA0;
+  --s-rule: #262A33; --s-accent: #C9A227; --s-up: #6E8C68;
+  --s-down: #C1663F; --s-warn: #C1663F;
+  --c1: #C1663F; --c2: #6E8C68; --c3: #4A5A8C; --c4: #C9A227; --c5: #7A4A6B;
+  font-family: Archivo, sans-serif;
+}
+.dir-c .c-hero {
+  margin: 10px -16px 0; padding: 18px 16px 20px;
+  background:
+    radial-gradient(120% 90% at 82% 0%, rgba(201,162,39,.20), transparent 62%),
+    linear-gradient(180deg, #1C1F27 0%, #15171D 100%);
+  border-bottom: 1px solid var(--s-rule);
+}
+.dir-c .c-eye { font-size: 9px; letter-spacing: .2em; text-transform: uppercase; color: var(--s-accent); }
+.dir-c .c-amt {
+  font-family: Fraunces, Georgia, serif;
+  font-size: 34px; font-weight: 600; letter-spacing: -.02em; line-height: 1.05; margin: 9px 0 6px;
+}
+.dir-c .c-amt small { font-family: Archivo, sans-serif; font-size: 13px; color: var(--s-dim); font-weight: 500; }
+.dir-c .c-meta { font-size: 11px; color: var(--s-dim); }
+.dir-c .c-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 15px; }
+.dir-c .c-cell { background: rgba(255,255,255,.045); border-radius: 10px; padding: 10px 11px; }
+.dir-c .c-cell .k { font-size: 8.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--s-dim); }
+.dir-c .c-cell .v { font-size: 15px; font-weight: 600; margin-top: 4px; letter-spacing: -.01em; }
+.dir-c .c-sec {
+  font-family: Fraunces, Georgia, serif;
+  font-size: 15px; font-weight: 600; margin: 17px 0 11px; letter-spacing: -.01em;
+}
+.dir-c .c-stack { display: grid; gap: 11px; }
+.dir-c .c-cat { display: grid; grid-template-columns: 9px minmax(0,1fr) auto; gap: 10px; align-items: center; }
+.dir-c .c-dot { width: 9px; height: 9px; border-radius: 50%; }
+.dir-c .c-cat .n { font-size: 12.5px; }
+.dir-c .c-cat .a { font-size: 12px; font-weight: 600; }
+.dir-c .c-track { grid-column: 2 / span 2; height: 4px; border-radius: 3px; background: rgba(255,255,255,.08); }
+.dir-c .c-track i { display: block; height: 100%; border-radius: 3px; }
+.dir-c .c-txn {
+  display: grid; grid-template-columns: 30px minmax(0,1fr) auto; gap: 11px; align-items: center;
+  padding: 11px 0; border-bottom: 1px solid var(--s-rule);
+}
+.dir-c .c-ic {
+  width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+  font-size: 12px; font-weight: 700; font-family: Fraunces, Georgia, serif;
+}
+.dir-c .c-txn .n { font-size: 12.5px; font-weight: 500; }
+.dir-c .c-txn .s { font-size: 10px; color: var(--s-dim); margin-top: 1px; }
+.dir-c .c-txn .a { font-size: 12.5px; font-weight: 600; text-align: right; }
+.dir-c .c-day {
+  font-family: Fraunces, Georgia, serif; font-size: 12px; color: var(--s-dim);
+  padding: 14px 0 4px; font-style: italic;
+}
+.dir-c .c-card {
+  background: rgba(255,255,255,.05); border-radius: 14px; padding: 14px; margin-top: 14px;
+  border: 1px solid var(--s-rule);
+}
+.dir-c .c-card h4 { font-family: Fraunces, Georgia, serif; margin: 0 0 4px; font-size: 14.5px; font-weight: 600; }
+.dir-c .c-card p { margin: 0 0 12px; font-size: 10.5px; color: var(--s-dim); line-height: 1.5; }
+.dir-c .c-row {
+  display: flex; justify-content: space-between; align-items: center;
+  background: rgba(0,0,0,.28); border-radius: 9px; padding: 9px 11px; margin-bottom: 12px;
+}
+.dir-c .c-row .n { font-size: 12px; font-weight: 500; }
+.dir-c .c-row .s { font-size: 9.5px; color: var(--s-dim); }
+.dir-c .c-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.dir-c .c-btn { text-align: center; font-size: 11px; font-weight: 600; padding: 9px 0; border-radius: 8px; }
+.dir-c .c-btn.p { background: var(--s-accent); color: #15171D; }
+.dir-c .c-btn.s { border: 1px solid var(--s-rule); color: var(--s-ink); }
+.dir-c .c-swipe {
+  margin-top: 12px; border-radius: 9px; overflow: hidden;
+  display: grid; grid-template-columns: 46px 1fr;
+  background: linear-gradient(90deg, var(--s-up) 0 46px, rgba(255,255,255,.05) 46px);
+}
+.dir-c .c-swipe .g { display: grid; place-items: center; font-size: 15px; color: #15171D; font-weight: 700; }
+.dir-c .c-swipe .t { padding: 9px 11px; font-size: 10.5px; color: var(--s-dim); }
+
+/* =====================================================================
+   DIRECTION D — GREEN BAR
+   Accounting paper: alternating ruled rows, ledger columns, red ruling.
+   ===================================================================== */
+.dir-d .glass {
+  --s-bg: #F5F3EA; --s-ink: #1A1F1A; --s-dim: #6E7568;
+  --s-rule: #C9CFBE; --s-accent: #1B5E3A; --s-up: #1B5E3A;
+  --s-down: #A8402F; --s-warn: #A8402F; --s-band: #E2ECDE;
+  font-family: Archivo, sans-serif;
+}
+.dir-d .d-head {
+  border-bottom: 2px solid var(--s-ink); padding: 12px 0 7px;
+  display: flex; justify-content: space-between; align-items: baseline;
+}
+.dir-d .d-head b { font-size: 13px; font-weight: 700; letter-spacing: -.01em; }
+.dir-d .d-head span { font-size: 9px; letter-spacing: .16em; text-transform: uppercase; color: var(--s-dim); }
+.dir-d .d-total { padding: 13px 0 11px; border-bottom: 1px double var(--s-rule); }
+.dir-d .d-lab { font-size: 9px; letter-spacing: .17em; text-transform: uppercase; color: var(--s-dim); }
+.dir-d .d-fig {
+  font-size: 30px; font-weight: 700; letter-spacing: -.03em; margin-top: 5px; line-height: 1;
+}
+.dir-d .d-fig small { font-size: 13px; font-weight: 500; color: var(--s-dim); margin-right: 5px; }
+.dir-d .d-cols {
+  display: grid; grid-template-columns: 1fr 74px 46px;
+  font-size: 8.5px; letter-spacing: .13em; text-transform: uppercase; color: var(--s-dim);
+  padding: 11px 6px 5px; border-bottom: 1px solid var(--s-ink);
+}
+.dir-d .d-cols span:not(:first-child) { text-align: right; }
+.dir-d .d-line {
+  display: grid; grid-template-columns: 1fr 74px 46px;
+  font-size: 12px; padding: 8px 6px;
+}
+.dir-d .d-line:nth-child(odd) { background: var(--s-band); }
+.dir-d .d-line span:not(:first-child) { text-align: right; }
+.dir-d .d-line .cr { color: var(--s-up); }
+.dir-d .d-line .dr { color: var(--s-down); }
+.dir-d .d-sub { font-size: 9.5px; color: var(--s-dim); }
+.dir-d .d-foot {
+  display: grid; grid-template-columns: 1fr 74px 46px;
+  font-size: 12px; font-weight: 700; padding: 9px 6px;
+  border-top: 2px solid var(--s-ink); border-bottom: 3px double var(--s-ink);
+}
+.dir-d .d-foot span:not(:first-child) { text-align: right; }
+.dir-d .d-stamp {
+  margin-top: 13px; border: 1.5px solid var(--s-down); color: var(--s-down);
+  font-size: 8.5px; letter-spacing: .18em; text-transform: uppercase;
+  padding: 5px 9px; display: inline-block; transform: rotate(-1.2deg);
+}
+
+/* =====================================================================
+   DIRECTION E — STATEMENT
+   One enormous figure per screen. No icons, text-only navigation.
+   ===================================================================== */
+.dir-e .glass {
+  --s-bg: #0C0C0C; --s-ink: #F4F1EB; --s-dim: #79766F;
+  --s-rule: #1E1E1D; --s-accent: #F4F1EB; --s-up: #F4F1EB;
+  --s-down: #F4F1EB; --s-warn: #8A8378;
+  font-family: Archivo, sans-serif;
+}
+.dir-e .e-mark {
+  font-size: 8.5px; letter-spacing: .3em; text-transform: uppercase;
+  color: var(--s-dim); padding: 16px 0 0;
+}
+.dir-e .e-lab {
+  font-size: 9px; letter-spacing: .22em; text-transform: uppercase;
+  color: var(--s-dim); margin-top: 44px;
+}
+.dir-e .e-huge {
+  font-family: Fraunces, Georgia, serif;
+  font-size: 46px; font-weight: 400; letter-spacing: -.035em; line-height: .96;
+  margin: 12px 0 0;
+}
+.dir-e .e-cur { font-size: 15px; letter-spacing: .04em; color: var(--s-dim); display: block; margin-bottom: 7px; font-family: Archivo, sans-serif; }
+.dir-e .e-note { font-size: 11.5px; color: var(--s-dim); margin-top: 16px; line-height: 1.6; max-width: 24ch; }
+.dir-e .e-pair {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-top: 40px;
+  border-top: 1px solid var(--s-rule);
+}
+.dir-e .e-pair div { padding: 14px 0; }
+.dir-e .e-pair div + div { padding-left: 16px; border-left: 1px solid var(--s-rule); }
+.dir-e .e-pair dt { font-size: 8.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--s-dim); }
+.dir-e .e-pair dd {
+  margin: 6px 0 0; font-family: Fraunces, Georgia, serif;
+  font-size: 19px; font-weight: 400; letter-spacing: -.02em;
+}
+.dir-e .e-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 15px 0; border-bottom: 1px solid var(--s-rule);
+}
+.dir-e .e-row .n { font-size: 12.5px; }
+.dir-e .e-row .n i { display: block; font-style: normal; font-size: 10px; color: var(--s-dim); margin-top: 3px; }
+.dir-e .e-row .v { font-family: Fraunces, Georgia, serif; font-size: 15px; letter-spacing: -.02em; }
+.dir-e .e-day {
+  font-size: 8.5px; letter-spacing: .2em; text-transform: uppercase;
+  color: var(--s-dim); padding: 22px 0 3px;
+}
+.dir-e .tabbar { border-top: 1px solid var(--s-rule); padding: 12px 4px 14px; }
+.dir-e .tab { font-size: 9px; letter-spacing: .1em; }
+.dir-e .tab .ic { display: none; }
+.dir-e .tab.on { color: var(--s-ink); }
+.dir-e .tab.on::after {
+  content: ""; display: block; width: 13px; height: 1px; background: var(--s-ink); margin-top: 4px;
+}
+
+/* =====================================================================
+   DIRECTION F — CALM
+   Low contrast, rounded, generous. Reassurance instead of alarm.
+   ===================================================================== */
+.dir-f .glass {
+  --s-bg: #ECEFE9; --s-ink: #2C382F; --s-dim: #77857A;
+  --s-rule: #D8DED3; --s-accent: #6F8E76; --s-up: #5E8467;
+  --s-down: #A9705C; --s-warn: #C0A15E;
+  font-family: "Bricolage Grotesque", Archivo, sans-serif;
+}
+.dir-f .f-hi { font-size: 12.5px; color: var(--s-dim); padding: 18px 0 0; }
+.dir-f .f-amt {
+  font-size: 31px; font-weight: 500; letter-spacing: -.03em; margin: 8px 0 0; line-height: 1.05;
+}
+.dir-f .f-amt small { font-size: 14px; color: var(--s-dim); font-weight: 400; }
+.dir-f .f-reassure {
+  background: #DDE6DB; border-radius: 16px; padding: 13px 15px; margin-top: 16px;
+  font-size: 12px; line-height: 1.5; color: var(--s-ink);
+}
+.dir-f .f-reassure b { font-weight: 700; }
+.dir-f .f-pills { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 13px; }
+.dir-f .f-pill { background: #fff; border-radius: 16px; padding: 13px 15px; }
+.dir-f .f-pill .k { font-size: 10px; color: var(--s-dim); }
+.dir-f .f-pill .v { font-size: 17px; font-weight: 600; margin-top: 4px; letter-spacing: -.02em; }
+.dir-f .f-sec { font-size: 13px; font-weight: 600; margin: 20px 0 11px; }
+.dir-f .f-cat {
+  display: flex; align-items: center; gap: 12px; background: #fff;
+  border-radius: 14px; padding: 12px 14px; margin-bottom: 9px;
+}
+.dir-f .f-ring {
+  width: 30px; height: 30px; border-radius: 50%; flex: none;
+  display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #fff;
+}
+.dir-f .f-cat .n { flex: 1; font-size: 12.5px; }
+.dir-f .f-cat .a { font-size: 13px; font-weight: 600; }
+.dir-f .f-txn {
+  display: flex; align-items: center; gap: 12px; padding: 13px 2px;
+  border-bottom: 1px solid var(--s-rule);
+}
+.dir-f .f-txn .n { flex: 1; font-size: 12.5px; }
+.dir-f .f-txn .n i { display: block; font-style: normal; font-size: 10px; color: var(--s-dim); margin-top: 2px; }
+.dir-f .f-txn .a { font-size: 13px; font-weight: 600; }
+.dir-f .f-day { font-size: 11px; color: var(--s-dim); padding: 15px 0 4px; }
+.dir-f .tabbar { border-top: 1px solid var(--s-rule); }
+.dir-f .tab .ic { border-radius: 9px; }
+
+/* =====================================================================
+   DIRECTION G — SIGNAL
+   Chart-led. Every screen opens with the shape of the money.
+   ===================================================================== */
+.dir-g .glass {
+  --s-bg: #0F1316; --s-ink: #E4E9EA; --s-dim: #6C7A80;
+  --s-rule: #1E262B; --s-accent: #6FA5B8; --s-up: #6FA5B8;
+  --s-down: #C97F63; --s-warn: #C9A961;
+  font-family: Archivo, sans-serif;
+}
+.dir-g .g-top { padding: 13px 0 0; display: flex; justify-content: space-between; align-items: baseline; }
+.dir-g .g-top .k { font-size: 9px; letter-spacing: .17em; text-transform: uppercase; color: var(--s-dim); }
+.dir-g .g-top .d { font-size: 9px; color: var(--s-dim); font-family: "JetBrains Mono", monospace; }
+.dir-g .g-fig {
+  font-size: 28px; font-weight: 600; letter-spacing: -.03em; margin: 7px 0 0; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.dir-g .g-fig small { font-size: 12px; color: var(--s-dim); font-weight: 500; margin-right: 4px; }
+.dir-g .g-delta { font-size: 11px; color: var(--s-up); margin-top: 5px; font-family: "JetBrains Mono", monospace; }
+.dir-g .g-chart { margin: 14px 0 0; }
+.dir-g .g-legend {
+  display: flex; gap: 14px; font-size: 9px; color: var(--s-dim);
+  font-family: "JetBrains Mono", monospace; margin-top: 7px;
+}
+.dir-g .g-legend i { width: 8px; height: 2px; display: inline-block; vertical-align: middle; margin-right: 4px; }
+.dir-g .g-stack { display: flex; height: 9px; border-radius: 2px; overflow: hidden; margin-top: 16px; }
+.dir-g .g-stack i { display: block; height: 100%; }
+.dir-g .g-key {
+  display: grid; grid-template-columns: 9px 1fr auto; gap: 9px; align-items: center;
+  font-size: 11.5px; padding: 7px 0; border-bottom: 1px solid var(--s-rule);
+}
+.dir-g .g-key i { width: 9px; height: 9px; border-radius: 2px; }
+.dir-g .g-key .a { font-family: "JetBrains Mono", monospace; font-size: 11px; }
+.dir-g .g-sec {
+  font-size: 9px; letter-spacing: .17em; text-transform: uppercase;
+  color: var(--s-dim); margin: 17px 0 7px;
+}
+.dir-g .g-row {
+  display: grid; grid-template-columns: minmax(0,1fr) 74px; gap: 10px;
+  padding: 9px 0; border-bottom: 1px solid var(--s-rule); align-items: center;
+}
+.dir-g .g-row .n { font-size: 12px; }
+.dir-g .g-row .n i { display: block; font-style: normal; font-size: 9.5px; color: var(--s-dim); margin-top: 2px; }
+.dir-g .g-row .a { text-align: right; font-family: "JetBrains Mono", monospace; font-size: 11.5px; }
+.dir-g .g-mini { height: 3px; background: var(--s-rule); border-radius: 2px; margin-top: 5px; }
+.dir-g .g-mini i { display: block; height: 100%; border-radius: 2px; background: var(--s-down); }
+
+/* ---- Insights components, per direction ---- */
+.seg { display: flex; }
+.dir-a .seg { border: 1px solid var(--s-rule); border-radius: 2px; margin: 12px 0 18px; }
+.dir-a .seg span { flex: 1; text-align: center; font-size: 10.5px; padding: 6px 0; color: var(--s-dim); }
+.dir-a .seg span.on { background: var(--s-ink); color: #FBFAF7; }
+.dir-a .cols { display: flex; align-items: flex-end; gap: 4px; height: 92px; border-bottom: 1px solid var(--s-ink); }
+.dir-a .cols i { flex: 1; background: var(--s-accent); opacity: .8; }
+.dir-a .cols i.on { opacity: 1; }
+.dir-a .xax { display: flex; justify-content: space-between; font-size: 8.5px; color: var(--s-dim); padding-top: 5px; }
+
+.dir-b .ascii { font-size: 10px; line-height: 1.85; }
+.dir-b .ascii div { display: grid; grid-template-columns: 30px 1fr 62px; gap: 6px; }
+.dir-b .ascii .bar { color: var(--s-accent); letter-spacing: -.06em; overflow: hidden; white-space: nowrap; }
+.dir-b .ascii .amt { text-align: right; }
+.dir-b .seg { border: 1px solid var(--s-rule); margin: 11px 0 14px; }
+.dir-b .seg span {
+  flex: 1; text-align: center; font-size: 9px; padding: 6px 0; color: var(--s-dim);
+  letter-spacing: .12em;
+}
+.dir-b .seg span.on { background: var(--s-accent); color: #0B0C0D; font-weight: 700; }
+
+.dir-c .seg { gap: 7px; margin: 4px 0 16px; }
+.dir-c .seg span {
+  font-size: 10.5px; padding: 5px 13px; border-radius: 20px;
+  border: 1px solid var(--s-rule); color: var(--s-dim);
+}
+.dir-c .seg span.on { background: var(--s-accent); border-color: var(--s-accent); color: #15171D; font-weight: 600; }
+.dir-c .c-legend { display: grid; gap: 8px; margin-top: 4px; }
+.dir-c .c-leg { display: grid; grid-template-columns: 9px 1fr auto; gap: 9px; align-items: center; font-size: 11.5px; }
+.dir-c .c-leg i { width: 9px; height: 9px; border-radius: 50%; }
+.dir-c .c-leg b { font-weight: 600; }
+
+.dir-d .seg { border: 1px solid var(--s-ink); margin: 11px 0 0; }
+.dir-d .seg span { flex: 1; text-align: center; font-size: 10px; padding: 5px 0; color: var(--s-dim); }
+.dir-d .seg span.on { background: var(--s-ink); color: #F5F3EA; }
+
+.dir-e .e-spark { display: flex; align-items: flex-end; gap: 4px; height: 60px; margin-top: 30px; }
+.dir-e .e-spark i { flex: 1; background: #2A2926; }
+.dir-e .e-spark i.on { background: var(--s-ink); }
+.dir-e .e-mini { display: flex; justify-content: space-between; font-size: 8.5px; color: var(--s-dim); padding-top: 7px; letter-spacing: .16em; }
+
+.dir-f .f-bars { display: flex; align-items: flex-end; gap: 5px; height: 84px; }
+.dir-f .f-bars i { flex: 1; background: #CBD8C8; border-radius: 5px 5px 0 0; }
+.dir-f .f-bars i.on { background: var(--s-accent); }
+.dir-f .seg { gap: 7px; margin: 14px 0 16px; }
+.dir-f .seg span {
+  font-size: 11px; padding: 6px 14px; border-radius: 20px; background: #fff; color: var(--s-dim);
+}
+.dir-f .seg span.on { background: var(--s-accent); color: #fff; font-weight: 600; }
+
+.dir-g .g-group { display: flex; align-items: flex-end; gap: 5px; height: 84px; }
+.dir-g .g-group .pair { flex: 1; display: flex; align-items: flex-end; gap: 1.5px; height: 100%; }
+.dir-g .g-group i { flex: 1; border-radius: 1px; }
+.dir-g .seg { gap: 0; border: 1px solid var(--s-rule); border-radius: 3px; margin: 11px 0 15px; }
+.dir-g .seg span {
+  flex: 1; text-align: center; font-size: 9.5px; padding: 5px 0; color: var(--s-dim);
+  font-family: "JetBrains Mono", monospace;
+}
+.dir-g .seg span.on { background: var(--s-accent); color: #0F1316; font-weight: 700; }
+
+/* =====================================================================
+   DIRECTION H — RECEIPT
+   The app as a till roll. Dashed rules, right-aligned totals, tear edge.
+   ===================================================================== */
+.dir-h .glass {
+  --s-bg: #F8F6F0; --s-ink: #1B1915; --s-dim: #8B857A;
+  --s-rule: #CFC8B9; --s-accent: #1B1915; --s-up: #2C6B45;
+  --s-down: #A33A2C; --s-warn: #A33A2C;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+.dir-h .h-top { text-align: center; padding: 14px 0 8px; }
+.dir-h .h-top b { font-size: 12px; letter-spacing: .28em; font-weight: 700; }
+.dir-h .h-top p { margin: 5px 0 0; font-size: 9px; letter-spacing: .1em; color: var(--s-dim); }
+.dir-h .h-dash { border-top: 1px dashed var(--s-rule); margin: 10px 0; }
+.dir-h .h-solid { border-top: 1.5px solid var(--s-ink); margin: 9px 0; }
+.dir-h .h-line { display: flex; justify-content: space-between; gap: 10px; font-size: 10.5px; padding: 2.5px 0; }
+.dir-h .h-line span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dir-h .h-line.s { color: var(--s-dim); font-size: 9.5px; }
+.dir-h .h-tot { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; padding: 4px 0; }
+.dir-h .h-big { text-align: center; font-size: 24px; font-weight: 700; letter-spacing: -.02em; padding: 4px 0 2px; }
+.dir-h .h-cap { text-align: center; font-size: 9px; letter-spacing: .16em; color: var(--s-dim); }
+.dir-h .h-hist { display: grid; grid-template-columns: 26px 1fr 56px; gap: 6px; font-size: 9.5px; line-height: 1.9; }
+.dir-h .h-hist .b { letter-spacing: -.08em; overflow: hidden; white-space: nowrap; }
+.dir-h .h-hist .a { text-align: right; font-variant-numeric: tabular-nums; }
+.dir-h .h-stars { text-align: center; font-size: 9.5px; letter-spacing: .1em; color: var(--s-dim); padding: 6px 0; }
+.dir-h .h-tear {
+  height: 10px; margin: 0 -16px;
+  background: repeating-linear-gradient(135deg, var(--s-bg) 0 5px, transparent 5px 10px);
+  border-top: 1px dashed var(--s-rule);
+}
+.dir-h .tabbar { border-top: 1px solid var(--s-rule); }
+.dir-h .tab { font-size: 8px; letter-spacing: .1em; }
+
+/* =====================================================================
+   DIRECTION I — SMALL MULTIPLES
+   Every category gets its own tiny chart, all on one shared scale.
+   ===================================================================== */
+.dir-i .glass {
+  --s-bg: #F4F5F6; --s-ink: #16181A; --s-dim: #7C848B;
+  --s-rule: #DFE1E3; --s-accent: #24506B; --s-up: #24506B;
+  --s-down: #9C4A38; --s-warn: #9C6A24;
+  font-family: Archivo, sans-serif;
+}
+.dir-i .i-top { padding: 14px 0 10px; border-bottom: 1px solid var(--s-ink); }
+.dir-i .i-lab { font-size: 9px; letter-spacing: .16em; text-transform: uppercase; color: var(--s-dim); }
+.dir-i .i-fig { font-size: 25px; font-weight: 600; letter-spacing: -.03em; margin: 5px 0 0; }
+.dir-i .i-fig small { font-size: 12px; color: var(--s-dim); font-weight: 500; margin-right: 4px; }
+.dir-i .i-note { font-size: 10.5px; color: var(--s-dim); margin-top: 4px; }
+.dir-i .i-scale {
+  font-size: 8.5px; color: var(--s-dim); letter-spacing: .1em; text-transform: uppercase;
+  padding: 10px 0 8px;
+}
+.dir-i .sm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.dir-i .sm { border: 1px solid var(--s-rule); background: #fff; border-radius: 3px; padding: 8px 9px 6px; }
+.dir-i .sm .k { font-size: 8.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--s-dim); }
+.dir-i .sm .v { font-size: 13.5px; font-weight: 600; letter-spacing: -.02em; margin: 2px 0 4px; }
+.dir-i .sm .t { font-size: 8.5px; }
+.dir-i .i-row {
+  display: grid; grid-template-columns: minmax(0,1fr) 58px 40px; gap: 8px;
+  font-size: 11.5px; padding: 8px 0; border-bottom: 1px solid var(--s-rule); align-items: center;
+}
+.dir-i .i-row .a { text-align: right; font-variant-numeric: tabular-nums; }
+.dir-i .i-row .d { text-align: right; font-size: 10px; }
+.dir-i .tabbar { border-top: 1px solid var(--s-rule); }
+
+/* =====================================================================
+   DIRECTION J — RIVER
+   Money as a flow: one spine, in on the left, out on the right.
+   ===================================================================== */
+.dir-j .glass {
+  --s-bg: #0A1416; --s-ink: #DCE9E7; --s-dim: #6A8280;
+  --s-rule: #16262A; --s-accent: #4FB3A6; --s-up: #4FB3A6;
+  --s-down: #D08A6A; --s-warn: #D0B06A;
+  font-family: Archivo, sans-serif;
+}
+.dir-j .j-top { padding: 15px 0 4px; }
+.dir-j .j-lab { font-size: 9px; letter-spacing: .18em; text-transform: uppercase; color: var(--s-dim); }
+.dir-j .j-fig { font-size: 28px; font-weight: 600; letter-spacing: -.03em; margin: 6px 0 0; }
+.dir-j .j-fig small { font-size: 12px; color: var(--s-dim); font-weight: 500; margin-right: 4px; }
+.dir-j .j-spine { position: relative; margin-top: 14px; padding-left: 0; }
+.dir-j .j-node {
+  display: grid; grid-template-columns: 1fr 13px 1fr; gap: 8px; align-items: center;
+  padding: 7px 0; position: relative;
+}
+.dir-j .j-node .rail {
+  position: relative; height: 100%; min-height: 30px; display: grid; place-items: center;
+}
+.dir-j .j-node .rail::before {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 50%;
+  width: 1px; background: var(--s-rule); transform: translateX(-50%);
+}
+.dir-j .j-node .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--s-dim); z-index: 1; }
+.dir-j .j-node.in .dot { background: var(--s-up); }
+.dir-j .j-node.out .dot { background: var(--s-down); }
+.dir-j .j-node .side { font-size: 11.5px; }
+.dir-j .j-node .side .n { display: block; }
+.dir-j .j-node .side .s { display: block; font-size: 9.5px; color: var(--s-dim); margin-top: 2px; }
+.dir-j .j-node .side .v { display: block; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.dir-j .j-node .l { text-align: right; }
+.dir-j .j-node .r { text-align: left; }
+.dir-j .j-empty { color: transparent; }
+.dir-j .j-head {
+  display: flex; justify-content: space-between; font-size: 8.5px;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--s-dim);
+  padding-bottom: 6px; border-bottom: 1px solid var(--s-rule);
+}
+.dir-j .j-sec { font-size: 9px; letter-spacing: .18em; text-transform: uppercase; color: var(--s-dim); margin: 16px 0 8px; }
+.dir-j .j-leg { display: flex; gap: 14px; font-size: 9.5px; color: var(--s-dim); margin-top: 8px; }
+.dir-j .j-leg i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; margin-right: 5px; vertical-align: -1px; }
+
+/* ---- Comparison ---- */
+.compare { border-top: 1px solid var(--rule); padding-top: 34px; }
+.compare h2 { font-size: 24px; letter-spacing: -.02em; margin: 0 0 20px; font-weight: 700; }
+.tablescroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 14.5px; }
+th, td { text-align: left; padding: 13px 16px 13px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+thead th {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-muted);
+  border-bottom: 1px solid var(--ink);
+}
+tbody th { font-weight: 600; width: 26%; }
+td { color: var(--ink-muted); }
+
+.closing {
+  margin-top: 44px; padding: 24px 26px; background: var(--ground-2);
+  border-left: 3px solid var(--accent); border-radius: 2px;
+}
+.closing p { margin: 0; font-size: 15px; max-width: 68ch; }
+.closing p + p { margin-top: 12px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .phone { transition: transform .25s ease; }
+  .screen-wrap:hover .phone { transform: translateY(-4px); }
+}
+</style>
+
+<div class="wrap">
+
+  <p class="eyebrow">SpendWise · direction study</p>
+  <h1>Seven ways this app could look.</h1>
+  <p class="lede">
+    Same data, same flows, same screens — rendered in seven different design languages.
+    Three developed in full, four pushed further out. Pick one, or pick parts of two,
+    and I'll build it in Flutter.
+  </p>
+
+  <dl class="brief">
+    <div>
+      <dt>What stays</dt>
+      <dd>Every screen, flow and gesture. Nothing we fixed gets touched.</dd>
+    </div>
+    <div>
+      <dt>What changes</dt>
+      <dd>Palette, type, spacing, surfaces, how money reads at a glance.</dd>
+    </div>
+    <div>
+      <dt>Shown with</dt>
+      <dd>Your real figures — Meezan, NayaPay, UBL, JazzCash.</dd>
+    </div>
+    <div>
+      <dt>Decide on</dt>
+      <dd>Which one you'd open five times a day without tiring of it.</dd>
+    </div>
+  </dl>
+
+  <!-- ============================ A ============================ -->
+  <section class="direction dir-a">
+    <div class="dir-head">
+      <div>
+        <p class="dir-id">Direction A</p>
+        <h2 class="dir-name">Ledger Paper</h2>
+        <p class="dir-thesis">
+          A printed statement, not a dashboard. Light ground, hairline rules, no cards at all —
+          the numbers are the only things allowed to be loud.
+        </p>
+      </div>
+      <div class="tradeoffs">
+        <div class="tradeoff"><span>Strength</span><span>Money is easiest to read here. Tabular figures on a quiet ground, nothing competing.</span></div>
+        <div class="tradeoff"><span>Signature</span><span>Zero cards. Hierarchy comes from type weight and rules alone.</span></div>
+        <div class="tradeoff cost"><span>Cost</span><span>Light theme is a big change from what you have. Least "app-like" of the three.</span></div>
+        <div class="specimen">
+          <span class="swatch"><i class="chip" style="background:#FBFAF7"></i>#FBFAF7</span>
+          <span class="swatch"><i class="chip" style="background:#15181A"></i>#15181A</span>
+          <span class="swatch"><i class="chip" style="background:#1F5F4E"></i>#1F5F4E</span>
+          <span class="swatch"><i class="chip" style="background:#A23A2E"></i>#A23A2E</span>
+          <span class="swatch">Instrument Sans</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail">
+      <div class="rail-inner">
+
+        <!-- A · Home -->
+        <div class="screen-wrap">
+          <div class="phone"><div class="glass">
+            <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+            <div class="body">
+              <div class="a-top">
+                <p class="a-kicker">Available to spend</p>
+                <p class="a-balance"><small>PKR</small><span class="num">186,961.62</span></p>
+                <p class="a-sub">88.7% of income retained</p>
+              </div>
+              <dl class="a-split">
+                <div><dt>In</dt><dd class="num up">176,800</dd></div>
+                <div><dt>Out</dt><dd class="num down">19,925</dd></div>
+              </dl>
+              <p class="sec">Where it went · September</p>
+              <div class="catrow">
+                <div class="catline"><b>Groceries</b><span class="num">8,420</span></div>
+                <div class="bar"><i style="width:100%"></i></div>
+              </div>
+              <div class="catrow">
+                <div class="catline"><b>Food &amp; dining</b><span class="num">4,215</span></div>
+                <div class="bar"><i style="width:50%"></i></div>
+              </div>
+              <div class="catrow">
+                <div class="catline"><b>Transport</b><span class="num">3,100</span></div>
+                <div class="bar"><i style="width:37%"></i></div>
+              </div>
+              <div class="catrow">
+                <div class="catline"><b>Bills</b><span class="num">2,090</span></div>
+                <div class="bar"><i style="width:25%"></i></div>
+              </div>
+              <p class="sec">Accounts</p>
+              <div class="txn" style="border-bottom:0;padding-top:2px">
+                <b>Meezan Debit</b>
+                <span class="amt num">177,641.13</span>
+                <span class="meta">Bank · ••4821</span>
+              </div>
+              <div class="txn" style="border-bottom:0;padding-top:0">
+                <b>NayaPay</b>
+                <span class="amt num">10,188.49</span>
+                <span class="meta">Wallet</span>
+              </div>
+            </div>
+            <div class="tabbar">
+              <div class="tab on"><span class="ic"></span>Home</div>
+              <div class="tab"><span class="ic"></span>Ledger</div>
+              <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+              <div class="tab"><span class="ic"></span>Settings</div>
+            </div>
+          </div></div>
+          <p class="screen-label">Home</p>
+        </div>
+
+        <!-- A · Ledger -->
+        <div class="screen-wrap">
+          <div class="phone"><div class="glass">
+            <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+            <div class="body">
+              <div class="a-top" style="padding-bottom:4px">
+                <p class="a-kicker">Ledger</p>
+                <p style="font-size:19px;font-weight:600;margin:6px 0 0;letter-spacing:-.02em">September</p>
+              </div>
+              <p class="daymark">Thu 04 Sep</p>
+              <div class="txn">
+                <b>Imtiaz Supermarket</b>
+                <span class="amt num down">−1,060.00</span>
+                <span class="meta">Groceries · Meezan Debit</span>
+              </div>
+              <div class="txn">
+                <b>Jenpharm Retail</b>
+                <span class="amt num down">−2,086.20</span>
+                <span class="meta">Health · UBL Current</span>
+              </div>
+              <p class="daymark">Tue 02 Sep</p>
+              <div class="txn">
+                <b>Account transfer</b>
+                <span class="amt num">10,000.00</span>
+                <span class="meta">Between your accounts · Meezan → NayaPay</span>
+              </div>
+              <div class="txn">
+                <b>Salary</b>
+                <span class="amt num up">+176,800.00</span>
+                <span class="meta">Income · Meezan Debit</span>
+              </div>
+              <p class="daymark">Mon 01 Sep</p>
+              <div class="txn" style="border-bottom:0">
+                <b>Raast payment</b>
+                <span class="amt num down">−80.00</span>
+                <span class="meta">Transfer · JazzCash</span>
+              </div>
+            </div>
+            <div class="tabbar">
+              <div class="tab"><span class="ic"></span>Home</div>
+              <div class="tab on"><span class="ic"></span>Ledger</div>
+              <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+              <div class="tab"><span class="ic"></span>Settings</div>
+            </div>
+          </div></div>
+          <p class="screen-label">Ledger</p>
+        </div>
+
+        <!-- A · Review -->
+        <div class="screen-wrap">
+          <div class="phone"><div class="glass">
+            <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+            <div class="body">
+              <div class="a-top" style="padding-bottom:4px">
+                <p class="a-kicker">Review · 6 waiting</p>
+                <p style="font-size:19px;font-weight:600;margin:6px 0 0;letter-spacing:-.02em">Needs a decision</p>
+              </div>
+              <div class="rev">
+                <h4>Is this right?</h4>
+                <p>Read as a payment, but the wording was unusual.</p>
+                <div class="line"><b>Raast · JazzCash</b><span class="num down">−80.00</span></div>
+                <div class="acts">
+                  <div class="btn s">Edit</div>
+                  <div class="btn p">Confirm</div>
+                </div>
+              </div>
+              <div class="rev" style="border-top-width:1px;border-top-color:var(--s-rule)">
+                <h4>10 alerts from Messages</h4>
+                <p>Direction is unclear — these could be payments in or out.</p>
+                <div class="acts">
+                  <div class="btn s">Dismiss</div>
+                  <div class="btn p">Open</div>
+                </div>
+              </div>
+              <p class="hint">Swipe right to confirm · left to delete</p>
+            </div>
+            <div class="tabbar">
+              <div class="tab"><span class="ic"></span>Home</div>
+              <div class="tab"><span class="ic"></span>Ledger</div>
+              <div class="tab on"><span class="ic badge" data-n="6"></span>Review</div>
+              <div class="tab"><span class="ic"></span>Settings</div>
+            </div>
+          </div></div>
+          <p class="screen-label">Review</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ B ============================ -->
+  <section class="direction dir-b">
+    <div class="dir-head">
+      <div>
+        <p class="dir-id">Direction B</p>
+        <h2 class="dir-name">Terminal</h2>
+        <p class="dir-thesis">
+          Leans all the way into "private, local, encrypted". Monospace throughout, rigid columns,
+          amber signal on charcoal. Reads like an instrument you own, not a bank you visit.
+        </p>
+      </div>
+      <div class="tradeoffs">
+        <div class="tradeoff"><span>Strength</span><span>Most distinctive by far. Nothing else on your phone looks like this.</span></div>
+        <div class="tradeoff"><span>Signature</span><span>Everything aligns to a column grid. Percentages sit beside every figure.</span></div>
+        <div class="tradeoff cost"><span>Cost</span><span>Mono is denser to read at a glance. Reads "technical" — less warm for daily money.</span></div>
+        <div class="specimen">
+          <span class="swatch"><i class="chip" style="background:#0B0C0D"></i>#0B0C0D</span>
+          <span class="swatch"><i class="chip" style="background:#E4E2DA"></i>#E4E2DA</span>
+          <span class="swatch"><i class="chip" style="background:#D9A441"></i>#D9A441</span>
+          <span class="swatch"><i class="chip" style="background:#7FB08A"></i>#7FB08A</span>
+          <span class="swatch">JetBrains Mono</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail">
+      <div class="rail-inner">
+
+        <!-- B · Home -->
+        <div class="screen-wrap">
+          <div class="phone"><div class="glass">
+            <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+            <div class="body">
+              <div class="b-head">
+                <b>SpendWise</b>
+                <span class="b-lock">◆ on-device</span>
+              </div>
+              <div class="b-block">
+                <p class="b-lab">Available</p>
+                <p class="b-big num">186,961.62<span>PKR</span></p>
+                <div class="b-flow">
+                  <div><span class="k">In</span><span class="num up">▲ 176,800</span></div>
+                  <div><span class="k">Out</span><span class="num down">▼ 19,925</span></div>
+                  <div><span class="k">Net</span><span class="num">+156,875</span></div>
+                </div>
+              </div>
+              <div class="tablehead"><span>Category</span><span class="r">Amount</span><span class="r">Share</span></div>
+              <div class="trow"><span>GROCERIES</span><span class="r num">8,420</span><span class="pct num">42.3</span></div>
+              <div class="trow"><span>FOOD</span><span class="r num">4,215</span><span class="pct num">21.2</span></div>
+              <div class="trow"><span>TRANSPORT</span><span class="r num">3,100</span><span class="pct num">15.6</span></div>
+              <div class="trow"><span>BILLS</span><span class="r num">2,090</span><span class="pct num">10.5</span></div>
+              <div class="trow"><span>OTHER</span><span class="r num">2,100</span><span class="pct num">10.4</span></div>
+              <div class="tablehead" style="grid-template-columns:1fr 90px"><span>Account</span><span class="r">Balance</span></div>
+              <div class="trow" style="grid-template-columns:1fr 90px">
+                <span>MEEZAN ••4821</span><span class="r num">177,641.13</span>
+              </div>
+              <div class="trow" style="grid-template-columns:1fr 90px;border-bottom:0">
+                <span>NAYAPAY</span><span class="r num">10,188.49</span>
+              </div>
+            </div>
+            <div class="tabbar">
+              <div class="tab on"><span class="ic"></span>HOME</div>
+              <div class="tab"><span class="ic"></span>LEDGER</div>
+              <div class="tab"><span class="ic badge" data-n="6"></span>REVIEW</div>
+              <div class="tab"><span class="ic"></span>CONF</div>
+            </div>
+          </div></div>
+          <p class="screen-label">Home</p>
+        </div>
+
+        <!-- B · Ledger -->
+        <div class="screen-wrap">
+          <div class="phone"><div class="glass">
+            <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+            <div class="body">
+              <div class="b-head"><b>Ledger</b><span>SEP 2026</span></div>
+              <p class="b-day">— 04 SEP</p>
+              <div class="trow" style="grid-template-columns:1fr 84px">
+                <span>IMTIAZ SUPERMARKET<br><span class="meta">GROCERIES · MEEZAN</span></span>
+                <span class="r num down">−1,060.00</span>
+              </div>
+              <div class="trow" style="grid-template-columns:1fr 84px">
+                <span>JENPHARM RETAIL<br><span class="meta">HEALTH · UBL</span></span>
+                <span class="r num down">−2,086.20</span>
+              </div>
+              <p class="b-day">— 02 SEP</p>
+              <div class="trow" style="grid-template-columns:1fr 84px">
+                <span>ACCOUNT TRANSFER<br><span class="meta">MEEZAN → NAYAPAY</span></span>
+                <span class="r num">10,000.00</span>
+              </div>
+              <div class="trow" style="grid-template-columns:1fr 84px">
+                <span>SALARY<br><span class="meta">INCOME · MEEZAN</span></span>
+                <span class="r num up">+176,800.00</span>
+              </div>
+              <p class="b-day">— 01 SEP</p>
+              <div class="trow" style="grid-template-columns:1fr 84px;border-bottom:0">
+                <span>RAAST PAYMENT<br><span class="meta">TRANSFER · JAZZCASH</span></span>
+                <span class="r num down">−80.00</span>
+              </div>
+            </div>
+            <div class="tabbar">
+              <div class="tab"><span class="ic"></span>HOME</div>
+              <div class="tab on"><span class="ic"></span>LEDGER</div>
+              <div class="tab"><span class="ic badge" data-n="6"></span>REVIEW</div>
+              <div class="tab"><span class="ic"></span>CONF</div>
+            </div>
+          </div></div>
+          <p class="screen-label">Ledger</p>
+        </div>
+
+        <!-- B · Review -->
+        <div class="screen-wrap">
+          <div class="phone"><div class="glass">
+            <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+            <div class="body">
+              <div class="b-head"><b>Review</b><span>6 PENDING</span></div>
+              <div class="b-rev">
+                <p class="t">◆ Needs decision</p>
+                <p class="m">RAAST · JAZZCASH</p>
+                <p class="s">−80.00 PKR · read as payment out</p>
+                <div class="b-acts">
+                  <div class="b-btn">EDIT</div>
+                  <div class="b-btn p">CONFIRM</div>
+                </div>
+              </div>
+              <div class="b-rev" style="border-color:var(--s-rule)">
+                <p class="t" style="color:var(--s-dim)">◆ Unreadable</p>
+                <p class="m">MESSAGES · 10 ALERTS</p>
+                <p class="s">Direction ambiguous</p>
+                <div class="b-acts">
+                  <div class="b-btn">DISMISS</div>
+                  <div class="b-btn p">OPEN</div>
+                </div>
+              </div>
+              <p class="b-note">
+                → SWIPE RIGHT&nbsp;&nbsp;CONFIRM<br>
+                → SWIPE LEFT&nbsp;&nbsp;&nbsp;DELETE
+              </p>
+            </div>
+            <div class="tabbar">
+              <div class="tab"><span class="ic"></span>HOME</div>
+              <div class="tab"><span class="ic"></span>LEDGER</div>
+              <div class="tab on"><span class="ic badge" data-n="6"></span>REVIEW</div>
+              <div class="tab"><span class="ic"></span>CONF</div>
+            </div>
+          </div></div>
+          <p class="screen-label">Review</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ C ============================ -->
+  <section class="direction dir-c">
+    <div class="dir-head">
+      <div>
+        <p class="dir-id">Direction C</p>
+        <h2 class="dir-name">Editorial</h2>
+        <p class="dir-thesis">
+          Stays dark like today, but with a real point of view: a serif for money,
+          and a proper colour system so categories are recognisable before you read them.
+        </p>
+      </div>
+      <div class="tradeoffs">
+        <div class="tradeoff"><span>Strength</span><span>Closest to what you have, so the smallest jump — but no longer looks generic.</span></div>
+        <div class="tradeoff"><span>Signature</span><span>Serif numerals, and one fixed colour per category used everywhere.</span></div>
+        <div class="tradeoff cost"><span>Cost</span><span>Most colour to keep disciplined. Serif needs care at small sizes.</span></div>
+        <div class="specimen">
+          <span class="swatch"><i class="chip" style="background:#15171D"></i>#15171D</span>
+          <span class="swatch"><i class="chip" style="background:#C9A227"></i>#C9A227</span>
+          <span class="swatch"><i class="chip" style="background:#C1663F"></i>#C1663F</span>
+          <span class="swatch"><i class="chip" style="background:#6E8C68"></i>#6E8C68</span>
+          <span class="swatch"><i class="chip" style="background:#4A5A8C"></i>#4A5A8C</span>
+          <span class="swatch">Fraunces + Archivo</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail">
+      <div class="rail-inner">
+
+        <!-- C · Home -->
+        <div class="screen-wrap">
+          <div class="phone"><div class="glass">
+            <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+            <div class="body">
+              <div class="c-hero">
+                <p class="c-eye">Available to spend</p>
+                <p class="c-amt num"><small>PKR </small>186,961.62</p>
+                <p class="c-meta">88.7% of income kept this month</p>
+                <div class="c-pair">
+                  <div class="c-cell"><p class="k">In</p><p class="v num up">176,800</p></div>
+                  <div class="c-cell"><p class="k">Out</p><p class="v num down">19,925</p></div>
+                </div>
+              </div>
+              <p class="c-sec">Where it went</p>
+              <div class="c-stack">
+                <div class="c-cat">
+                  <i class="c-dot" style="background:var(--c2)"></i>
+                  <span class="n">Groceries</span><span class="a num">8,420</span>
+                  <span class="c-track"><i style="width:100%;background:var(--c2)"></i></span>
+                </div>
+                <div class="c-cat">
+                  <i class="c-dot" style="background:var(--c1)"></i>
+                  <span class="n">Food &amp; dining</span><span class="a num">4,215</span>
+                  <span class="c-track"><i style="width:50%;background:var(--c1)"></i></span>
+                </div>
+                <div class="c-cat">
+                  <i class="c-dot" style="background:var(--c3)"></i>
+                  <span class="n">Transport</span><span class="a num">3,100</span>
+                  <span class="c-track"><i style="width:37%;background:var(--c3)"></i></span>
+                </div>
+                <div class="c-cat">
+                  <i class="c-dot" style="background:var(--c4)"></i>
+                  <span class="n">Bills</span><span class="a num">2,090</span>
+                  <span class="c-track"><i style="width:25%;background:var(--c4)"></i></span>
+                </div>
+              </div>
+            </div>
+            <div class="tabbar">
+              <div class="tab on"><span class="ic"></span>Home</div>
+              <div class="tab"><span class="ic"></span>Ledger</div>
+              <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+              <div class="tab"><span class="ic"></span>Settings</div>
+            </div>
+          </div></div>
+          <p class="screen-label">Home</p>
+        </div>
+
+        <!-- C · Ledger -->
+        <div class="screen-wrap">
+          <div class="phone"><div class="glass">
+            <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+            <div class="body">
+              <p class="c-sec" style="margin-top:14px">Ledger</p>
+              <p class="c-day">Thursday, 4 September</p>
+              <div class="c-txn">
+                <span class="c-ic" style="background:rgba(110,140,104,.22);color:var(--c2)">I</span>
+                <span><span class="n">Imtiaz Supermarket</span><span class="s">Groceries · Meezan Debit</span></span>
+                <span class="a num down">−1,060</span>
+              </div>
+              <div class="c-txn">
+                <span class="c-ic" style="background:rgba(122,74,107,.24);color:var(--c5)">J</span>
+                <span><span class="n">Jenpharm Retail</span><span class="s">Health · UBL Current</span></span>
+                <span class="a num down">−2,086</span>
+              </div>
+              <p class="c-day">Tuesday, 2 September</p>
+              <div class="c-txn">
+                <span class="c-ic" style="background:rgba(74,90,140,.26);color:var(--c3)">⇄</span>
+                <span><span class="n">Account transfer</span><span class="s">Between your accounts</span></span>
+                <span class="a num">10,000</span>
+              </div>
+              <div class="c-txn">
+                <span class="c-ic" style="background:rgba(110,140,104,.22);color:var(--c2)">S</span>
+                <span><span class="n">Salary</span><span class="s">Income · Meezan Debit</span></span>
+                <span class="a num up">+176,800</span>
+              </div>
+              <p class="c-day">Monday, 1 September</p>
+              <div class="c-txn" style="border-bottom:0">
+                <span class="c-ic" style="background:rgba(193,102,63,.22);color:var(--c1)">R</span>
+                <span><span class="n">Raast payment</span><span class="s">Transfer · JazzCash</span></span>
+                <span class="a num down">−80</span>
+              </div>
+            </div>
+            <div class="tabbar">
+              <div class="tab"><span class="ic"></span>Home</div>
+              <div class="tab on"><span class="ic"></span>Ledger</div>
+              <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+              <div class="tab"><span class="ic"></span>Settings</div>
+            </div>
+          </div></div>
+          <p class="screen-label">Ledger</p>
+        </div>
+
+        <!-- C · Review -->
+        <div class="screen-wrap">
+          <div class="phone"><div class="glass">
+            <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+            <div class="body">
+              <p class="c-sec" style="margin-top:14px">Review</p>
+              <p class="c-meta" style="margin-top:-6px">6 waiting on you</p>
+              <div class="c-card">
+                <h4>Is this right?</h4>
+                <p>Read as a payment out, but the wording was unusual.</p>
+                <div class="c-row">
+                  <span><span class="n">Raast</span><br><span class="s">JazzCash</span></span>
+                  <span class="num down" style="font-weight:600">−80.00</span>
+                </div>
+                <div class="c-acts">
+                  <div class="c-btn s">Edit</div>
+                  <div class="c-btn p">Confirm</div>
+                </div>
+              </div>
+              <div class="c-card">
+                <h4>10 alerts from Messages</h4>
+                <p>Could be money in or out — the wording doesn't say.</p>
+                <div class="c-acts">
+                  <div class="c-btn s">Dismiss</div>
+                  <div class="c-btn p">Open</div>
+                </div>
+              </div>
+              <div class="c-swipe">
+                <span class="g">✓</span>
+                <span class="t">Swipe right to confirm, left to delete</span>
+              </div>
+            </div>
+            <div class="tabbar">
+              <div class="tab"><span class="ic"></span>Home</div>
+              <div class="tab"><span class="ic"></span>Ledger</div>
+              <div class="tab on"><span class="ic badge" data-n="6"></span>Review</div>
+              <div class="tab"><span class="ic"></span>Settings</div>
+            </div>
+          </div></div>
+          <p class="screen-label">Review</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <div class="round-two">
+    <p class="eyebrow">Round two</p>
+    <h2>Four more, further out.</h2>
+    <p class="lede" style="margin-bottom:0">
+      Home and Ledger for each — enough to judge the world. Review follows the same system.
+    </p>
+  </div>
+
+  <!-- ============================ D ============================ -->
+  <section class="direction dir-d">
+    <div class="dir-head">
+      <div>
+        <p class="dir-id">Direction D</p>
+        <h2 class="dir-name">Green Bar</h2>
+        <p class="dir-thesis">
+          Accounting paper. Alternating ruled bands, debit and credit columns, a double rule
+          under the total. Bookkeeping's own visual language, used straight.
+        </p>
+      </div>
+      <div class="tradeoffs">
+        <div class="tradeoff"><span>Strength</span><span>Rows are effortless to track across — the banding does the work your eye usually has to.</span></div>
+        <div class="tradeoff"><span>Signature</span><span>Debit / credit columns and a ruled total, like a real ledger sheet.</span></div>
+        <div class="tradeoff cost"><span>Cost</span><span>Reads formal, even old-fashioned. Banding limits how much colour you can add later.</span></div>
+        <div class="specimen">
+          <span class="swatch"><i class="chip" style="background:#F5F3EA"></i>#F5F3EA</span>
+          <span class="swatch"><i class="chip" style="background:#E2ECDE"></i>#E2ECDE</span>
+          <span class="swatch"><i class="chip" style="background:#1B5E3A"></i>#1B5E3A</span>
+          <span class="swatch"><i class="chip" style="background:#A8402F"></i>#A8402F</span>
+          <span class="swatch">Archivo</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail">
+      <div class="rail-inner">
+
+        <div class="screen-wrap">
+          <div class="phone"><div class="glass">
+            <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+            <div class="body">
+              <div class="d-head"><b>SpendWise</b><span>Sep 2026</span></div>
+              <div class="d-total">
+                <p class="d-lab">Balance carried forward</p>
+                <p class="d-fig num"><small>PKR</small>186,961.62</p>
+              </div>
+              <div class="d-cols"><span>Category</span><span>Amount</span><span>%</span></div>
+              <div class="d-line"><span>Groceries</span><span class="num dr">8,420.00</span><span class="num">42</span></div>
+              <div class="d-line"><span>Food &amp; dining</span><span class="num dr">4,215.00</span><span class="num">21</span></div>
+              <div class="d-line"><span>Transport</span><span class="num dr">3,100.00</span><span class="num">16</span></div>
+              <div class="d-line"><span>Bills</span><span class="num dr">2,090.00</span><span class="num">10</span></div>
+              <div class="d-line"><span>Other</span><span class="num dr">2,100.20</span><span class="num">11</span></div>
+              <div class="d-foot"><span>Total out</span><span class="num">19,925.20</span><span>100</span></div>
+              <div class="d-cols" style="border-bottom:1px solid var(--s-ink)"><span>Account</span><span>Balance</span><span></span></div>
+              <div class="d-line"><span>Meezan Debit<br><span class="d-sub">••4821</span></span><span class="num">177,641.13</span><span></span></div>
+              <div class="d-line"><span>NayaPay<br><span class="d-sub">Wallet</span></span><span class="num">10,188.49</span><span></span></div>
+            </div>
+            <div class="tabbar">
+              <div class="tab on"><span class="ic"></span>Home</div>
+              <div class="tab"><span class="ic"></span>Ledger</div>
+              <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+              <div class="tab"><span class="ic"></span>Settings</div>
+            </div>
+          </div></div>
+          <p class="screen-label">Home</p>
+        </div>
+
+        <div class="screen-wrap">
+          <div class="phone"><div class="glass">
+            <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+            <div class="body">
+              <div class="d-head"><b>Ledger</b><span>5 entries</span></div>
+              <div class="d-cols"><span>Entry</span><span>Debit</span><span>Credit</span></div>
+              <div class="d-line">
+                <span>Imtiaz Supermarket<br><span class="d-sub">04 Sep · Meezan</span></span>
+                <span class="num dr">1,060.00</span><span></span>
+              </div>
+              <div class="d-line">
+                <span>Jenpharm Retail<br><span class="d-sub">04 Sep · UBL</span></span>
+                <span class="num dr">2,086.20</span><span></span>
+              </div>
+              <div class="d-line">
+                <span>Transfer to NayaPay<br><span class="d-sub">02 Sep · own account</span></span>
+                <span class="num">10,000</span><span class="num">10,000</span>
+              </div>
+              <div class="d-line">
+                <span>Salary<br><span class="d-sub">02 Sep · Meezan</span></span>
+                <span></span><span class="num cr">176,800.00</span>
+              </div>
+              <div class="d-line">
+                <span>Raast payment<br><span class="d-sub">01 Sep · JazzCash</span></span>
+                <span class="num dr">80.00</span><span></span>
+              </div>
+              <div class="d-foot"><span>Totals</span><span class="num">3,226.20</span><span class="num">176,800</span></div>
+              <span class="d-stamp">6 entries pending review</span>
+            </div>
+            <div class="tabbar">
+              <div class="tab"><span class="ic"></span>Home</div>
+              <div class="tab on"><span class="ic"></span>Ledger</div>
+              <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+              <div class="tab"><span class="ic"></span>Settings</div>
+            </div>
+          </div></div>
+          <p class="screen-label">Ledger</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ E ============================ -->
+  <section class="direction dir-e">
+    <div class="dir-head">
+      <div>
+        <p class="dir-id">Direction E</p>
+        <h2 class="dir-name">Statement</h2>
+        <p class="dir-thesis">
+          One figure, enormous, and almost nothing else. No icons anywhere, navigation is words.
+          Restraint as the whole idea — the money has the room to itself.
+        </p>
+      </div>
+      <div class="tradeoffs">
+        <div class="tradeoff"><span>Strength</span><span>Nothing to parse. You open it, you know where you stand, you close it.</span></div>
+        <div class="tradeoff"><span>Signature</span><span>No accent colour at all. Serif numerals on near-black, and space.</span></div>
+        <div class="tradeoff cost"><span>Cost</span><span>Least information per screen — more scrolling and tapping to reach detail.</span></div>
+        <div class="specimen">
+          <span class="swatch"><i class="chip" style="background:#0C0C0C"></i>#0C0C0C</span>
+          <span class="swatch"><i class="chip" style="background:#F4F1EB"></i>#F4F1EB</span>
+          <span class="swatch"><i class="chip" style="background:#79766F"></i>#79766F</span>
+          <span class="swatch">no accent</span>
+          <span class="swatch">Fraunces</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail">
+      <div class="rail-inner">
+
+        <div class="screen-wrap">
+          <div class="phone"><div class="glass">
+            <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+            <div class="body">
+              <p class="e-mark">SpendWise</p>
+              <p class="e-lab">Available to spend</p>
+              <p class="e-huge num"><span class="e-cur">PKR</span>186,961<span style="font-size:24px">.62</span></p>
+              <p class="e-note">You have kept 88.7% of what came in this month.</p>
+              <dl class="e-pair">
+                <div><dt>Received</dt><dd class="num">176,800</dd></div>
+                <div><dt>Spent</dt><dd class="num">19,925</dd></div>
+              </dl>
+            </div>
+            <div class="tabbar">
+              <div class="tab on">Balance</div>
+              <div class="tab">Ledger</div>
+              <div class="tab">Review</div>
+              <div class="tab">Settings</div>
+            </div>
+          </div></div>
+          <p class="screen-label">Home</p>
+        </div>
+
+        <div class="screen-wrap">
+          <div class="phone"><div class="glass">
+            <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+            <div class="body">
+              <p class="e-mark">Ledger</p>
+              <p class="e-day">Thursday 4 September</p>
+              <div class="e-row">
+                <span class="n">Imtiaz Supermarket<i>Groceries · Meezan</i></span>
+                <span class="v num">−1,060</span>
+              </div>
+              <div class="e-row">
+                <span class="n">Jenpharm Retail<i>Health · UBL</i></span>
+                <span class="v num">−2,086</span>
+              </div>
+              <p class="e-day">Tuesday 2 September</p>
+              <div class="e-row">
+                <span class="n">Account transfer<i>Meezan to NayaPay</i></span>
+                <span class="v num">10,000</span>
+              </div>
+              <div class="e-row">
+                <span class="n">Salary<i>Income · Meezan</i></span>
+                <span class="v num">+176,800</span>
+              </div>
+              <p class="e-day">Monday 1 September</p>
+              <div class="e-row" style="border-bottom:0">
+                <span class="n">Raast payment<i>Transfer · JazzCash</i></span>
+                <span class="v num">−80</span>
+              </div>
+            </div>
+            <div class="tabbar">
+              <div class="tab">Balance</div>
+              <div class="tab on">Ledger</div>
+              <div class="tab">Review</div>
+              <div class="tab">Settings</div>
+            </div>
+          </div></div>
+          <p class="screen-label">Ledger</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ F ============================ -->
+  <section class="direction dir-f">
+    <div class="dir-head">
+      <div>
+        <p class="dir-id">Direction F</p>
+        <h2 class="dir-name">Calm</h2>
+        <p class="dir-thesis">
+          Money apps mostly shout. This one doesn't: soft sage ground, rounded surfaces,
+          low contrast, and a plain sentence telling you whether you're fine.
+        </p>
+      </div>
+      <div class="tradeoffs">
+        <div class="tradeoff"><span>Strength</span><span>Lowest anxiety. Says what your position means, not just what the number is.</span></div>
+        <div class="tradeoff"><span>Signature</span><span>A sentence above the figures, and no red unless something is genuinely wrong.</span></div>
+        <div class="tradeoff cost"><span>Cost</span><span>Low contrast is harder in sunlight. Softness can read as less serious about money.</span></div>
+        <div class="specimen">
+          <span class="swatch"><i class="chip" style="background:#ECEFE9"></i>#ECEFE9</span>
+          <span class="swatch"><i class="chip" style="background:#DDE6DB"></i>#DDE6DB</span>
+          <span class="swatch"><i class="chip" style="background:#6F8E76"></i>#6F8E76</span>
+          <span class="swatch"><i class="chip" style="background:#A9705C"></i>#A9705C</span>
+          <span class="swatch">Bricolage Grotesque</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail">
+      <div class="rail-inner">
+
+        <div class="screen-wrap">
+          <div class="phone"><div class="glass">
+            <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+            <div class="body">
+              <p class="f-hi">Available to spend</p>
+              <p class="f-amt num"><small>PKR </small>186,961.62</p>
+              <div class="f-reassure">
+                You're <b>well ahead</b> this month — you've spent about a tenth of what came in.
+              </div>
+              <div class="f-pills">
+                <div class="f-pill"><p class="k">Came in</p><p class="v num up">176,800</p></div>
+                <div class="f-pill"><p class="k">Went out</p><p class="v num">19,925</p></div>
+              </div>
+              <p class="f-sec">Where it went</p>
+              <div class="f-cat">
+                <span class="f-ring" style="background:#6F8E76">G</span>
+                <span class="n">Groceries</span><span class="a num">8,420</span>
+              </div>
+              <div class="f-cat">
+                <span class="f-ring" style="background:#A9705C">F</span>
+                <span class="n">Food &amp; dining</span><span class="a num">4,215</span>
+              </div>
+              <div class="f-cat">
+                <span class="f-ring" style="background:#8095A8">T</span>
+                <span class="n">Transport</span><span class="a num">3,100</span>
+              </div>
+            </div>
+            <div class="tabbar">
+              <div class="tab on"><span class="ic"></span>Home</div>
+              <div class="tab"><span class="ic"></span>Ledger</div>
+              <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+              <div class="tab"><span class="ic"></span>Settings</div>
+            </div>
+          </div></div>
+          <p class="screen-label">Home</p>
+        </div>
+
+        <div class="screen-wrap">
+          <div class="phone"><div class="glass">
+            <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+            <div class="body">
+              <p class="f-sec" style="margin-top:18px">Your ledger</p>
+              <p class="f-day">Thursday, 4 September</p>
+              <div class="f-txn">
+                <span class="f-ring" style="background:#6F8E76">I</span>
+                <span class="n">Imtiaz Supermarket<i>Groceries · Meezan Debit</i></span>
+                <span class="a num">−1,060</span>
+              </div>
+              <div class="f-txn">
+                <span class="f-ring" style="background:#A9705C">J</span>
+                <span class="n">Jenpharm Retail<i>Health · UBL Current</i></span>
+                <span class="a num">−2,086</span>
+              </div>
+              <p class="f-day">Tuesday, 2 September</p>
+              <div class="f-txn">
+                <span class="f-ring" style="background:#8095A8">⇄</span>
+                <span class="n">Moved to NayaPay<i>Still your money</i></span>
+                <span class="a num">10,000</span>
+              </div>
+              <div class="f-txn" style="border-bottom:0">
+                <span class="f-ring" style="background:#5E8467">S</span>
+                <span class="n">Salary<i>Income · Meezan Debit</i></span>
+                <span class="a num up">+176,800</span>
+              </div>
+            </div>
+            <div class="tabbar">
+              <div class="tab"><span class="ic"></span>Home</div>
+              <div class="tab on"><span class="ic"></span>Ledger</div>
+              <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+              <div class="tab"><span class="ic"></span>Settings</div>
+            </div>
+          </div></div>
+          <p class="screen-label">Ledger</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ G ============================ -->
+  <section class="direction dir-g">
+    <div class="dir-head">
+      <div>
+        <p class="dir-id">Direction G</p>
+        <h2 class="dir-name">Signal</h2>
+        <p class="dir-thesis">
+          Chart first, always. Every screen opens with the shape of the money before the figures,
+          and each transaction carries a bar showing how big it was against the rest.
+        </p>
+      </div>
+      <div class="tradeoffs">
+        <div class="tradeoff"><span>Strength</span><span>Trend is instant. You see a bad week before you read a single number.</span></div>
+        <div class="tradeoff"><span>Signature</span><span>A 30-day line on Home, and a proportion bar under every ledger row.</span></div>
+        <div class="tradeoff cost"><span>Cost</span><span>Charts need real history to be honest — thin months will look sparse.</span></div>
+        <div class="specimen">
+          <span class="swatch"><i class="chip" style="background:#0F1316"></i>#0F1316</span>
+          <span class="swatch"><i class="chip" style="background:#6FA5B8"></i>#6FA5B8</span>
+          <span class="swatch"><i class="chip" style="background:#C97F63"></i>#C97F63</span>
+          <span class="swatch"><i class="chip" style="background:#C9A961"></i>#C9A961</span>
+          <span class="swatch">Archivo + JetBrains Mono</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail">
+      <div class="rail-inner">
+
+        <div class="screen-wrap">
+          <div class="phone"><div class="glass">
+            <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+            <div class="body">
+              <div class="g-top"><span class="k">Available</span><span class="d">30D</span></div>
+              <p class="g-fig num"><small>PKR</small>186,961.62</p>
+              <p class="g-delta">▲ 156,875 this month</p>
+              <div class="g-chart">
+                <svg viewBox="0 0 240 74" width="100%" height="74" role="img" aria-label="Balance over the last 30 days, rising sharply at the start of September">
+                  <defs>
+                    <linearGradient id="gfill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stop-color="#6FA5B8" stop-opacity=".34"></stop>
+                      <stop offset="100%" stop-color="#6FA5B8" stop-opacity="0"></stop>
+                    </linearGradient>
+                  </defs>
+                  <line x1="0" y1="18" x2="240" y2="18" stroke="#1E262B" stroke-width="1"></line>
+                  <line x1="0" y1="44" x2="240" y2="44" stroke="#1E262B" stroke-width="1"></line>
+                  <path d="M0,64 L34,63 L62,61 L84,60 L104,58 L118,57 L128,16 L152,18 L176,21 L200,24 L222,26 L240,27 L240,74 L0,74 Z" fill="url(#gfill)"></path>
+                  <path d="M0,64 L34,63 L62,61 L84,60 L104,58 L118,57 L128,16 L152,18 L176,21 L200,24 L222,26 L240,27"
+                        fill="none" stroke="#6FA5B8" stroke-width="1.8" stroke-linejoin="round"></path>
+                  <circle cx="240" cy="27" r="3" fill="#6FA5B8"></circle>
+                </svg>
+              </div>
+              <div class="g-legend"><span><i style="background:#6FA5B8"></i>BALANCE</span><span>06 AUG → 05 SEP</span></div>
+              <p class="g-sec">Out this month</p>
+              <div class="g-stack">
+                <i style="background:#6FA5B8;width:42%"></i>
+                <i style="background:#C97F63;width:21%"></i>
+                <i style="background:#C9A961;width:16%"></i>
+                <i style="background:#8C7FB8;width:10%"></i>
+                <i style="background:#3A464C;width:11%"></i>
+              </div>
+              <div class="g-key"><i style="background:#6FA5B8"></i><span>Groceries</span><span class="a">8,420</span></div>
+              <div class="g-key"><i style="background:#C97F63"></i><span>Food &amp; dining</span><span class="a">4,215</span></div>
+              <div class="g-key" style="border-bottom:0"><i style="background:#C9A961"></i><span>Transport</span><span class="a">3,100</span></div>
+            </div>
+            <div class="tabbar">
+              <div class="tab on"><span class="ic"></span>Home</div>
+              <div class="tab"><span class="ic"></span>Ledger</div>
+              <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+              <div class="tab"><span class="ic"></span>Settings</div>
+            </div>
+          </div></div>
+          <p class="screen-label">Home</p>
+        </div>
+
+        <div class="screen-wrap">
+          <div class="phone"><div class="glass">
+            <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+            <div class="body">
+              <div class="g-top"><span class="k">Ledger</span><span class="d">SEP</span></div>
+              <p class="g-sec">04 Sep</p>
+              <div class="g-row">
+                <span class="n">Imtiaz Supermarket<i>Groceries · Meezan</i>
+                  <span class="g-mini"><i style="width:51%"></i></span>
+                </span>
+                <span class="a down">−1,060.00</span>
+              </div>
+              <div class="g-row">
+                <span class="n">Jenpharm Retail<i>Health · UBL</i>
+                  <span class="g-mini"><i style="width:100%"></i></span>
+                </span>
+                <span class="a down">−2,086.20</span>
+              </div>
+              <p class="g-sec">02 Sep</p>
+              <div class="g-row">
+                <span class="n">Account transfer<i>Meezan → NayaPay</i>
+                  <span class="g-mini"><i style="width:38%;background:#6FA5B8"></i></span>
+                </span>
+                <span class="a">10,000.00</span>
+              </div>
+              <div class="g-row">
+                <span class="n">Salary<i>Income · Meezan</i>
+                  <span class="g-mini"><i style="width:100%;background:#6FA5B8"></i></span>
+                </span>
+                <span class="a up">+176,800</span>
+              </div>
+              <p class="g-sec">01 Sep</p>
+              <div class="g-row" style="border-bottom:0">
+                <span class="n">Raast payment<i>Transfer · JazzCash</i>
+                  <span class="g-mini"><i style="width:4%"></i></span>
+                </span>
+                <span class="a down">−80.00</span>
+              </div>
+            </div>
+            <div class="tabbar">
+              <div class="tab"><span class="ic"></span>Home</div>
+              <div class="tab on"><span class="ic"></span>Ledger</div>
+              <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+              <div class="tab"><span class="ic"></span>Settings</div>
+            </div>
+          </div></div>
+          <p class="screen-label">Ledger</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <div class="round-two">
+    <p class="eyebrow">Round three</p>
+    <h2>Three stranger ideas.</h2>
+    <p class="lede" style="margin-bottom:0">
+      Each one takes a real-world object or a way of drawing data and builds the whole app out of it.
+      Home and Insights for each.
+    </p>
+  </div>
+
+  <!-- ============================ H ============================ -->
+  <section class="direction dir-h">
+    <div class="dir-head">
+      <div>
+        <p class="dir-id">Direction H</p>
+        <h2 class="dir-name">Receipt</h2>
+        <p class="dir-thesis">
+          The whole app is a till roll. Dashed rules, right-aligned totals, a torn edge at the
+          bottom of every screen. You already know how to read a receipt — no learning required.
+        </p>
+      </div>
+      <div class="tradeoffs">
+        <div class="tradeoff"><span>Strength</span><span>Instantly familiar. Totals line up because receipts have always lined them up.</span></div>
+        <div class="tradeoff"><span>Signature</span><span>Torn paper edge, dashed separators, and a printed histogram in block characters.</span></div>
+        <div class="tradeoff cost"><span>Cost</span><span>A strong metaphor to commit to. Could tip into novelty if overplayed.</span></div>
+        <div class="specimen">
+          <span class="swatch"><i class="chip" style="background:#F8F6F0"></i>#F8F6F0</span>
+          <span class="swatch"><i class="chip" style="background:#1B1915"></i>#1B1915</span>
+          <span class="swatch"><i class="chip" style="background:#2C6B45"></i>#2C6B45</span>
+          <span class="swatch"><i class="chip" style="background:#A33A2C"></i>#A33A2C</span>
+          <span class="swatch">JetBrains Mono</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail">
+      <div class="rail-inner">
+
+        <div class="screen-wrap">
+          <div class="phone"><div class="glass">
+            <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+            <div class="body">
+              <div class="h-top">
+                <b>SPENDWISE</b>
+                <p>ON-DEVICE · NO CLOUD</p>
+              </div>
+              <div class="h-dash"></div>
+              <p class="h-cap">AVAILABLE TO SPEND</p>
+              <p class="h-big num">186,961.62</p>
+              <p class="h-cap">PKR</p>
+              <div class="h-dash"></div>
+              <div class="h-line"><span>RECEIVED</span><span class="up">+176,800.00</span></div>
+              <div class="h-line"><span>SPENT</span><span class="down">−19,925.20</span></div>
+              <div class="h-solid"></div>
+              <div class="h-tot"><span>NET</span><span>+156,874.80</span></div>
+              <div class="h-dash"></div>
+              <p class="h-cap" style="text-align:left">ACCOUNTS</p>
+              <div class="h-line"><span>MEEZAN ••4821</span><span>177,641.13</span></div>
+              <div class="h-line"><span>NAYAPAY</span><span>10,188.49</span></div>
+              <div class="h-dash"></div>
+              <p class="h-stars">* * * 6 ITEMS PENDING * * *</p>
+              <div class="h-tear"></div>
+            </div>
+            <div class="tabbar">
+              <div class="tab on"><span class="ic"></span>HOME</div>
+              <div class="tab"><span class="ic"></span>ROLL</div>
+              <div class="tab"><span class="ic badge" data-n="6"></span>CHECK</div>
+              <div class="tab"><span class="ic"></span>SETUP</div>
+            </div>
+          </div></div>
+          <p class="screen-label">Home</p>
+        </div>
+
+        <div class="screen-wrap">
+          <div class="phone"><div class="glass">
+            <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+            <div class="body">
+              <div class="h-top">
+                <b>STATEMENT</b>
+                <p>SEP 2025 — SEP 2026</p>
+              </div>
+              <div class="h-dash"></div>
+              <div class="h-line s"><span>PERIOD</span><span>12 MONTHS</span></div>
+              <div class="h-line"><span>TOTAL SPENT</span><span>284,610.00</span></div>
+              <div class="h-line"><span>AVG / MONTH</span><span>23,717.50</span></div>
+              <div class="h-line"><span>VS LAST YEAR</span><span class="up">−12.4%</span></div>
+              <div class="h-dash"></div>
+              <p class="h-cap" style="text-align:left">BY MONTH</p>
+              <div class="h-hist">
+                <span>APR</span><span class="b">████████</span><span class="a">18,240</span>
+                <span>MAY</span><span class="b">███████████</span><span class="a">24,910</span>
+                <span>JUN</span><span class="b">██████</span><span class="a">14,380</span>
+                <span>JUL</span><span class="b">█████████████</span><span class="a">29,050</span>
+                <span>AUG</span><span class="b">████████████</span><span class="a">27,410</span>
+                <span>SEP</span><span class="b">████████</span><span class="a">19,925</span>
+              </div>
+              <div class="h-dash"></div>
+              <p class="h-cap" style="text-align:left">BY CATEGORY</p>
+              <div class="h-line"><span>GROCERIES</span><span>88,230</span></div>
+              <div class="h-line"><span>FOOD &amp; DINING</span><span>54,076</span></div>
+              <div class="h-line"><span>TRANSPORT</span><span>39,845</span></div>
+              <div class="h-line"><span>BILLS</span><span>31,307</span></div>
+              <div class="h-solid"></div>
+              <div class="h-tot"><span>TOTAL</span><span>284,610</span></div>
+              <div class="h-tear"></div>
+            </div>
+            <div class="tabbar">
+              <div class="tab"><span class="ic"></span>HOME</div>
+              <div class="tab on"><span class="ic"></span>ROLL</div>
+              <div class="tab"><span class="ic badge" data-n="6"></span>CHECK</div>
+              <div class="tab"><span class="ic"></span>SETUP</div>
+            </div>
+          </div></div>
+          <p class="screen-label">Insights</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ I ============================ -->
+  <section class="direction dir-i">
+    <div class="dir-head">
+      <div>
+        <p class="dir-id">Direction I</p>
+        <h2 class="dir-name">Small Multiples</h2>
+        <p class="dir-thesis">
+          One big chart hides as much as it shows. This gives every category its own tiny chart
+          on a shared scale, so a habit changing is visible at a glance — not buried in a total.
+        </p>
+      </div>
+      <div class="tradeoffs">
+        <div class="tradeoff"><span>Strength</span><span>The most genuinely useful Insights screen here. You see which category moved, not just that spending moved.</span></div>
+        <div class="tradeoff"><span>Signature</span><span>A grid of sparklines sharing one y-scale, so the cards are honestly comparable.</span></div>
+        <div class="tradeoff cost"><span>Cost</span><span>Needs a year of history to earn its keep. Quiet — no drama anywhere.</span></div>
+        <div class="specimen">
+          <span class="swatch"><i class="chip" style="background:#F4F5F6"></i>#F4F5F6</span>
+          <span class="swatch"><i class="chip" style="background:#24506B"></i>#24506B</span>
+          <span class="swatch"><i class="chip" style="background:#9C4A38"></i>#9C4A38</span>
+          <span class="swatch"><i class="chip" style="background:#16181A"></i>#16181A</span>
+          <span class="swatch">Archivo</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail">
+      <div class="rail-inner">
+
+        <div class="screen-wrap">
+          <div class="phone"><div class="glass">
+            <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+            <div class="body">
+              <div class="i-top">
+                <p class="i-lab">Available to spend</p>
+                <p class="i-fig num"><small>PKR</small>186,961.62</p>
+                <p class="i-note">Kept 88.7% of income · 12-month average 71.2%</p>
+              </div>
+              <p class="i-scale">This month vs your usual</p>
+              <div class="i-row"><span>Groceries</span><span class="a">8,420</span><span class="d up">−9%</span></div>
+              <div class="i-row"><span>Food &amp; dining</span><span class="a">4,215</span><span class="d down">+34%</span></div>
+              <div class="i-row"><span>Transport</span><span class="a">3,100</span><span class="d up">−6%</span></div>
+              <div class="i-row"><span>Bills</span><span class="a">2,090</span><span class="d">0%</span></div>
+              <div class="i-row" style="border-bottom:0"><span>Health</span><span class="a">2,086</span><span class="d down">+112%</span></div>
+              <p class="i-scale" style="padding-bottom:4px">Accounts</p>
+              <div class="i-row" style="grid-template-columns:1fr auto"><span>Meezan Debit ••4821</span><span class="a">177,641.13</span></div>
+              <div class="i-row" style="grid-template-columns:1fr auto;border-bottom:0"><span>NayaPay</span><span class="a">10,188.49</span></div>
+            </div>
+            <div class="tabbar">
+              <div class="tab on"><span class="ic"></span>Home</div>
+              <div class="tab"><span class="ic"></span>Ledger</div>
+              <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+              <div class="tab"><span class="ic"></span>Settings</div>
+            </div>
+          </div></div>
+          <p class="screen-label">Home</p>
+        </div>
+
+        <div class="screen-wrap">
+          <div class="phone"><div class="glass">
+            <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+            <div class="body">
+              <div class="i-top">
+                <p class="i-lab">Spent · last 12 months</p>
+                <p class="i-fig num"><small>PKR</small>284,610</p>
+                <p class="i-note">23,718 a month on average · 12.4% less than last year</p>
+              </div>
+              <p class="i-scale">Every category, same scale</p>
+              <div class="sm-grid">
+                <div class="sm">
+                  <p class="k">Groceries</p><p class="v num">88,230</p>
+                  <svg viewBox="0 0 100 26" width="100%" height="26" role="img" aria-label="Groceries steady across the year">
+                    <polyline points="0,14 14,13 28,15 42,12 56,14 70,13 84,15 100,14" fill="none" stroke="#24506B" stroke-width="2"></polyline>
+                  </svg>
+                  <p class="t up">steady</p>
+                </div>
+                <div class="sm">
+                  <p class="k">Food &amp; dining</p><p class="v num">54,076</p>
+                  <svg viewBox="0 0 100 26" width="100%" height="26" role="img" aria-label="Food and dining rising through the year">
+                    <polyline points="0,22 14,21 28,19 42,17 56,14 70,11 84,8 100,5" fill="none" stroke="#9C4A38" stroke-width="2"></polyline>
+                  </svg>
+                  <p class="t down">rising</p>
+                </div>
+                <div class="sm">
+                  <p class="k">Transport</p><p class="v num">39,845</p>
+                  <svg viewBox="0 0 100 26" width="100%" height="26" role="img" aria-label="Transport falling through the year">
+                    <polyline points="0,8 14,10 28,12 42,13 56,15 70,17 84,18 100,20" fill="none" stroke="#24506B" stroke-width="2"></polyline>
+                  </svg>
+                  <p class="t up">falling</p>
+                </div>
+                <div class="sm">
+                  <p class="k">Bills</p><p class="v num">31,307</p>
+                  <svg viewBox="0 0 100 26" width="100%" height="26" role="img" aria-label="Bills flat across the year">
+                    <polyline points="0,16 14,16 28,15 42,16 56,16 70,15 84,16 100,16" fill="none" stroke="#24506B" stroke-width="2"></polyline>
+                  </svg>
+                  <p class="t">flat</p>
+                </div>
+                <div class="sm">
+                  <p class="k">Health</p><p class="v num">28,940</p>
+                  <svg viewBox="0 0 100 26" width="100%" height="26" role="img" aria-label="Health spiking in the last two months">
+                    <polyline points="0,21 14,21 28,20 42,21 56,20 70,19 84,10 100,3" fill="none" stroke="#9C4A38" stroke-width="2"></polyline>
+                  </svg>
+                  <p class="t down">spiking</p>
+                </div>
+                <div class="sm">
+                  <p class="k">Shopping</p><p class="v num">22,410</p>
+                  <svg viewBox="0 0 100 26" width="100%" height="26" role="img" aria-label="Shopping spiky but averaging down">
+                    <polyline points="0,12 14,20 28,9 42,21 56,11 70,19 84,14 100,18" fill="none" stroke="#24506B" stroke-width="2"></polyline>
+                  </svg>
+                  <p class="t up">erratic</p>
+                </div>
+              </div>
+            </div>
+            <div class="tabbar">
+              <div class="tab"><span class="ic"></span>Home</div>
+              <div class="tab"><span class="ic"></span>Ledger</div>
+              <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+              <div class="tab on"><span class="ic"></span>Insights</div>
+            </div>
+          </div></div>
+          <p class="screen-label">Insights</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ J ============================ -->
+  <section class="direction dir-j">
+    <div class="dir-head">
+      <div>
+        <p class="dir-id">Direction J</p>
+        <h2 class="dir-name">River</h2>
+        <p class="dir-thesis">
+          Money as a current, not a list. One spine down the middle of the screen: what came in
+          branches left, what went out branches right, and Insights shows the stream widening
+          and narrowing across the year.
+        </p>
+      </div>
+      <div class="tradeoffs">
+        <div class="tradeoff"><span>Strength</span><span>In and out are separated by position, so direction reads before any colour or sign does.</span></div>
+        <div class="tradeoff"><span>Signature</span><span>A centre spine with events branching either side; a stream graph for the year.</span></div>
+        <div class="tradeoff cost"><span>Cost</span><span>Halves the width available for merchant names. Most unusual to learn.</span></div>
+        <div class="specimen">
+          <span class="swatch"><i class="chip" style="background:#0A1416"></i>#0A1416</span>
+          <span class="swatch"><i class="chip" style="background:#4FB3A6"></i>#4FB3A6</span>
+          <span class="swatch"><i class="chip" style="background:#D08A6A"></i>#D08A6A</span>
+          <span class="swatch"><i class="chip" style="background:#DCE9E7"></i>#DCE9E7</span>
+          <span class="swatch">Archivo</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail">
+      <div class="rail-inner">
+
+        <div class="screen-wrap">
+          <div class="phone"><div class="glass">
+            <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+            <div class="body">
+              <div class="j-top">
+                <p class="j-lab">Available to spend</p>
+                <p class="j-fig num"><small>PKR</small>186,961.62</p>
+              </div>
+              <div class="j-head" style="margin-top:14px"><span>In</span><span>Out</span></div>
+              <div class="j-spine">
+                <div class="j-node in">
+                  <span class="side l">
+                    <span class="n">Salary</span>
+                    <span class="s">Meezan · 02 Sep</span>
+                    <span class="v up">176,800</span>
+                  </span>
+                  <span class="rail"><i class="dot"></i></span>
+                  <span class="side r j-empty">.</span>
+                </div>
+                <div class="j-node out">
+                  <span class="side l j-empty">.</span>
+                  <span class="rail"><i class="dot"></i></span>
+                  <span class="side r">
+                    <span class="n">Jenpharm Retail</span>
+                    <span class="s">Health · UBL</span>
+                    <span class="v down">2,086</span>
+                  </span>
+                </div>
+                <div class="j-node out">
+                  <span class="side l j-empty">.</span>
+                  <span class="rail"><i class="dot"></i></span>
+                  <span class="side r">
+                    <span class="n">Imtiaz</span>
+                    <span class="s">Groceries · Meezan</span>
+                    <span class="v down">1,060</span>
+                  </span>
+                </div>
+                <div class="j-node">
+                  <span class="side l">
+                    <span class="n">NayaPay</span>
+                    <span class="s">own account</span>
+                    <span class="v">10,000</span>
+                  </span>
+                  <span class="rail"><i class="dot"></i></span>
+                  <span class="side r">
+                    <span class="n">Meezan</span>
+                    <span class="s">own account</span>
+                    <span class="v">10,000</span>
+                  </span>
+                </div>
+                <div class="j-node out">
+                  <span class="side l j-empty">.</span>
+                  <span class="rail"><i class="dot"></i></span>
+                  <span class="side r">
+                    <span class="n">Raast</span>
+                    <span class="s">JazzCash · 01 Sep</span>
+                    <span class="v down">80</span>
+                  </span>
+                </div>
+              </div>
+              <div class="j-leg">
+                <span><i style="background:var(--s-up)"></i>In</span>
+                <span><i style="background:var(--s-down)"></i>Out</span>
+                <span><i style="background:var(--s-dim)"></i>Own accounts</span>
+              </div>
+            </div>
+            <div class="tabbar">
+              <div class="tab on"><span class="ic"></span>Flow</div>
+              <div class="tab"><span class="ic"></span>Ledger</div>
+              <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+              <div class="tab"><span class="ic"></span>Insights</div>
+            </div>
+          </div></div>
+          <p class="screen-label">Home · the flow</p>
+        </div>
+
+        <div class="screen-wrap">
+          <div class="phone"><div class="glass">
+            <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+            <div class="body">
+              <div class="j-top">
+                <p class="j-lab">The year, as a current</p>
+                <p class="j-fig num"><small>PKR</small>284,610<span style="font-size:12px;color:var(--s-dim);font-weight:500"> out</span></p>
+              </div>
+              <div style="margin-top:16px">
+                <svg viewBox="0 0 240 132" width="100%" height="132" role="img"
+                     aria-label="Stream graph of spending by category across twelve months, widest in July">
+                  <path d="M0,66 C30,64 50,58 70,56 C100,52 130,40 160,44 C190,48 215,58 240,60 L240,72 C215,74 190,84 160,88 C130,92 100,80 70,76 C50,74 30,68 0,66 Z"
+                        fill="#4FB3A6" opacity=".85"></path>
+                  <path d="M0,54 C30,52 50,44 70,42 C100,38 130,22 160,28 C190,34 215,46 240,48 L240,60 C215,58 190,48 160,44 C130,40 100,52 70,56 C50,58 30,64 0,66 Z"
+                        fill="#D08A6A" opacity=".8"></path>
+                  <path d="M0,44 C30,42 50,34 70,31 C100,27 130,10 160,17 C190,24 215,37 240,39 L240,48 C215,46 190,34 160,28 C130,22 100,38 70,42 C50,44 30,52 0,54 Z"
+                        fill="#D0B06A" opacity=".75"></path>
+                  <path d="M0,72 C30,74 50,80 70,84 C100,90 130,102 160,98 C190,94 215,84 240,82 L240,92 C215,94 190,104 160,108 C130,112 100,100 70,94 C50,90 30,80 0,78 Z"
+                        fill="#6A8FD0" opacity=".7"></path>
+                  <line x1="0" y1="126" x2="240" y2="126" stroke="#16262A" stroke-width="1"></line>
+                </svg>
+                <div style="display:flex;justify-content:space-between;font-size:8.5px;color:var(--s-dim);letter-spacing:.1em">
+                  <span>OCT</span><span>JAN</span><span>APR</span><span>JUL</span><span>SEP</span>
+                </div>
+              </div>
+              <p class="j-sec">Widest month</p>
+              <div class="j-head" style="border-bottom:0;padding-bottom:2px"><span>July</span><span class="num" style="color:var(--s-ink)">29,050</span></div>
+              <p class="j-sec">By category</p>
+              <div class="j-leg" style="display:grid;gap:9px;margin-top:0">
+                <span><i style="background:#4FB3A6"></i>Groceries <b style="color:var(--s-ink);float:right">88,230</b></span>
+                <span><i style="background:#D08A6A"></i>Food &amp; dining <b style="color:var(--s-ink);float:right">54,076</b></span>
+                <span><i style="background:#D0B06A"></i>Transport <b style="color:var(--s-ink);float:right">39,845</b></span>
+                <span><i style="background:#6A8FD0"></i>Bills <b style="color:var(--s-ink);float:right">31,307</b></span>
+              </div>
+            </div>
+            <div class="tabbar">
+              <div class="tab"><span class="ic"></span>Flow</div>
+              <div class="tab"><span class="ic"></span>Ledger</div>
+              <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+              <div class="tab on"><span class="ic"></span>Insights</div>
+            </div>
+          </div></div>
+          <p class="screen-label">Insights · the year</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== Insights, every direction ==================== -->
+  <div class="round-two">
+    <p class="eyebrow">Same screen, seven ways</p>
+    <h2>Insights, compared directly.</h2>
+    <p class="lede" style="margin-bottom:0">
+      Your densest screen — twelve months of spend, an average, a year-on-year change,
+      and a category breakdown — drawn in each of the first seven languages.
+    </p>
+  </div>
+
+  <div class="rail" style="margin-bottom:88px">
+    <div class="rail-inner">
+
+      <!-- A -->
+      <div class="screen-wrap dir-a">
+        <div class="phone"><div class="glass">
+          <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+          <div class="body">
+            <div class="a-top" style="padding-bottom:0">
+              <p class="a-kicker">Insights</p>
+              <p class="a-balance" style="font-size:26px"><small>PKR</small><span class="num">284,610</span></p>
+              <p class="a-sub" style="color:var(--s-dim)">Spent over the last 12 months</p>
+            </div>
+            <div class="seg"><span>Days</span><span class="on">Months</span><span>Years</span></div>
+            <div class="cols">
+              <i style="height:48%"></i><i style="height:62%"></i><i style="height:40%"></i>
+              <i style="height:71%"></i><i style="height:55%"></i><i style="height:35%"></i>
+              <i style="height:60%"></i><i style="height:82%"></i><i style="height:44%"></i>
+              <i style="height:90%"></i><i style="height:78%"></i><i class="on" style="height:52%"></i>
+            </div>
+            <div class="xax"><span>OCT</span><span>JAN</span><span>APR</span><span>JUL</span><span>SEP</span></div>
+            <dl class="a-split" style="margin-top:16px">
+              <div><dt>Average / mo</dt><dd class="num">23,718</dd></div>
+              <div><dt>vs last year</dt><dd class="num up">−12.4%</dd></div>
+            </dl>
+            <p class="sec">Where it went</p>
+            <div class="catrow">
+              <div class="catline"><b>Groceries</b><span class="num">88,230</span></div>
+              <div class="bar"><i style="width:100%"></i></div>
+            </div>
+            <div class="catrow">
+              <div class="catline"><b>Food &amp; dining</b><span class="num">54,076</span></div>
+              <div class="bar"><i style="width:61%"></i></div>
+            </div>
+          </div>
+          <div class="tabbar">
+            <div class="tab"><span class="ic"></span>Home</div>
+            <div class="tab"><span class="ic"></span>Ledger</div>
+            <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+            <div class="tab on"><span class="ic"></span>Insights</div>
+          </div>
+        </div></div>
+        <p class="screen-label">A · Ledger Paper</p>
+      </div>
+
+      <!-- B -->
+      <div class="screen-wrap dir-b">
+        <div class="phone"><div class="glass">
+          <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+          <div class="body">
+            <div class="b-head"><b>Insights</b><span>12M</span></div>
+            <div class="seg"><span>DAY</span><span class="on">MON</span><span>YR</span></div>
+            <div class="b-block" style="padding-top:0">
+              <p class="b-lab">Total out</p>
+              <p class="b-big num">284,610<span>PKR</span></p>
+              <div class="b-flow">
+                <div><span class="k">Avg/mo</span><span class="num">23,718</span></div>
+                <div><span class="k">YoY</span><span class="num up">−12.4%</span></div>
+                <div><span class="k">Peak</span><span class="num">JUL</span></div>
+              </div>
+            </div>
+            <p class="b-day">— BY MONTH</p>
+            <div class="ascii">
+              <div><span class="m">APR</span><span class="bar">████████</span><span class="amt">18,240</span></div>
+              <div><span class="m">MAY</span><span class="bar">███████████</span><span class="amt">24,910</span></div>
+              <div><span class="m">JUN</span><span class="bar">██████</span><span class="amt">14,380</span></div>
+              <div><span class="m">JUL</span><span class="bar">█████████████</span><span class="amt">29,050</span></div>
+              <div><span class="m">AUG</span><span class="bar">████████████</span><span class="amt">27,410</span></div>
+              <div><span class="m">SEP</span><span class="bar">████████</span><span class="amt">19,925</span></div>
+            </div>
+            <div class="tablehead"><span>Category</span><span class="r">Total</span><span class="r">%</span></div>
+            <div class="trow"><span>GROCERIES</span><span class="r num">88,230</span><span class="pct num">31</span></div>
+            <div class="trow"><span>FOOD</span><span class="r num">54,076</span><span class="pct num">19</span></div>
+            <div class="trow" style="border-bottom:0"><span>TRANSPORT</span><span class="r num">39,845</span><span class="pct num">14</span></div>
+          </div>
+          <div class="tabbar">
+            <div class="tab"><span class="ic"></span>HOME</div>
+            <div class="tab"><span class="ic"></span>LEDGER</div>
+            <div class="tab"><span class="ic badge" data-n="6"></span>REVIEW</div>
+            <div class="tab on"><span class="ic"></span>STATS</div>
+          </div>
+        </div></div>
+        <p class="screen-label">B · Terminal</p>
+      </div>
+
+      <!-- C -->
+      <div class="screen-wrap dir-c">
+        <div class="phone"><div class="glass">
+          <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+          <div class="body">
+            <p class="c-sec" style="margin:14px 0 8px">The year in spending</p>
+            <div class="seg"><span>Days</span><span class="on">Months</span><span>Years</span></div>
+            <div style="display:flex;align-items:center;gap:16px">
+              <svg viewBox="0 0 42 42" width="106" height="106" role="img"
+                   aria-label="Category share: groceries 31 percent, food 19, transport 14, bills 11, other 25">
+                <circle cx="21" cy="21" r="15.9" fill="none" stroke="#262A33" stroke-width="6"></circle>
+                <circle cx="21" cy="21" r="15.9" fill="none" stroke="#6E8C68" stroke-width="6"
+                        stroke-dasharray="31 69" stroke-dashoffset="25"></circle>
+                <circle cx="21" cy="21" r="15.9" fill="none" stroke="#C1663F" stroke-width="6"
+                        stroke-dasharray="19 81" stroke-dashoffset="-6"></circle>
+                <circle cx="21" cy="21" r="15.9" fill="none" stroke="#4A5A8C" stroke-width="6"
+                        stroke-dasharray="14 86" stroke-dashoffset="-25"></circle>
+                <circle cx="21" cy="21" r="15.9" fill="none" stroke="#C9A227" stroke-width="6"
+                        stroke-dasharray="11 89" stroke-dashoffset="-39"></circle>
+              </svg>
+              <div>
+                <p class="c-eye">Total out</p>
+                <p class="c-amt num" style="font-size:24px;margin:6px 0 2px">284,610</p>
+                <p class="c-meta">23,718 a month</p>
+                <p class="c-meta" style="color:var(--s-up)">12.4% less than last year</p>
+              </div>
+            </div>
+            <div class="c-legend" style="margin-top:18px">
+              <div class="c-leg"><i style="background:var(--c2)"></i><span>Groceries</span><b class="num">88,230</b></div>
+              <div class="c-leg"><i style="background:var(--c1)"></i><span>Food &amp; dining</span><b class="num">54,076</b></div>
+              <div class="c-leg"><i style="background:var(--c3)"></i><span>Transport</span><b class="num">39,845</b></div>
+              <div class="c-leg"><i style="background:var(--c4)"></i><span>Bills</span><b class="num">31,307</b></div>
+              <div class="c-leg"><i style="background:var(--c5)"></i><span>Everything else</span><b class="num">71,152</b></div>
+            </div>
+          </div>
+          <div class="tabbar">
+            <div class="tab"><span class="ic"></span>Home</div>
+            <div class="tab"><span class="ic"></span>Ledger</div>
+            <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+            <div class="tab on"><span class="ic"></span>Insights</div>
+          </div>
+        </div></div>
+        <p class="screen-label">C · Editorial</p>
+      </div>
+
+      <!-- D -->
+      <div class="screen-wrap dir-d">
+        <div class="phone"><div class="glass">
+          <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+          <div class="body">
+            <div class="d-head"><b>Summary</b><span>12 months</span></div>
+            <div class="seg"><span>Days</span><span class="on">Months</span><span>Years</span></div>
+            <div class="d-cols"><span>Month</span><span>Out</span><span>%</span></div>
+            <div class="d-line"><span>April</span><span class="num">18,240</span><span class="num">6</span></div>
+            <div class="d-line"><span>May</span><span class="num">24,910</span><span class="num">9</span></div>
+            <div class="d-line"><span>June</span><span class="num">14,380</span><span class="num">5</span></div>
+            <div class="d-line"><span>July</span><span class="num">29,050</span><span class="num">10</span></div>
+            <div class="d-line"><span>August</span><span class="num">27,410</span><span class="num">10</span></div>
+            <div class="d-line"><span>September</span><span class="num">19,925</span><span class="num">7</span></div>
+            <div class="d-foot"><span>Year total</span><span class="num">284,610</span><span>100</span></div>
+            <div class="d-cols" style="border-bottom:1px solid var(--s-ink)"><span>Statistic</span><span>Value</span><span></span></div>
+            <div class="d-line"><span>Average / month</span><span class="num">23,717.50</span><span></span></div>
+            <div class="d-line"><span>Highest month</span><span class="num">29,050.00</span><span></span></div>
+            <div class="d-line"><span>vs prior year</span><span class="num cr">−12.4%</span><span></span></div>
+          </div>
+          <div class="tabbar">
+            <div class="tab"><span class="ic"></span>Home</div>
+            <div class="tab"><span class="ic"></span>Ledger</div>
+            <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+            <div class="tab on"><span class="ic"></span>Summary</div>
+          </div>
+        </div></div>
+        <p class="screen-label">D · Green Bar</p>
+      </div>
+
+      <!-- E -->
+      <div class="screen-wrap dir-e">
+        <div class="phone"><div class="glass">
+          <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+          <div class="body">
+            <p class="e-mark">Insights</p>
+            <p class="e-lab" style="margin-top:38px">You spend, on average</p>
+            <p class="e-huge num"><span class="e-cur">PKR PER MONTH</span>23,718</p>
+            <p class="e-note">That is 12.4% less than the year before. July was your heaviest month.</p>
+            <div class="e-spark">
+              <i style="height:48%"></i><i style="height:62%"></i><i style="height:40%"></i>
+              <i style="height:71%"></i><i style="height:55%"></i><i style="height:35%"></i>
+              <i style="height:60%"></i><i style="height:82%"></i><i style="height:44%"></i>
+              <i class="on" style="height:100%"></i><i style="height:78%"></i><i style="height:52%"></i>
+            </div>
+            <div class="e-mini"><span>OCT</span><span>JUL</span><span>SEP</span></div>
+          </div>
+          <div class="tabbar">
+            <div class="tab">Balance</div>
+            <div class="tab">Ledger</div>
+            <div class="tab">Review</div>
+            <div class="tab on">Insights</div>
+          </div>
+        </div></div>
+        <p class="screen-label">E · Statement</p>
+      </div>
+
+      <!-- F -->
+      <div class="screen-wrap dir-f">
+        <div class="phone"><div class="glass">
+          <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+          <div class="body">
+            <p class="f-sec" style="margin-top:18px">Your year so far</p>
+            <div class="f-reassure" style="margin-top:0">
+              You spent less than your usual in <b>7 of the last 12 months</b>. July was the outlier.
+            </div>
+            <div class="seg"><span>Days</span><span class="on">Months</span><span>Years</span></div>
+            <div class="f-bars">
+              <i style="height:48%"></i><i style="height:62%"></i><i style="height:40%"></i>
+              <i style="height:71%"></i><i style="height:55%"></i><i style="height:35%"></i>
+              <i style="height:60%"></i><i class="on" style="height:100%"></i><i style="height:44%"></i>
+              <i style="height:90%"></i><i style="height:78%"></i><i style="height:52%"></i>
+            </div>
+            <div class="f-pills" style="margin-top:16px">
+              <div class="f-pill"><p class="k">A month, usually</p><p class="v num">23,718</p></div>
+              <div class="f-pill"><p class="k">vs last year</p><p class="v num up">−12.4%</p></div>
+            </div>
+            <p class="f-sec">Biggest habits</p>
+            <div class="f-cat">
+              <span class="f-ring" style="background:#6F8E76">G</span>
+              <span class="n">Groceries</span><span class="a num">88,230</span>
+            </div>
+            <div class="f-cat">
+              <span class="f-ring" style="background:#A9705C">F</span>
+              <span class="n">Food &amp; dining</span><span class="a num">54,076</span>
+            </div>
+          </div>
+          <div class="tabbar">
+            <div class="tab"><span class="ic"></span>Home</div>
+            <div class="tab"><span class="ic"></span>Ledger</div>
+            <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+            <div class="tab on"><span class="ic"></span>Insights</div>
+          </div>
+        </div></div>
+        <p class="screen-label">F · Calm</p>
+      </div>
+
+      <!-- G -->
+      <div class="screen-wrap dir-g">
+        <div class="phone"><div class="glass">
+          <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+          <div class="body">
+            <div class="g-top"><span class="k">Spent · 12 months</span><span class="d">12M</span></div>
+            <p class="g-fig num"><small>PKR</small>284,610</p>
+            <p class="g-delta">▼ 12.4% vs last year</p>
+            <div class="seg"><span>30D</span><span>6M</span><span class="on">12M</span><span>ALL</span></div>
+            <div class="g-group">
+              <span class="pair"><i style="height:48%;background:#6FA5B8"></i><i style="height:30%;background:#C97F63"></i></span>
+              <span class="pair"><i style="height:62%;background:#6FA5B8"></i><i style="height:41%;background:#C97F63"></i></span>
+              <span class="pair"><i style="height:40%;background:#6FA5B8"></i><i style="height:26%;background:#C97F63"></i></span>
+              <span class="pair"><i style="height:71%;background:#6FA5B8"></i><i style="height:52%;background:#C97F63"></i></span>
+              <span class="pair"><i style="height:55%;background:#6FA5B8"></i><i style="height:38%;background:#C97F63"></i></span>
+              <span class="pair"><i style="height:35%;background:#6FA5B8"></i><i style="height:22%;background:#C97F63"></i></span>
+              <span class="pair"><i style="height:82%;background:#6FA5B8"></i><i style="height:61%;background:#C97F63"></i></span>
+              <span class="pair"><i style="height:100%;background:#6FA5B8"></i><i style="height:74%;background:#C97F63"></i></span>
+              <span class="pair"><i style="height:52%;background:#6FA5B8"></i><i style="height:33%;background:#C97F63"></i></span>
+            </div>
+            <div class="g-legend">
+              <span><i style="background:#6FA5B8"></i>IN</span>
+              <span><i style="background:#C97F63"></i>OUT</span>
+              <span>JAN → SEP</span>
+            </div>
+            <p class="g-sec">Share of spending</p>
+            <div class="g-stack">
+              <i style="background:#6FA5B8;width:31%"></i>
+              <i style="background:#C97F63;width:19%"></i>
+              <i style="background:#C9A961;width:14%"></i>
+              <i style="background:#8C7FB8;width:11%"></i>
+              <i style="background:#3A464C;width:25%"></i>
+            </div>
+            <div class="g-key"><i style="background:#6FA5B8"></i><span>Groceries</span><span class="a">88,230</span></div>
+            <div class="g-key"><i style="background:#C97F63"></i><span>Food &amp; dining</span><span class="a">54,076</span></div>
+            <div class="g-key" style="border-bottom:0"><i style="background:#C9A961"></i><span>Transport</span><span class="a">39,845</span></div>
+          </div>
+          <div class="tabbar">
+            <div class="tab"><span class="ic"></span>Home</div>
+            <div class="tab"><span class="ic"></span>Ledger</div>
+            <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+            <div class="tab on"><span class="ic"></span>Insights</div>
+          </div>
+        </div></div>
+        <p class="screen-label">G · Signal</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ==================== Accounts, every direction ==================== -->
+  <div class="round-two">
+    <p class="eyebrow">Same screen, seven ways</p>
+    <h2>Accounts, compared directly.</h2>
+    <p class="lede" style="margin-bottom:0">
+      The screen that now decides everything else: which apps and SMS senders feed which account.
+      Each one shows the attached sources, because that mapping is what makes routing work.
+    </p>
+  </div>
+
+  <div class="rail" style="margin-bottom:88px">
+    <div class="rail-inner">
+
+      <!-- A -->
+      <div class="screen-wrap dir-a">
+        <div class="phone"><div class="glass">
+          <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+          <div class="body">
+            <div class="a-top" style="padding-bottom:2px">
+              <p class="a-kicker">Total tracked</p>
+              <p class="a-balance" style="font-size:26px"><small>PKR</small><span class="num">437,829.62</span></p>
+            </div>
+            <p class="sec">Everyday</p>
+            <div class="txn">
+              <b>Meezan Debit</b>
+              <span class="amt num">177,641.13</span>
+              <span class="meta">Bank ••4821 · SMS “Meezan” + app</span>
+            </div>
+            <div class="txn">
+              <b>NayaPay</b>
+              <span class="amt num">10,188.49</span>
+              <span class="meta">Wallet · app</span>
+            </div>
+            <p class="sec">Kept separate</p>
+            <div class="txn">
+              <b>Meezan Savings</b>
+              <span class="amt num">250,000.00</span>
+              <span class="meta">Bank ••7734 · not counted as spendable</span>
+            </div>
+            <p class="sec">Not linked yet</p>
+            <div class="txn" style="border-bottom:0">
+              <b>UBL Current</b>
+              <span class="amt num dim">—</span>
+              <span class="meta">Add last digits to route its SMS</span>
+            </div>
+            <div class="acts" style="margin-top:16px">
+              <div class="btn s">Import</div>
+              <div class="btn p">Add account</div>
+            </div>
+          </div>
+          <div class="tabbar">
+            <div class="tab"><span class="ic"></span>Home</div>
+            <div class="tab"><span class="ic"></span>Ledger</div>
+            <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+            <div class="tab on"><span class="ic"></span>Accounts</div>
+          </div>
+        </div></div>
+        <p class="screen-label">A · Ledger Paper</p>
+      </div>
+
+      <!-- B -->
+      <div class="screen-wrap dir-b">
+        <div class="phone"><div class="glass">
+          <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+          <div class="body">
+            <div class="b-head"><b>Accounts</b><span>4 CONFIGURED</span></div>
+            <div class="b-block" style="padding-top:12px">
+              <p class="b-lab">Total tracked</p>
+              <p class="b-big num">437,829.62<span>PKR</span></p>
+            </div>
+            <div class="tablehead" style="grid-template-columns:1fr 90px"><span>Account</span><span class="r">Balance</span></div>
+            <div class="trow" style="grid-template-columns:1fr 90px">
+              <span>MEEZAN DEBIT<br><span class="meta">••4821 · SMS+APP</span></span>
+              <span class="r num">177,641.13</span>
+            </div>
+            <div class="trow" style="grid-template-columns:1fr 90px">
+              <span>NAYAPAY<br><span class="meta">WALLET · APP</span></span>
+              <span class="r num">10,188.49</span>
+            </div>
+            <div class="trow" style="grid-template-columns:1fr 90px">
+              <span>MEEZAN SAVINGS<br><span class="meta">••7734 · EXCLUDED</span></span>
+              <span class="r num">250,000.00</span>
+            </div>
+            <div class="trow" style="grid-template-columns:1fr 90px;border-bottom:0">
+              <span>UBL CURRENT<br><span class="meta" style="color:var(--s-warn)">NO SUFFIX — UNROUTED</span></span>
+              <span class="r num dim">—</span>
+            </div>
+            <div class="b-acts" style="margin-top:16px">
+              <div class="b-btn">IMPORT</div>
+              <div class="b-btn p">+ ACCOUNT</div>
+            </div>
+          </div>
+          <div class="tabbar">
+            <div class="tab"><span class="ic"></span>HOME</div>
+            <div class="tab"><span class="ic"></span>LEDGER</div>
+            <div class="tab"><span class="ic badge" data-n="6"></span>REVIEW</div>
+            <div class="tab on"><span class="ic"></span>ACCTS</div>
+          </div>
+        </div></div>
+        <p class="screen-label">B · Terminal</p>
+      </div>
+
+      <!-- C -->
+      <div class="screen-wrap dir-c">
+        <div class="phone"><div class="glass">
+          <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+          <div class="body">
+            <div class="c-hero">
+              <p class="c-eye">Total tracked</p>
+              <p class="c-amt num" style="font-size:28px"><small>PKR </small>437,829.62</p>
+              <p class="c-meta">Across four accounts, three linked</p>
+            </div>
+            <p class="c-sec">Everyday</p>
+            <div class="c-txn">
+              <span class="c-ic" style="background:rgba(110,140,104,.22);color:var(--c2)">M</span>
+              <span><span class="n">Meezan Debit</span><span class="s">••4821 · SMS “Meezan” + app</span></span>
+              <span class="a num">177,641</span>
+            </div>
+            <div class="c-txn">
+              <span class="c-ic" style="background:rgba(74,90,140,.26);color:var(--c3)">N</span>
+              <span><span class="n">NayaPay</span><span class="s">Wallet · app</span></span>
+              <span class="a num">10,188</span>
+            </div>
+            <p class="c-sec">Kept separate</p>
+            <div class="c-txn">
+              <span class="c-ic" style="background:rgba(201,162,39,.2);color:var(--c4)">S</span>
+              <span><span class="n">Meezan Savings</span><span class="s">••7734 · not spendable</span></span>
+              <span class="a num">250,000</span>
+            </div>
+            <div class="c-card" style="margin-top:14px">
+              <h4>One account isn't linked</h4>
+              <p>UBL Current has no last digits saved, so its SMS can't be routed to it yet.</p>
+              <div class="c-acts">
+                <div class="c-btn s">Later</div>
+                <div class="c-btn p">Add digits</div>
+              </div>
+            </div>
+          </div>
+          <div class="tabbar">
+            <div class="tab"><span class="ic"></span>Home</div>
+            <div class="tab"><span class="ic"></span>Ledger</div>
+            <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+            <div class="tab on"><span class="ic"></span>Accounts</div>
+          </div>
+        </div></div>
+        <p class="screen-label">C · Editorial</p>
+      </div>
+
+      <!-- D -->
+      <div class="screen-wrap dir-d">
+        <div class="phone"><div class="glass">
+          <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+          <div class="body">
+            <div class="d-head"><b>Accounts</b><span>4 on file</span></div>
+            <div class="d-cols"><span>Account</span><span>Balance</span><span>Src</span></div>
+            <div class="d-line">
+              <span>Meezan Debit<br><span class="d-sub">Bank ••4821</span></span>
+              <span class="num">177,641.13</span><span class="num">2</span>
+            </div>
+            <div class="d-line">
+              <span>NayaPay<br><span class="d-sub">Wallet</span></span>
+              <span class="num">10,188.49</span><span class="num">1</span>
+            </div>
+            <div class="d-line">
+              <span>Meezan Savings<br><span class="d-sub">Bank ••7734 · excluded</span></span>
+              <span class="num">250,000.00</span><span class="num">1</span>
+            </div>
+            <div class="d-line">
+              <span>UBL Current<br><span class="d-sub">No suffix on file</span></span>
+              <span class="num">—</span><span class="num">0</span>
+            </div>
+            <div class="d-foot"><span>Total tracked</span><span class="num">437,829.62</span><span>4</span></div>
+            <span class="d-stamp">1 account unrouted</span>
+          </div>
+          <div class="tabbar">
+            <div class="tab"><span class="ic"></span>Home</div>
+            <div class="tab"><span class="ic"></span>Ledger</div>
+            <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+            <div class="tab on"><span class="ic"></span>Accounts</div>
+          </div>
+        </div></div>
+        <p class="screen-label">D · Green Bar</p>
+      </div>
+
+      <!-- E -->
+      <div class="screen-wrap dir-e">
+        <div class="phone"><div class="glass">
+          <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+          <div class="body">
+            <p class="e-mark">Accounts</p>
+            <p class="e-lab" style="margin-top:34px">Total tracked</p>
+            <p class="e-huge num" style="font-size:34px"><span class="e-cur">PKR</span>437,829</p>
+            <p class="e-day">Everyday</p>
+            <div class="e-row">
+              <span class="n">Meezan Debit<i>••4821 · SMS and app</i></span>
+              <span class="v num">177,641</span>
+            </div>
+            <div class="e-row">
+              <span class="n">NayaPay<i>Wallet · app</i></span>
+              <span class="v num">10,188</span>
+            </div>
+            <p class="e-day">Kept separate</p>
+            <div class="e-row">
+              <span class="n">Meezan Savings<i>••7734</i></span>
+              <span class="v num">250,000</span>
+            </div>
+            <div class="e-row" style="border-bottom:0">
+              <span class="n">UBL Current<i>Not linked yet</i></span>
+              <span class="v num" style="color:var(--s-dim)">—</span>
+            </div>
+          </div>
+          <div class="tabbar">
+            <div class="tab">Balance</div>
+            <div class="tab">Ledger</div>
+            <div class="tab">Review</div>
+            <div class="tab on">Accounts</div>
+          </div>
+        </div></div>
+        <p class="screen-label">E · Statement</p>
+      </div>
+
+      <!-- F -->
+      <div class="screen-wrap dir-f">
+        <div class="phone"><div class="glass">
+          <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+          <div class="body">
+            <p class="f-hi" style="padding-top:16px">Everything you track</p>
+            <p class="f-amt num"><small>PKR </small>437,829.62</p>
+            <div class="f-reassure">
+              Three accounts are linked and reading fine. <b>UBL Current</b> still needs its last digits.
+            </div>
+            <p class="f-sec">Everyday</p>
+            <div class="f-cat">
+              <span class="f-ring" style="background:#6F8E76">M</span>
+              <span class="n">Meezan Debit<br><span style="font-size:10px;color:var(--s-dim)">••4821</span></span>
+              <span class="a num">177,641</span>
+            </div>
+            <div class="f-cat">
+              <span class="f-ring" style="background:#8095A8">N</span>
+              <span class="n">NayaPay<br><span style="font-size:10px;color:var(--s-dim)">Wallet</span></span>
+              <span class="a num">10,188</span>
+            </div>
+            <p class="f-sec">Kept separate</p>
+            <div class="f-cat">
+              <span class="f-ring" style="background:#C0A15E">S</span>
+              <span class="n">Meezan Savings<br><span style="font-size:10px;color:var(--s-dim)">Not spendable</span></span>
+              <span class="a num">250,000</span>
+            </div>
+          </div>
+          <div class="tabbar">
+            <div class="tab"><span class="ic"></span>Home</div>
+            <div class="tab"><span class="ic"></span>Ledger</div>
+            <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+            <div class="tab on"><span class="ic"></span>Accounts</div>
+          </div>
+        </div></div>
+        <p class="screen-label">F · Calm</p>
+      </div>
+
+      <!-- G -->
+      <div class="screen-wrap dir-g">
+        <div class="phone"><div class="glass">
+          <div class="statusbar"><span class="num">8:41</span><span class="sig">▮▮▮ ⌁ 96</span></div>
+          <div class="body">
+            <div class="g-top"><span class="k">Total tracked</span><span class="d">4 ACCT</span></div>
+            <p class="g-fig num"><small>PKR</small>437,829.62</p>
+            <p class="g-delta">▲ 156,875 over 30 days</p>
+            <p class="g-sec">Everyday</p>
+            <div class="g-row">
+              <span class="n">Meezan Debit<i>••4821 · SMS + app</i>
+                <span class="g-mini"><i style="width:100%;background:#6FA5B8"></i></span>
+              </span>
+              <span class="a">177,641.13</span>
+            </div>
+            <div class="g-row">
+              <span class="n">NayaPay<i>Wallet · app</i>
+                <span class="g-mini"><i style="width:6%;background:#6FA5B8"></i></span>
+              </span>
+              <span class="a">10,188.49</span>
+            </div>
+            <p class="g-sec">Kept separate</p>
+            <div class="g-row">
+              <span class="n">Meezan Savings<i>••7734 · excluded</i>
+                <span class="g-mini"><i style="width:100%;background:#C9A961"></i></span>
+              </span>
+              <span class="a">250,000.00</span>
+            </div>
+            <p class="g-sec">Unrouted</p>
+            <div class="g-row" style="border-bottom:0">
+              <span class="n">UBL Current<i style="color:var(--s-warn)">No suffix — SMS can't be routed</i></span>
+              <span class="a dim">—</span>
+            </div>
+          </div>
+          <div class="tabbar">
+            <div class="tab"><span class="ic"></span>Home</div>
+            <div class="tab"><span class="ic"></span>Ledger</div>
+            <div class="tab"><span class="ic badge" data-n="6"></span>Review</div>
+            <div class="tab on"><span class="ic"></span>Accounts</div>
+          </div>
+        </div></div>
+        <p class="screen-label">G · Signal</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============================ Compare ============================ -->
+  <section class="compare">
+    <h2>Side by side</h2>
+    <div class="tablescroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Direction</th><th>Ground</th><th>Best at</th><th>Costs you</th><th>Jump from today</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th>A · Ledger Paper</th>
+            <td>Warm off-white</td>
+            <td>Reading money — nothing competes</td>
+            <td>Full theme flip; least app-like</td>
+            <td>Large</td>
+          </tr>
+          <tr>
+            <th>B · Terminal</th>
+            <td>Deep charcoal</td>
+            <td>Distinctiveness; precision</td>
+            <td>Mono is dense; reads technical</td>
+            <td>Large</td>
+          </tr>
+          <tr>
+            <th>C · Editorial</th>
+            <td>Dark ink (as today)</td>
+            <td>Category recognition by colour</td>
+            <td>Most colour to keep disciplined</td>
+            <td>Small</td>
+          </tr>
+          <tr>
+            <th>D · Green Bar</th>
+            <td>Paper + green bands</td>
+            <td>Tracking rows across columns</td>
+            <td>Formal, near old-fashioned</td>
+            <td>Large</td>
+          </tr>
+          <tr>
+            <th>E · Statement</th>
+            <td>Near-black, no accent</td>
+            <td>Answering "where do I stand" instantly</td>
+            <td>Least info per screen</td>
+            <td>Medium</td>
+          </tr>
+          <tr>
+            <th>F · Calm</th>
+            <td>Soft sage</td>
+            <td>Lowest anxiety; plain-language read</td>
+            <td>Low contrast in sunlight</td>
+            <td>Large</td>
+          </tr>
+          <tr>
+            <th>G · Signal</th>
+            <td>Cool near-black</td>
+            <td>Seeing the trend before the numbers</td>
+            <td>Needs real history to look honest</td>
+            <td>Medium</td>
+          </tr>
+          <tr>
+            <th>H · Receipt</th>
+            <td>Paper white</td>
+            <td>Familiarity — you can already read it</td>
+            <td>A metaphor you have to commit to</td>
+            <td>Large</td>
+          </tr>
+          <tr>
+            <th>I · Small Multiples</th>
+            <td>Cool white</td>
+            <td>Spotting which habit actually changed</td>
+            <td>Needs a year of history; very quiet</td>
+            <td>Large</td>
+          </tr>
+          <tr>
+            <th>J · River</th>
+            <td>Deep teal-black</td>
+            <td>In vs out readable by position alone</td>
+            <td>Halves the width for names</td>
+            <td>Largest</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="closing">
+      <p>
+        These are real screens, not sketches — laid out at true phone width with your figures in them,
+        so what you see is what the app would read like in your hand.
+      </p>
+      <p>
+        Tell me a letter and I'll build it: theme tokens, type scale, and the screens in Flutter,
+        with the fixes from tonight untouched.
+      </p>
+      <p>
+        Mixing is encouraged — the strongest combinations are probably <b>C + G</b> (dark editorial
+        ground, but every screen opens on a chart), <b>B + E</b> (terminal rigour with statement-scale
+        figures), or <b>F's plain-language line</b> dropped on top of whichever ground you pick.
+      </p>
+    </div>
+  </section>
+
+</div>

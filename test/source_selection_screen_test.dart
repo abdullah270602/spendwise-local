@@ -97,10 +97,6 @@ class _SourceModel extends ChangeNotifier implements SpendWiseViewModel {
   @override
   Future<void> exportData() async {}
   @override
-  Future<void> importCsv(String csvText) async {}
-  @override
-  Future<String?> pickCsvFile() async => null;
-  @override
   Future<void> requestNotificationAccess() async {}
   @override
   Future<void> resolveReview(String id, {required bool merge}) async {}
