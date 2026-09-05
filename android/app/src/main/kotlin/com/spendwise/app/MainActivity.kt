@@ -7,16 +7,20 @@ import android.graphics.Canvas
 import android.graphics.Rect
 import android.graphics.drawable.Drawable
 import android.provider.Settings
+import android.view.WindowManager
 import android.service.notification.NotificationListenerService
 import java.io.ByteArrayOutputStream
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.StandardMethodCodec
 
-class MainActivity : FlutterActivity() {
+// FlutterFragmentActivity, not FlutterActivity: BiometricPrompt is shown
+// through the AndroidX fragment manager, which a plain FlutterActivity does
+// not have. Everything else about the embedding is unchanged.
+class MainActivity : FlutterFragmentActivity() {
     private var notificationTaskQueue: BinaryMessenger.TaskQueue? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -55,6 +59,22 @@ class MainActivity : FlutterActivity() {
                     result.success(true)
                 }
                 "isNotificationAccessGranted" -> result.success(isNotificationAccessGranted())
+                "setScreenPrivacy" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    // FLAG_SECURE must be set on the UI thread, and this channel
+                    // deliberately runs on a background queue, so hop across.
+                    runOnUiThread {
+                        if (enabled) {
+                            window.setFlags(
+                                WindowManager.LayoutParams.FLAG_SECURE,
+                                WindowManager.LayoutParams.FLAG_SECURE,
+                            )
+                        } else {
+                            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                        }
+                    }
+                    result.success(true)
+                }
                 "peekQueuedEvents" -> {
                     val requestedLimit = call.argument<Number>("limit")?.toInt() ?: 500
                     val limit = requestedLimit.coerceIn(1, 2_000)

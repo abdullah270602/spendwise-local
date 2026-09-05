@@ -3,10 +3,12 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/palette.dart';
+import '../../security/app_lock.dart';
 import '../../app/theme.dart';
 import '../../main.dart';
 import '../../widgets/spendwise_components.dart';
 import '../shell/spendwise_view_model.dart';
+import 'app_lock_screen.dart';
 import 'source_selection_screen.dart';
 import '../reports/report_screen.dart';
 import 'home_period_screen.dart';
@@ -75,6 +77,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ],
           ),
+        ),
+        const SizedBox(height: 22),
+        const SectionHeading('Security'),
+        const SizedBox(height: 8),
+        Builder(
+          builder: (context) {
+            final lock = AppLockScope.maybeOf(context);
+            return Card(
+              child: ListTile(
+                leading: const Icon(Icons.lock_outline_rounded),
+                title: const Text('App lock'),
+                subtitle: Text(
+                  lock == null
+                      ? 'Unavailable'
+                      : lock.enabled
+                      ? '${lock.biometricsEnabled ? 'PIN and fingerprint' : 'PIN'}'
+                            ', ${lock.delay.title.toLowerCase()}'
+                      : 'Off',
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: lock == null
+                    ? null
+                    : () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) => AppLockScreen(lock: lock),
+                          ),
+                        );
+                        if (mounted) setState(() {});
+                      },
+              ),
+            );
+          },
         ),
         const SizedBox(height: 22),
         const SectionHeading('Your identity'),
