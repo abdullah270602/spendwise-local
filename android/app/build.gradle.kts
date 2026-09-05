@@ -28,6 +28,26 @@ android {
         versionName = flutter.versionName
     }
 
+    // Two installs of the same code, side by side on one phone.
+    //
+    // `live` keeps the original applicationId to the letter, so an existing
+    // install and its encrypted ledger are upgraded in place and never
+    // touched. `sandbox` is a different application id, which Android treats
+    // as a wholly separate app: its own data directory, its own keystore
+    // entry, its own notification-listener grant, its own empty ledger to set
+    // up from zero.
+    flavorDimensions += "install"
+    productFlavors {
+        create("live") {
+            dimension = "install"
+        }
+        create("sandbox") {
+            dimension = "install"
+            applicationIdSuffix = ".sandbox"
+            versionNameSuffix = "-sandbox"
+        }
+    }
+
     buildTypes {
         release {
             // V1 release signing is intentionally supplied by the publisher.

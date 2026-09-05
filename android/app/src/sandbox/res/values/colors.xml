@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The sandbox build overrides only what makes it recognisable from the
+         outside: the launcher icon's ground, and the splash behind it. Every
+         colour inside the app comes from Dart and is identical to live, which
+         is the point. This is the same app, not a different one. -->
+    <color name="spendwise_background">#2A2140</color>
+</resources>
