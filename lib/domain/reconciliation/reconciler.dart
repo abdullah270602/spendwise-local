@@ -299,7 +299,11 @@ final class Reconciler {
       evidenceIds: {...debit.evidenceIds, ...credit.evidenceIds},
       fromAccountId: debit.primary.accountId,
       toAccountId: credit.primary.accountId,
-      description: '${debit.primary.accountId} → ${credit.primary.accountId}',
+      // Deliberately unnamed: the only names available here are opaque
+      // account ids, and rendering "2cfe72de-... → 9f31a0c4-..." as the
+      // transaction's name is worse than letting the UI label it and show
+      // the resolved account names alongside.
+      description: null,
       needsReview:
           debit.primary.confidence < 0.8 || credit.primary.confidence < 0.8,
       reconciliationState:

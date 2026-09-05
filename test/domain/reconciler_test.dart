@@ -53,6 +53,11 @@ void main() {
     expect(transaction.fromAccountId, 'hbl');
     expect(transaction.toAccountId, 'sadapay');
     expect(transaction.evidenceIds, {'hbl', 'sadapay'});
+    expect(
+      transaction.description,
+      isNull,
+      reason: 'account ids are not a human-readable name',
+    );
   });
 
   test('collapses duplicate same-leg evidence before transfer matching', () {

@@ -237,7 +237,11 @@ final class SpendWiseController extends ChangeNotifier
             id: item.id,
             title: item.description?.trim().isNotEmpty == true
                 ? item.description!.trim()
-                : item.kind.name,
+                : switch (item.kind) {
+                    domain.TransactionKind.expense => 'Payment',
+                    domain.TransactionKind.income => 'Money received',
+                    domain.TransactionKind.transfer => 'Account transfer',
+                  },
             subtitle: accountLabel,
             amount: MoneyViewData(
               item.kind == domain.TransactionKind.expense

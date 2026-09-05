@@ -35,8 +35,12 @@ final class NotificationParser {
   );
   // Bounded by common trailing markers so a bank's own boilerplate (IBAN,
   // account suffix, reference, timestamp) is never swept into the name.
+  // Stops at sentence punctuation even with no space before it, so
+  // "at IMTIAZ SUPERMARKET. Avbl Bal Rs.9,000" yields the shop and not the
+  // balance sentence trailing it.
   static const _counterpartyStop =
-      r'(?=\s+(?:of|on|via|IBAN|A\/?c|Ref|Reference|TID|Trx|Rs\.?|PKR|₨|,|\.|$))';
+      r'(?=\s*[.,;]|\s+(?:of|on|via|as|for|using|by|dated|IBAN|A\/?c|Ref|'
+      r'Reference|TID|Trx|Rs\.?|PKR|₨)|$)';
   static final RegExp _debitCounterpartyPattern = RegExp(
     r'\b(?:sent|paid|transferred)\s+to\s+([A-Za-z][A-Za-z.\s]{1,40}?)' +
         _counterpartyStop,
@@ -157,9 +161,7 @@ final class NotificationParser {
       occurredAt: observation.observedAt,
       reference: reference,
       counterparty: counterparty,
-      description: observation.title?.trim().isNotEmpty == true
-          ? observation.title!.trim()
-          : null,
+      description: _describe(observation.title, counterparty),
       type: direction == EntryDirection.debit
           ? CandidateType.purchase
           : CandidateType.income,
@@ -185,6 +187,20 @@ final class NotificationParser {
   /// transferred from X", or "at X" match. Returns null rather than risk a
   /// wrong name — an unset counterparty is a lesser harm than a mislabeled
   /// one.
+  /// What to call this transaction in the ledger.
+  ///
+  /// The notification title is often just the SMS short code the bank sends
+  /// from ("8558"), which tells the reader nothing. The merchant or
+  /// counterparty is the useful name, so it wins; a title is used only when
+  /// it actually contains words.
+  static String? _describe(String? title, String? counterparty) {
+    final name = counterparty?.trim();
+    if (name != null && name.isNotEmpty) return name;
+    final heading = title?.trim();
+    if (heading == null || heading.isEmpty) return null;
+    return RegExp(r'[A-Za-z]{2,}').hasMatch(heading) ? heading : null;
+  }
+
   /// Amounts that could be the transaction itself, with balance figures set
   /// aside. Falls back to every match when filtering leaves nothing, so an
   /// unusual phrasing degrades to "ambiguous" rather than to a wrong read.
@@ -243,7 +259,10 @@ final class NotificationParser {
                     _referencePattern.firstMatch(text)?.group(1))
                 ?.trim()
                 .toUpperCase(),
-        description: observation.title,
+        description: _describe(
+          observation.title,
+          named(rule.counterpartyGroup)?.trim(),
+        ),
         confidence: rule.confidence,
         type: rule.type,
         parserId: definition.id,

@@ -64,6 +64,44 @@ void main() {
     );
   });
 
+  test('names the transaction after the merchant, not the SMS short code', () {
+    final candidate = parser.parse(
+      RawObservation(
+        id: 'sms-2',
+        kind: ObservationKind.notification,
+        observedAt: DateTime.utc(2026, 9, 5, 12),
+        title: '8558',
+        body: 'Rs.1,500 debited at IMTIAZ SUPERMARKET. Avbl Bal Rs.9,000',
+        accountId: 'acct-1',
+        sourcePackage: 'com.google.android.apps.messaging',
+      ),
+    );
+    expect(candidate!.description, 'IMTIAZ SUPERMARKET');
+  });
+
+  test('a sender code alone is not used as the transaction name', () {
+    final candidate = parser.parse(
+      RawObservation(
+        id: 'sms-3',
+        kind: ObservationKind.notification,
+        observedAt: DateTime.utc(2026, 9, 5, 12),
+        title: '8558',
+        body: 'PKR 300 debited. Avl Bal PKR 700',
+        accountId: 'acct-1',
+        sourcePackage: 'com.google.android.apps.messaging',
+      ),
+    );
+    expect(candidate!.description, isNull);
+  });
+
+  test('stops the merchant name before trailing narration', () {
+    final candidate = parse(
+      'PKR 2,086.20 debited at JENPHARM RETAIL as international transaction. '
+      'Avl Bal PKR 5,000',
+    );
+    expect(candidate!.description, 'JENPHARM RETAIL');
+  });
+
   test('a lone amount is unaffected', () {
     final candidate = parse('Your account was debited PKR 1,500 at SHOP');
     expect(candidate, isNotNull);
