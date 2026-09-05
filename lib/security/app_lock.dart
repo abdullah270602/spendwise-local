@@ -146,10 +146,10 @@ class AppLockController extends ChangeNotifier with WidgetsBindingObserver {
 
   /// How many digits this person chose. Kept so the keypad can draw the right
   /// number of slots and submit on the last one, instead of making everyone
-  /// press an extra confirm key. The dots reveal the length anyway, so storing
-  /// it gives nothing away.
+  /// press an extra confirm key. The slots reveal the length anyway, so
+  /// storing it gives nothing away.
   static const minPinLength = 4;
-  static const maxPinLength = 8;
+  static const maxPinLength = 10;
   int get pinLength =>
       int.tryParse(_prefs.read(lengthKey) ?? '')?.clamp(
         minPinLength,

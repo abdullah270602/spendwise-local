@@ -30,6 +30,10 @@ class PinDots extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tone = error ? SpendWiseColors.spend : SpendWiseColors.fg;
+    // A long PIN must not run off the edge of a narrow phone, so the slots
+    // tighten rather than wrap.
+    final size = length > 6 ? 12.0 : 15.0;
+    final gap = length > 6 ? 4.0 : 7.0;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -37,9 +41,9 @@ class PinDots extends StatelessWidget {
           AnimatedContainer(
             duration: const Duration(milliseconds: 140),
             curve: Curves.easeOut,
-            margin: const EdgeInsets.symmetric(horizontal: 7),
-            width: 15,
-            height: 15,
+            margin: EdgeInsets.symmetric(horizontal: gap),
+            width: size,
+            height: size,
             decoration: BoxDecoration(
               color: index < filled
                   ? tone.withValues(alpha: muted ? .45 : 1)

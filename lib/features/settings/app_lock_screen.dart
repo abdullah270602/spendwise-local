@@ -39,16 +39,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
           48 + MediaQuery.viewPaddingOf(context).bottom,
         ),
         children: [
-          Text(
-            // Say plainly what this is worth. Overstating it is how a person
-            // ends up trusting the wrong thing.
-            'Your ledger is already encrypted on this phone, and nothing in '
-            'SpendWise can reach the network. A PIN adds the one thing that '
-            'protects: a step between someone holding your unlocked phone and '
-            'reading what you spend.',
-            style: SpendWiseType.body.copyWith(fontSize: 13.5),
-          ),
-          const SizedBox(height: 22),
+          // No explanation of what an app lock is. Everybody knows.
           Card(
             child: SwitchListTile(
               secondary: const Icon(Icons.lock_outline_rounded),
@@ -77,11 +68,9 @@ class _AppLockScreenState extends State<AppLockScreen> {
                   SwitchListTile(
                     secondary: const Icon(Icons.fingerprint_rounded),
                     title: const Text('Fingerprint or face'),
-                    subtitle: Text(
-                      lock.biometricsAvailable
-                          ? 'Faster, with the PIN always as a fallback'
-                          : 'Nothing is enrolled on this phone yet',
-                    ),
+                    subtitle: lock.biometricsAvailable
+                        ? null
+                        : const Text('None enrolled on this phone'),
                     value: lock.biometricsEnabled,
                     onChanged: lock.biometricsAvailable
                         ? lock.setBiometricsEnabled
@@ -137,29 +126,21 @@ class _AppLockScreenState extends State<AppLockScreen> {
               ),
             ),
             const SizedBox(height: 22),
-            _Heading('While you are away'),
+            _Heading('Privacy'),
             const SizedBox(height: 8),
             Card(
               child: SwitchListTile(
                 secondary: const Icon(Icons.visibility_off_outlined),
                 title: const Text('Hide in the app switcher'),
-                subtitle: const Text(
-                  'Blanks the preview Android keeps of the last screen. '
-                  'Also stops screenshots.',
-                ),
+                subtitle: const Text('Also blocks screenshots'),
                 value: lock.hideInSwitcher,
                 onChanged: (value) => lock.setHideInSwitcher(value),
               ),
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 18),
+            // The one fact that is not obvious and cannot be undone.
             Text(
-              'Wrong guesses are free for the first '
-              '${AppLockController.freeAttempts}, then each one costs a '
-              'wait that grows: thirty seconds, a minute, five, fifteen. '
-              'Closing the app does not reset it.\n\n'
-              'There is no way to recover a forgotten PIN. Nothing outside '
-              'this phone knows it, which is the point — but it also means '
-              'erasing the app data is the only way back in.',
+              'A forgotten PIN cannot be recovered.',
               style: SpendWiseType.body.copyWith(fontSize: 12.5),
             ),
           ],
