@@ -17,10 +17,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Insights'), findsOneWidget);
-    // Insights opens on the flow spine; the per-category detail is behind the
-    // toggle, so switch to it before asserting on the breakdown.
-    await tester.tap(find.text('DETAIL'));
-    await tester.pumpAndSettle();
+    // Detail is the default view now: thirty days of all spending is the
+    // question people arrive with.
     expect(find.text('Total tracked'), findsOneWidget);
     expect(find.text('MONEY MOVING OVER TIME'), findsOneWidget);
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
@@ -30,7 +28,7 @@ void main() {
     await tester.drag(find.byType(CustomScrollView), const Offset(0, 1000));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('DAYS'));
+    await tester.tap(find.text('7 DAYS'));
     await tester.pumpAndSettle();
     expect(find.text('Average per day'), findsOneWidget);
 

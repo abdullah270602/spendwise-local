@@ -8,7 +8,7 @@ void main() {
     () {
       final analytics = SpendingAnalytics.calculate(
         now: DateTime(2026, 8, 22, 18),
-        resolution: AnalyticsResolution.days,
+        resolution: AnalyticsResolution.last7Days,
         transactions: [
           _transaction(
             'food',

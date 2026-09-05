@@ -60,9 +60,9 @@ class DashboardScreen extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Expanded(
-                    child: Eyebrow('$month · what happened to it'),
-                  ),
+                  // The month alone. "What happened to it" was a caption on a
+                  // picture that already says so.
+                  Expanded(child: Eyebrow(month)),
                   IconButton(
                     onPressed: () => Navigator.push(
                       context,
@@ -152,25 +152,13 @@ class DashboardScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // No heading: the bar and the list under it are
+                      // self-evidently the breakdown of what left.
                       Container(
-                        padding: const EdgeInsets.only(top: 13),
-                        decoration: const BoxDecoration(
-                          border: Border(
-                            top: BorderSide(color: SpendWiseColors.line),
-                          ),
-                        ),
-                        child: Eyebrow(
-                          received > 0
-                              ? 'The ${_percent(spent, received)}, up close'
-                              : 'Where it went',
-                          trailing: Text(
-                            '${categories.length} '
-                            '${categories.length == 1 ? 'category' : 'categories'}',
-                            style: SpendWiseType.eyebrow,
-                          ),
-                        ),
+                        margin: const EdgeInsets.only(bottom: 14),
+                        height: 1,
+                        color: SpendWiseColors.line,
                       ),
-                      const SizedBox(height: 12),
                       SegmentBar(
                         weights: [
                           for (final item in categories)

@@ -23,8 +23,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.textContaining('WHAT HAPPENED TO IT'), findsOneWidget);
-    expect(find.text('RECEIVED 4,000'), findsOneWidget);
+    // The month alone: the shape below it says what happened to it.
+    expect(find.textContaining('RECEIVED 4,000'), findsOneWidget);
     // 4,000 arrived, 1,500 left, so 2,500 is still yours.
     expect(find.text('STILL YOURS'), findsOneWidget);
     expect(find.text('2,500'), findsOneWidget);

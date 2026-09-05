@@ -20,12 +20,11 @@ class InsightsScreen extends StatefulWidget {
 }
 
 class _InsightsScreenState extends State<InsightsScreen> {
-  AnalyticsResolution resolution = AnalyticsResolution.months;
+  /// Thirty days of all spending is the question people actually arrive with,
+  /// so it is what the screen opens on.
+  AnalyticsResolution resolution = AnalyticsResolution.last30Days;
   String? category;
-
-  /// River first: it is the only view where direction reads from position
-  /// rather than from a colour or a sign.
-  _InsightsView view = _InsightsView.river;
+  _InsightsView view = _InsightsView.detail;
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
@@ -92,7 +91,11 @@ class _InsightsScreenState extends State<InsightsScreen> {
                               child: Align(
                                 alignment: Alignment.centerLeft,
                                 child: ViewToggle(
-                                  options: const ['Days', 'Months', 'Years'],
+                                  options: [
+                                    for (final value
+                                        in AnalyticsResolution.values)
+                                      value.shortLabel,
+                                  ],
                                   selected: AnalyticsResolution.values.indexOf(
                                     resolution,
                                   ),
@@ -229,11 +232,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
     },
   );
 
-  static String _resolutionWord(AnalyticsResolution value) => switch (value) {
-    AnalyticsResolution.days => 'day',
-    AnalyticsResolution.months => 'month',
-    AnalyticsResolution.years => 'year',
-  };
+  static String _resolutionWord(AnalyticsResolution value) => value.cadence;
 }
 
 enum _InsightsView { river, flow, detail }
@@ -531,11 +530,7 @@ class _SummaryBand extends StatelessWidget {
     final changeColor = change == null || change <= 0
         ? SpendWiseColors.income
         : SpendWiseColors.expense;
-    final cadence = switch (analytics.resolution) {
-      AnalyticsResolution.days => 'per day',
-      AnalyticsResolution.months => 'per month',
-      AnalyticsResolution.years => 'per year',
-    };
+    final cadence = 'per ${analytics.resolution.cadence}';
     return Container(
       padding: const EdgeInsets.only(top: 14),
       decoration: const BoxDecoration(
@@ -677,26 +672,47 @@ class _TrendChartState extends State<_TrendChart> {
               ],
             ),
             const SizedBox(height: 18),
-            SizedBox(
-              height: 190,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  for (var index = 0; index < analytics.buckets.length; index++)
-                    Expanded(
+            // Twelve bars fit a phone; thirty do not. Past that the chart
+            // scrolls at a readable bar width instead of squeezing every day
+            // into three pixels and dropping its label.
+            LayoutBuilder(
+              builder: (context, constraints) {
+                const minBarWidth = 26.0;
+                final count = analytics.buckets.length;
+                final scrolls = count * minBarWidth > constraints.maxWidth;
+                final bars = [
+                  for (var index = 0; index < count; index++)
+                    SizedBox(
+                      width: scrolls
+                          ? minBarWidth
+                          : constraints.maxWidth / count,
                       child: _BarColumn(
                         bucket: analytics.buckets[index],
                         maxValue: maxValue,
                         selected:
-                            index ==
-                            (selectedIndex ?? analytics.buckets.length - 1),
+                            index == (selectedIndex ?? count - 1),
                         showIncome: analytics.category == null,
                         currency: analytics.currency,
                         onTap: () => setState(() => selectedIndex = index),
                       ),
                     ),
-                ],
-              ),
+                ];
+                final row = Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: bars,
+                );
+                return SizedBox(
+                  height: 190,
+                  child: scrolls
+                      ? SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          reverse: true,
+                          child: row,
+                        )
+                      : row,
+                );
+              },
             ),
           ],
         ),

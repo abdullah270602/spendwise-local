@@ -29,7 +29,9 @@ class _AccountsScreenState extends State<AccountsScreen> {
   /// Total pixel budget the map divides between accounts by share. Big enough
   /// that the largest block dominates, small enough that four accounts still
   /// fit above the fold on a normal phone.
-  static const _mapBudget = 300.0;
+  /// Tallest block in a zone. Each zone gets its own, so the biggest everyday
+  /// account and the biggest savings account are drawn at the same size.
+  static const _mapBudget = 210.0;
   static const _minBlock = 34.0;
 
   late bool asMap;
@@ -183,11 +185,11 @@ class _AccountsScreenState extends State<AccountsScreen> {
               children: [
                 if (everyday.isNotEmpty) ...[
                   _zone('Available to spend', everydayTotal),
-                  ..._blocks(everyday, total),
+                  ..._blocks(everyday),
                 ],
                 if (savings.isNotEmpty) ...[
                   _zone('Held back · savings', savingsTotal),
-                  ..._blocks(savings, total),
+                  ..._blocks(savings),
                 ],
                 ..._loans(),
                 if (unconfigured.isNotEmpty) _incomplete(unconfigured),
@@ -287,11 +289,19 @@ class _AccountsScreenState extends State<AccountsScreen> {
     ),
   );
 
-  List<Widget> _blocks(List<AccountViewData> accounts, int grandTotal) {
+  /// Each zone is scaled against its own largest account, not against the
+  /// grand total. Savings are usually several times what is spendable, and
+  /// sharing one scale flattened every everyday account into a hairline —
+  /// which is exactly the comparison nobody wants to make. Within a zone the
+  /// proportions are still true, which is the comparison that is useful.
+  List<Widget> _blocks(List<AccountViewData> accounts) {
     if (!asMap) {
       return [for (final account in accounts) _plainRow(context, account)];
     }
-    final safeTotal = grandTotal == 0 ? 1 : grandTotal;
+    final largest = accounts.fold<int>(
+      1,
+      (best, account) => math.max(best, account.balance.minorUnits.abs()),
+    );
     return [
       for (final account in accounts)
         ProportionBlock(
@@ -300,7 +310,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
           detail: account.suffix.isEmpty ? '' : '••${account.suffix}',
           height: math.max(
             _minBlock,
-            _mapBudget * (account.balance.minorUnits.abs() / safeTotal),
+            _mapBudget * (account.balance.minorUnits.abs() / largest),
           ),
           filled: account.isIncluded,
           onTap: () => _editAccount(context, account),
