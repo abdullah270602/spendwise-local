@@ -112,6 +112,49 @@ final class UnparsedSourceSummary {
 /// One captured notification, exactly as it arrived. Review can summarise
 /// alerts into rules, but the user must always be able to read the raw text
 /// SpendWise made its decision from.
+/// Money that left but is still yours, or arrived but is not.
+///
+/// A loan is the one thing a ledger built on bank alerts cannot see: the alert
+/// for "PKR 20,000 sent to a friend" is identical to the alert for buying a
+/// phone. Only the person knows which it was, so this is marked by hand -- and
+/// once marked, it stops counting as spending, because it is coming back.
+final class StoredDebt {
+  const StoredDebt({
+    required this.id,
+    required this.lent,
+    required this.counterparty,
+    required this.principalMinor,
+    required this.settledMinor,
+    required this.currency,
+    required this.openedAt,
+    this.note,
+    this.closedAt,
+    this.openingTransactionId,
+  });
+
+  final String id;
+
+  /// True when the user lent the money out; false when they borrowed it.
+  final bool lent;
+  final String counterparty;
+  final int principalMinor;
+
+  /// How much has come back (or been repaid), across any number of payments.
+  final int settledMinor;
+  final String currency;
+  final DateTime openedAt;
+  final String? note;
+  final DateTime? closedAt;
+  final String? openingTransactionId;
+
+  int get outstandingMinor {
+    final left = principalMinor - settledMinor;
+    return left < 0 ? 0 : left;
+  }
+
+  bool get isSettled => closedAt != null || outstandingMinor == 0;
+}
+
 final class StoredAlert {
   const StoredAlert({
     required this.id,
@@ -353,6 +396,24 @@ final class LocalLedger {
         observation_id TEXT NOT NULL UNIQUE REFERENCES raw_observations(id),
         PRIMARY KEY(transaction_id, observation_id)
       );
+      CREATE TABLE IF NOT EXISTS debts (
+        id TEXT PRIMARY KEY,
+        direction TEXT NOT NULL CHECK(direction IN ('lent','borrowed')),
+        counterparty TEXT NOT NULL,
+        principal_minor INTEGER NOT NULL CHECK(principal_minor > 0),
+        currency TEXT NOT NULL,
+        opened_at INTEGER NOT NULL,
+        opening_transaction_id TEXT REFERENCES transactions(id) ON DELETE SET NULL,
+        note TEXT,
+        closed_at INTEGER
+      );
+      CREATE TABLE IF NOT EXISTS debt_settlements (
+        id TEXT PRIMARY KEY,
+        debt_id TEXT NOT NULL REFERENCES debts(id) ON DELETE CASCADE,
+        transaction_id TEXT REFERENCES transactions(id) ON DELETE SET NULL,
+        amount_minor INTEGER NOT NULL CHECK(amount_minor > 0),
+        settled_at INTEGER NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS app_settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
@@ -506,6 +567,8 @@ final class LocalLedger {
       CREATE INDEX IF NOT EXISTS evidence_match_idx ON financial_evidence(currency, amount_minor, direction, occurred_at);
       CREATE INDEX IF NOT EXISTS import_hash_idx ON import_batches(file_sha256, account_id);
       CREATE INDEX IF NOT EXISTS category_rule_match_idx ON category_rules(priority DESC, normalized_match);
+      CREATE INDEX IF NOT EXISTS debt_open_idx ON debts(closed_at, opened_at DESC);
+      CREATE INDEX IF NOT EXISTS debt_settlement_idx ON debt_settlements(debt_id);
     ''');
 
     _addColumn('accounts', 'institution_name', 'TEXT');
@@ -564,6 +627,13 @@ final class LocalLedger {
     _addColumn('transactions', 'updated_at', 'INTEGER');
     _addColumn('transactions', 'category_rule_id', 'TEXT');
     _addColumn('transactions', 'note', 'TEXT');
+    // The link that takes a transaction out of the spending figures: it is
+    // either the moment a loan was made, or a payment against one.
+    _addColumn(
+      'transactions',
+      'debt_id',
+      'TEXT REFERENCES debts(id) ON DELETE SET NULL',
+    );
 
     _db.execute('''
       INSERT OR IGNORE INTO categories(id,name,icon_key,color_value,kind,is_system) VALUES
@@ -578,6 +648,8 @@ final class LocalLedger {
         ('education','Education','school',4280391411,'expense',1),
         ('travel','Travel','flight',4286208615,'expense',1),
         ('personal-care','Self care','self_care',4294198070,'expense',1),
+        ('lent','Lent out','call_made',4283215696,'both',1),
+        ('borrowed','Borrowed','call_received',4294940672,'both',1),
         ('home','Home','home',4288585374,'expense',1),
         ('insurance','Insurance','verified_user',4280391411,'expense',1),
         ('gifts-charity','Gifts & charity','volunteer_activism',4286208615,'expense',1),
@@ -1096,6 +1168,166 @@ final class LocalLedger {
     _db.execute('DELETE FROM categories WHERE id = ?', [id]);
   }
 
+  /// Marks an existing transaction as a loan, in either direction, and opens
+  /// the debt it belongs to. The transaction keeps its amount, date and
+  /// evidence -- only its meaning changes.
+  StoredDebt openDebt({
+    required String transactionId,
+    required bool lent,
+    required String counterparty,
+    String? note,
+  }) {
+    final rows = _db.select(
+      'SELECT amount_minor, currency, occurred_at FROM transactions '
+      'WHERE id = ? AND deleted_at IS NULL',
+      [transactionId],
+    );
+    if (rows.isEmpty) {
+      throw ArgumentError.value(transactionId, 'transactionId', 'No such entry');
+    }
+    final row = rows.first;
+    final name = counterparty.trim();
+    if (name.isEmpty) {
+      throw ArgumentError.value(counterparty, 'counterparty', 'Needs a name');
+    }
+
+    final id = _ids.v4();
+    _db.execute(
+      'INSERT INTO debts(id,direction,counterparty,principal_minor,currency,'
+      'opened_at,opening_transaction_id,note) VALUES (?,?,?,?,?,?,?,?)',
+      [
+        id,
+        lent ? 'lent' : 'borrowed',
+        name,
+        (row['amount_minor'] as int).abs(),
+        row['currency'] as String,
+        row['occurred_at'] as int,
+        transactionId,
+        note?.trim().isEmpty == true ? null : note?.trim(),
+      ],
+    );
+    _db.execute(
+      'UPDATE transactions SET debt_id = ?, category_id = ?, category = ?, '
+      'needs_review = 0, locked = 1 WHERE id = ?',
+      [
+        id,
+        lent ? 'lent' : 'borrowed',
+        lent ? 'Lent out' : 'Borrowed',
+        transactionId,
+      ],
+    );
+    return debt(id)!;
+  }
+
+  /// Records money coming back against a loan. [transactionId] links a real
+  /// entry from the ledger; leaving it null records the payment as a note on
+  /// the debt alone, for cash that never touched a tracked account.
+  void settleDebt({
+    required String debtId,
+    required int amountMinor,
+    String? transactionId,
+    DateTime? at,
+  }) {
+    if (amountMinor <= 0) {
+      throw ArgumentError.value(amountMinor, 'amountMinor', 'Must be positive');
+    }
+    final existing = debt(debtId);
+    if (existing == null) {
+      throw ArgumentError.value(debtId, 'debtId', 'No such debt');
+    }
+    _db.execute(
+      'INSERT INTO debt_settlements(id,debt_id,transaction_id,amount_minor,'
+      'settled_at) VALUES (?,?,?,?,?)',
+      [
+        _ids.v4(),
+        debtId,
+        transactionId,
+        amountMinor,
+        (at ?? DateTime.now()).toUtc().millisecondsSinceEpoch,
+      ],
+    );
+    if (transactionId != null) {
+      // A repayment is not income either: it is the loan coming home.
+      _db.execute(
+        'UPDATE transactions SET debt_id = ?, category_id = ?, category = ?, '
+        'needs_review = 0, locked = 1 WHERE id = ?',
+        [
+          debtId,
+          existing.lent ? 'lent' : 'borrowed',
+          existing.lent ? 'Lent out' : 'Borrowed',
+          transactionId,
+        ],
+      );
+    }
+    final after = debt(debtId);
+    if (after != null && after.outstandingMinor == 0) {
+      closeDebt(debtId);
+    }
+  }
+
+  void closeDebt(String id) => _db.execute(
+    'UPDATE debts SET closed_at = ? WHERE id = ? AND closed_at IS NULL',
+    [_now, id],
+  );
+
+  void reopenDebt(String id) =>
+      _db.execute('UPDATE debts SET closed_at = NULL WHERE id = ?', [id]);
+
+  /// Forgets a debt without touching the money. The transactions go back to
+  /// being ordinary spending or income, which is the honest outcome: the
+  /// ledger recorded what happened, only the promise is gone.
+  void removeDebt(String id) {
+    _db.execute('UPDATE transactions SET debt_id = NULL WHERE debt_id = ?', [
+      id,
+    ]);
+    _db.execute('DELETE FROM debts WHERE id = ?', [id]);
+  }
+
+  StoredDebt? debt(String id) {
+    final rows = _debtQuery('WHERE d.id = ?', [id]);
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  List<StoredDebt> debts({bool includeSettled = true}) => _debtQuery(
+    includeSettled ? '' : 'WHERE d.closed_at IS NULL',
+    const [],
+  );
+
+  List<StoredDebt> _debtQuery(String where, List<Object?> parameters) {
+    final rows = _db.select('''
+      SELECT d.*, COALESCE((
+        SELECT SUM(s.amount_minor) FROM debt_settlements s
+        WHERE s.debt_id = d.id
+      ), 0) AS settled
+      FROM debts d
+      $where
+      ORDER BY d.closed_at IS NOT NULL, d.opened_at DESC
+      ''', parameters);
+    return [
+      for (final row in rows)
+        StoredDebt(
+          id: row['id'] as String,
+          lent: row['direction'] == 'lent',
+          counterparty: row['counterparty'] as String,
+          principalMinor: row['principal_minor'] as int,
+          settledMinor: (row['settled'] as num).toInt(),
+          currency: row['currency'] as String,
+          openedAt: DateTime.fromMillisecondsSinceEpoch(
+            row['opened_at'] as int,
+            isUtc: true,
+          ),
+          note: row['note'] as String?,
+          closedAt: row['closed_at'] == null
+              ? null
+              : DateTime.fromMillisecondsSinceEpoch(
+                  row['closed_at'] as int,
+                  isUtc: true,
+                ),
+          openingTransactionId: row['opening_transaction_id'] as String?,
+        ),
+    ];
+  }
+
   CategoryClassification classifyDescription({
     required String text,
     required TransactionKind kind,
@@ -1261,6 +1493,7 @@ final class LocalLedger {
                SUM(t.amount_minor) AS total
         FROM transactions t LEFT JOIN categories c ON c.id = t.category_id
         WHERE t.deleted_at IS NULL AND t.kind = 'expense'
+          AND t.debt_id IS NULL
           AND t.occurred_at >= ? AND t.occurred_at < ?
         GROUP BY COALESCE(c.name,t.category,'Other') ORDER BY total DESC
         ''',
@@ -2908,6 +3141,7 @@ final class LocalLedger {
     needsReview: row['needs_review'] == 1,
     locked: row['locked'] == 1,
     origin: TransactionOrigin.values.byName(row['origin'] as String),
+    debtId: row['debt_id'] as String?,
     reconciliationState: ReconciliationState.values.byName(
       row['reconcile_state'] as String? ??
           (row['needs_review'] == 1 ? 'needsReview' : 'confirmed'),

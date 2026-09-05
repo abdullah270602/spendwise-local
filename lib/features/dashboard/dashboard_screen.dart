@@ -208,6 +208,12 @@ class DashboardScreen extends StatelessWidget {
                   onTap: onOpenAccounts,
                 ),
               ),
+            SliverToBoxAdapter(
+              child: _LoansNote(
+                viewModel: viewModel,
+                onOpenAccounts: onOpenAccounts,
+              ),
+            ),
             if (ownMoves.isNotEmpty)
               SliverToBoxAdapter(
                 child: _OwnMovesNote(
@@ -423,6 +429,109 @@ class _SavingsStrip extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Lending is the other reason the spend figure is smaller than a naive sum
+/// of outgoing alerts, so it gets the same one-line treatment.
+class _LoansNote extends StatelessWidget {
+  const _LoansNote({required this.viewModel, required this.onOpenAccounts});
+
+  final SpendWiseViewModel viewModel;
+  final VoidCallback onOpenAccounts;
+
+  @override
+  Widget build(BuildContext context) {
+    final open = viewModel.uiDebts.where((item) => !item.isSettled).toList();
+    if (open.isEmpty) return const SizedBox.shrink();
+    final lentOut = open.where((item) => item.lent).fold<int>(
+      0,
+      (sum, item) => sum + item.outstanding.minorUnits,
+    );
+    final owed = open.where((item) => !item.lent).fold<int>(
+      0,
+      (sum, item) => sum + item.outstanding.minorUnits,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        SpendWiseTheme.gutter,
+        20,
+        SpendWiseTheme.gutter,
+        0,
+      ),
+      child: InkWell(
+        onTap: onOpenAccounts,
+        child: Container(
+          padding: const EdgeInsets.only(top: 13),
+          decoration: const BoxDecoration(
+            border: Border(top: BorderSide(color: SpendWiseColors.line)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (lentOut > 0)
+                _LoanLine(
+                  amount: lentOut,
+                  tail: 'is out on loan — still yours, not spending.',
+                  tone: SpendWiseColors.keep,
+                ),
+              if (lentOut > 0 && owed > 0) const SizedBox(height: 7),
+              if (owed > 0)
+                _LoanLine(
+                  amount: owed,
+                  tail: 'you owe — arrived, but not yours to keep.',
+                  tone: SpendWiseColors.spend,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LoanLine extends StatelessWidget {
+  const _LoanLine({
+    required this.amount,
+    required this.tail,
+    required this.tone,
+  });
+
+  final int amount;
+  final String tail;
+  final Color tone;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Container(
+        margin: const EdgeInsets.only(right: 9, top: 5),
+        width: 6,
+        height: 6,
+        color: tone,
+      ),
+      Expanded(
+        child: Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: '${formatMinor(amount, cents: false)} ',
+                style: SpendWiseType.row.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: tone,
+                ),
+              ),
+              TextSpan(
+                text: tail,
+                style: SpendWiseType.body.copyWith(fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ],
+  );
 }
 
 /// The one place Home mentions own-account transfers: they are the reason the

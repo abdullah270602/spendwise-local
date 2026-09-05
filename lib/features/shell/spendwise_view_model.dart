@@ -44,6 +44,7 @@ class TransactionViewData {
     this.accountId,
     this.toAccountId,
     this.evidence = const [],
+    this.debtId,
   });
   final String id;
   final String title;
@@ -59,6 +60,12 @@ class TransactionViewData {
   final String? accountId;
   final String? toAccountId;
   final List<EvidenceViewData> evidence;
+
+  /// Set when this is a loan being made or repaid. Such a movement is
+  /// neither spending nor income, so it is left out of both.
+  final String? debtId;
+
+  bool get isLoanMovement => debtId != null;
 }
 
 @immutable
@@ -233,6 +240,43 @@ class ReviewDecision {
 
   int get count =>
       alertIds.isEmpty ? transactionIds.length : alertIds.length;
+}
+
+/// Money that left but is still yours, or arrived but is not.
+///
+/// A bank alert cannot tell a loan from a purchase -- both read "PKR 20,000
+/// sent". Only the person knows, so this is marked by hand, and once marked
+/// the money stops counting as spending because it is coming back.
+@immutable
+class DebtViewData {
+  const DebtViewData({
+    required this.id,
+    required this.lent,
+    required this.counterparty,
+    required this.principal,
+    required this.settled,
+    required this.outstanding,
+    required this.openedAt,
+    required this.isSettled,
+    this.note,
+    this.closedAt,
+  });
+
+  final String id;
+
+  /// True when the user lent it out; false when they borrowed it.
+  final bool lent;
+  final String counterparty;
+  final MoneyViewData principal;
+  final MoneyViewData settled;
+  final MoneyViewData outstanding;
+  final DateTime openedAt;
+  final bool isSettled;
+  final String? note;
+  final DateTime? closedAt;
+
+  bool get isPartlyPaid =>
+      settled.minorUnits > 0 && outstanding.minorUnits > 0;
 }
 
 /// A category the user can file a transaction under. System categories are
@@ -456,6 +500,28 @@ abstract class SpendWiseAdvancedViewModel implements SpendWiseViewModel {
   Future<NotificationTrayScanViewData> scanNotificationTray();
   Future<void> applyReviewDecision(ReviewDecision decision);
 
+  /// Loans made and taken, newest first.
+  List<DebtViewData> get debts;
+
+  /// Marks an existing entry as a loan and opens the debt behind it.
+  Future<void> openDebt({
+    required String transactionId,
+    required bool lent,
+    required String counterparty,
+    String? note,
+  });
+
+  /// Records money coming back. Pass [transactionId] when a real entry in the
+  /// ledger is the repayment; omit it for cash that never touched an account.
+  Future<void> settleDebt({
+    required String debtId,
+    required MoneyViewData amount,
+    String? transactionId,
+  });
+
+  Future<void> closeDebt(String id);
+  Future<void> removeDebt(String id);
+
   /// Every category available to file under, system and user-added.
   List<CategoryViewData> get categories;
 
@@ -562,6 +628,35 @@ extension SpendWiseAdvancedAccess on SpendWiseViewModel {
       _advanced?.unroutedAlerts ?? const [];
   bool uiIsSharedSource(String packageName) =>
       _advanced?.isSharedSource(packageName) ?? false;
+  List<DebtViewData> get uiDebts => _advanced?.debts ?? const [];
+  Future<void> uiOpenDebt({
+    required String transactionId,
+    required bool lent,
+    required String counterparty,
+    String? note,
+  }) =>
+      _advanced?.openDebt(
+        transactionId: transactionId,
+        lent: lent,
+        counterparty: counterparty,
+        note: note,
+      ) ??
+      Future.error(UnsupportedError('Loans are not available'));
+  Future<void> uiSettleDebt({
+    required String debtId,
+    required MoneyViewData amount,
+    String? transactionId,
+  }) =>
+      _advanced?.settleDebt(
+        debtId: debtId,
+        amount: amount,
+        transactionId: transactionId,
+      ) ??
+      Future.error(UnsupportedError('Loans are not available'));
+  Future<void> uiCloseDebt(String id) =>
+      _advanced?.closeDebt(id) ?? Future.value();
+  Future<void> uiRemoveDebt(String id) =>
+      _advanced?.removeDebt(id) ?? Future.value();
   List<CategoryViewData> get uiCategories => _advanced?.categories ?? const [];
   Future<String> uiAddCategory(String name, {String kind = 'expense'}) =>
       _advanced?.addCategory(name, kind: kind) ??

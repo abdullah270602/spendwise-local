@@ -506,6 +506,30 @@ class _BatchImportViewModel extends _FakeViewModel
   Future<void> removeCategory(String id) async {}
 
   @override
+  List<DebtViewData> get debts => const [];
+
+  @override
+  Future<void> openDebt({
+    required String transactionId,
+    required bool lent,
+    required String counterparty,
+    String? note,
+  }) async {}
+
+  @override
+  Future<void> settleDebt({
+    required String debtId,
+    required MoneyViewData amount,
+    String? transactionId,
+  }) async {}
+
+  @override
+  Future<void> closeDebt(String id) async {}
+
+  @override
+  Future<void> removeDebt(String id) async {}
+
+  @override
   String? viewPreference(String key) => viewPreferences[key];
 
   @override

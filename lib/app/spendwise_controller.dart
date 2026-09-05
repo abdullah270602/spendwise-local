@@ -42,6 +42,7 @@ final class SpendWiseController extends ChangeNotifier
   // alongside the rest and invalidated by the same reload.
   List<AlertViewData>? _unroutedAlertsCache;
   List<CategoryViewData>? _categoriesCache;
+  List<DebtViewData>? _debtsCache;
 
   static Future<SpendWiseController> create() async {
     final ledger = await timedAsync('ledgerOpen', LocalLedger.open);
@@ -137,6 +138,7 @@ final class SpendWiseController extends ChangeNotifier
     _reviewsCache = null;
     _unroutedAlertsCache = null;
     _categoriesCache = null;
+    _debtsCache = null;
     notifyListeners();
   }
 
@@ -292,6 +294,7 @@ final class SpendWiseController extends ChangeNotifier
                 })
                 .toList(growable: false),
             isReviewed: !item.needsReview,
+            debtId: item.debtId,
           );
         })
         .toList(growable: false);
@@ -306,6 +309,9 @@ final class SpendWiseController extends ChangeNotifier
     for (final item in _snapshot.transactions) {
       final local = item.occurredAt.toLocal();
       if (local.year != now.year || local.month != now.month) continue;
+      // Money lent out is still yours and money borrowed is not: neither
+      // belongs in the month's income or spending. They get their own line.
+      if (item.debtId != null) continue;
       if (item.kind == domain.TransactionKind.income) {
         income += item.amount.minorUnits;
       }
@@ -846,6 +852,69 @@ final class SpendWiseController extends ChangeNotifier
     reason: alert.reason,
     accountName: alert.accountName,
   );
+
+  @override
+  List<DebtViewData> get debts => _debtsCache ??= _ledger
+      .debts()
+      .map(
+        (item) => DebtViewData(
+          id: item.id,
+          lent: item.lent,
+          counterparty: item.counterparty,
+          principal: MoneyViewData(
+            item.principalMinor,
+            currency: item.currency,
+          ),
+          settled: MoneyViewData(item.settledMinor, currency: item.currency),
+          outstanding: MoneyViewData(
+            item.outstandingMinor,
+            currency: item.currency,
+          ),
+          openedAt: item.openedAt.toLocal(),
+          isSettled: item.isSettled,
+          note: item.note,
+          closedAt: item.closedAt?.toLocal(),
+        ),
+      )
+      .toList(growable: false);
+
+  @override
+  Future<void> openDebt({
+    required String transactionId,
+    required bool lent,
+    required String counterparty,
+    String? note,
+  }) => _runBusy(() async {
+    _ledger.openDebt(
+      transactionId: transactionId,
+      lent: lent,
+      counterparty: counterparty,
+      note: note,
+    );
+  });
+
+  @override
+  Future<void> settleDebt({
+    required String debtId,
+    required MoneyViewData amount,
+    String? transactionId,
+  }) => _runBusy(() async {
+    _ledger.settleDebt(
+      debtId: debtId,
+      amountMinor: amount.minorUnits.abs(),
+      transactionId: transactionId,
+    );
+  });
+
+  @override
+  Future<void> closeDebt(String id) => _runBusy(() async {
+    _ledger.closeDebt(id);
+  });
+
+  @override
+  Future<void> removeDebt(String id) => _runBusy(() async {
+    _ledger.removeDebt(id);
+  });
 
   @override
   List<CategoryViewData> get categories => _categoriesCache ??= _ledger

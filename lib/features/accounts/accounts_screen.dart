@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../app/theme.dart';
 import '../../core/money.dart';
 import '../../widgets/shape_kit.dart';
+import '../debts/debt_sheets.dart' as debt_sheets;
 import '../../widgets/spendwise_components.dart';
 import '../shell/spendwise_view_model.dart';
 
@@ -52,7 +53,10 @@ class _AccountsScreenState extends State<AccountsScreen> {
         .toList(growable: false);
     final everydayTotal = _sum(everyday);
     final savingsTotal = _sum(savings);
-    final total = everydayTotal + savingsTotal;
+    final owedToYou = viewModel.uiDebts
+        .where((item) => !item.isSettled && item.lent)
+        .fold<int>(0, (sum, item) => sum + item.outstanding.minorUnits);
+    final total = everydayTotal + savingsTotal + owedToYou;
     final unconfigured = viewModel.accounts
         .where((account) => account.suffix.trim().isEmpty)
         .toList(growable: false);
@@ -185,11 +189,85 @@ class _AccountsScreenState extends State<AccountsScreen> {
                   _zone('Held back · savings', savingsTotal),
                   ..._blocks(savings, total),
                 ],
+                ..._loans(),
                 if (unconfigured.isNotEmpty) _incomplete(unconfigured),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Lent money is still yours; borrowed money is not. Neither sits in an
+  /// account, so the map has to say so out loud or the total lies.
+  List<Widget> _loans() {
+    final open = viewModel.uiDebts.where((item) => !item.isSettled).toList();
+    if (open.isEmpty) return const [];
+    final owedToYou = open.where((item) => item.lent).toList();
+    final youOwe = open.where((item) => !item.lent).toList();
+    int total(List<DebtViewData> items) => items.fold<int>(
+      0,
+      (sum, item) => sum + item.outstanding.minorUnits,
+    );
+
+    return [
+      if (owedToYou.isNotEmpty) ...[
+        _zone('Owed to you', total(owedToYou)),
+        for (final item in owedToYou) _loanRow(item),
+      ],
+      if (youOwe.isNotEmpty) ...[
+        _zone('You owe', total(youOwe)),
+        for (final item in youOwe) _loanRow(item),
+      ],
+    ];
+  }
+
+  Widget _loanRow(DebtViewData debt) {
+    final tone = debt.lent ? SpendWiseColors.keep : SpendWiseColors.spend;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: InkWell(
+        onTap: () => debt_sheets.openDebt(
+          context,
+          viewModel: viewModel,
+          debt: debt,
+        ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+          decoration: BoxDecoration(
+            border: Border(
+              left: BorderSide(color: tone, width: 2),
+              top: const BorderSide(color: SpendWiseColors.line),
+              right: const BorderSide(color: SpendWiseColors.line),
+              bottom: const BorderSide(color: SpendWiseColors.line),
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(debt.counterparty, style: SpendWiseType.row),
+                    if (debt.isPartlyPaid) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        '${formatAmount(debt.settled, cents: false)} of '
+                        '${formatAmount(debt.principal, cents: false)} back',
+                        style: SpendWiseType.metaTight,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Text(
+                formatAmount(debt.outstanding, cents: false),
+                style: SpendWiseType.rowStrong.copyWith(color: tone),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -219,11 +297,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
         ProportionBlock(
           name: account.name,
           amount: formatMinor(account.balance.minorUnits),
-          detail: [
-            if (account.suffix.isNotEmpty) '••${account.suffix}',
-            if (account.sources.isNotEmpty)
-              account.sources.map((s) => s.label).join(' + '),
-          ].join(' · '),
+          detail: account.suffix.isEmpty ? '' : '••${account.suffix}',
           height: math.max(
             _minBlock,
             _mapBudget * (account.balance.minorUnits.abs() / safeTotal),
@@ -304,11 +378,9 @@ class _AccountsScreenState extends State<AccountsScreen> {
                 Text(account.name, style: SpendWiseType.row),
                 const SizedBox(height: 2),
                 Text(
-                  [
-                    if (account.institution.isNotEmpty) account.institution,
-                    if (account.suffix.isNotEmpty) '••${account.suffix}',
-                    if (!account.isIncluded) 'savings',
-                  ].join(' · '),
+                  account.suffix.isEmpty
+                      ? account.institution
+                      : '••${account.suffix}',
                   style: SpendWiseType.metaTight,
                 ),
               ],
@@ -551,7 +623,10 @@ class _AccountsScreenState extends State<AccountsScreen> {
                 20,
                 0,
                 20,
-                MediaQuery.viewInsetsOf(context).bottom,
+                // The keyboard when it is up, and the gesture bar always.
+                MediaQuery.viewInsetsOf(context).bottom +
+                    MediaQuery.viewPaddingOf(context).bottom +
+                    24,
               ),
               child: Form(
                 key: formKey,
@@ -771,7 +846,10 @@ class _AccountsScreenState extends State<AccountsScreen> {
                 20,
                 0,
                 20,
-                MediaQuery.viewInsetsOf(context).bottom,
+                // The keyboard when it is up, and the gesture bar always.
+                MediaQuery.viewInsetsOf(context).bottom +
+                    MediaQuery.viewPaddingOf(context).bottom +
+                    24,
               ),
               child: Form(
                 key: formKey,

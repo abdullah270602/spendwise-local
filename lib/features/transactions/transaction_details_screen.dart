@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
 import '../../widgets/category_picker.dart';
+import '../../widgets/shape_kit.dart';
+import '../debts/debt_sheets.dart' as debt_sheets;
 import '../../widgets/spendwise_components.dart';
 import '../shell/spendwise_view_model.dart';
 
@@ -111,6 +113,7 @@ class TransactionDetailsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
+          _LoanSection(viewModel: viewModel, transaction: transaction),
           const SectionHeading('Source evidence'),
           const SizedBox(height: 8),
           Card(
@@ -582,4 +585,102 @@ class _Detail extends StatelessWidget {
       ],
     ),
   );
+}
+
+
+/// Lending is invisible to a bank alert, so this is where a person tells the
+/// ledger what really happened. Offered on every ordinary movement, and
+/// replaced by the loan itself once one exists.
+class _LoanSection extends StatelessWidget {
+  const _LoanSection({required this.viewModel, required this.transaction});
+
+  final SpendWiseViewModel viewModel;
+  final TransactionViewData transaction;
+
+  @override
+  Widget build(BuildContext context) {
+    if (transaction.kind == TransactionKind.transfer) {
+      return const SizedBox.shrink();
+    }
+    final debt = transaction.debtId == null
+        ? null
+        : viewModel.uiDebts
+              .where((item) => item.id == transaction.debtId)
+              .firstOrNull;
+
+    if (debt == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionHeading('Was this a loan?'),
+          const SizedBox(height: 8),
+          Text(
+            transaction.kind == TransactionKind.income
+                ? 'If somebody lent you this, it is not income — it goes back.'
+                : 'If you lent this out, it is not spending — it comes back.',
+            style: SpendWiseType.body.copyWith(fontSize: 13),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: () => debt_sheets.markAsLoan(
+              context,
+              viewModel: viewModel,
+              transaction: transaction,
+            ),
+            child: Text(
+              transaction.kind == TransactionKind.income
+                  ? 'I borrowed this'
+                  : 'I lent this out',
+            ),
+          ),
+          const SizedBox(height: 18),
+        ],
+      );
+    }
+
+    final tone = debt.lent ? SpendWiseColors.keep : SpendWiseColors.spend;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionHeading(debt.lent ? 'Lent out' : 'Borrowed'),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: () =>
+              debt_sheets.openDebt(context, viewModel: viewModel, debt: debt),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+            decoration: BoxDecoration(
+              border: Border(
+                left: BorderSide(color: tone, width: 2),
+                top: const BorderSide(color: SpendWiseColors.line),
+                right: const BorderSide(color: SpendWiseColors.line),
+                bottom: const BorderSide(color: SpendWiseColors.line),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(debt.counterparty, style: SpendWiseType.row),
+                      const SizedBox(height: 2),
+                      Text(
+                        debt.isSettled
+                            ? 'Settled'
+                            : '${formatAmount(debt.outstanding, cents: false)} still out',
+                        style: SpendWiseType.metaTight,
+                      ),
+                    ],
+                  ),
+                ),
+                const Text('→', style: TextStyle(color: SpendWiseColors.dim)),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+      ],
+    );
+  }
 }
