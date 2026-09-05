@@ -12,6 +12,15 @@ final class NotificationParser {
     r'(?<![A-Za-z])(?:[+-]\s*)?(?:PKR|Rs\.?|₨)\s*[+-]?\s*(?:(?:\d{1,3}(?:,\d{3})+)|\d+)(?:\.\d{1,2})?',
     caseSensitive: false,
   );
+  // Bank SMS nearly always quote the running balance beside the transaction
+  // amount ("...debited PKR 80. Avl Bal: PKR 12,345"). Matched against the
+  // text *preceding* an amount: a balance label, then anything but a digit,
+  // so "Bal: ", "Avbl Bal ", and "new balance is Rs. " all qualify while an
+  // earlier, unrelated number cannot be skipped over.
+  static final RegExp _balanceLabelBefore = RegExp(
+    r'\bbal(?:ance)?\b[^0-9]{0,15}$',
+    caseSensitive: false,
+  );
   static final RegExp _debitWords = RegExp(
     r'\b(debit(?:ed)?|paid|sent|spent|purchase(?:d)?|withdrawn?|deducted|transferred\s+to)\b',
     caseSensitive: false,
@@ -74,7 +83,7 @@ final class NotificationParser {
     final text =
         observation.snapshot?.combinedText ??
         '${observation.title ?? ''} ${observation.body}'.trim();
-    final amountMatches = _moneyPattern.allMatches(text).toList();
+    final amountMatches = _transactionAmounts(text);
     if (amountMatches.length != 1) {
       return ParserResult(
         status: amountMatches.isEmpty
@@ -83,7 +92,12 @@ final class NotificationParser {
         parserId: 'pk.prescreen',
         parserVersion: 1,
         confidence: 0,
-        reasons: const ['Expected exactly one explicit PKR amount.'],
+        reasons: [
+          if (amountMatches.isEmpty)
+            'No PKR amount was found in this alert.'
+          else
+            'Found ${amountMatches.length} amounts and could not tell which is the transaction.',
+        ],
       );
     }
     final configured = registry ?? ParserRegistry(pakistanParserDefinitions);
@@ -171,6 +185,21 @@ final class NotificationParser {
   /// transferred from X", or "at X" match. Returns null rather than risk a
   /// wrong name — an unset counterparty is a lesser harm than a mislabeled
   /// one.
+  /// Amounts that could be the transaction itself, with balance figures set
+  /// aside. Falls back to every match when filtering leaves nothing, so an
+  /// unusual phrasing degrades to "ambiguous" rather than to a wrong read.
+  static List<RegExpMatch> _transactionAmounts(String text) {
+    final all = _moneyPattern.allMatches(text).toList();
+    if (all.length <= 1) return all;
+    final withoutBalances = all
+        .where(
+          (match) =>
+              !_balanceLabelBefore.hasMatch(text.substring(0, match.start)),
+        )
+        .toList();
+    return withoutBalances.isEmpty ? all : withoutBalances;
+  }
+
   String? _counterparty(String text, EntryDirection direction) {
     final match = direction == EntryDirection.debit
         ? (_debitCounterpartyPattern.firstMatch(text) ??

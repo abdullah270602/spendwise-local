@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:uuid/uuid.dart';
 
+import '../core/perf.dart';
 import '../domain/domain.dart';
 
 final class StoredSource {
@@ -80,6 +81,32 @@ final class StoredEvidence {
   final List<String> reasonCodes;
   final String payloadJson;
   final String? reference;
+}
+
+/// Why a captured notification never became a transaction, grouped so the
+/// user can act on it. A single "N observations need setup" total says
+/// nothing about which app to fix.
+final class UnparsedSourceSummary {
+  const UnparsedSourceSummary({
+    required this.packageName,
+    required this.displayName,
+    required this.count,
+    required this.needsAccount,
+    this.reason,
+  });
+
+  final String? packageName;
+  final String displayName;
+  final int count;
+
+  /// The most common parser explanation for this group, so the card can say
+  /// what actually went wrong instead of only how many.
+  final String? reason;
+
+  /// True when the source has no account attached, which the user can fix in
+  /// one step. Otherwise the text simply isn't a transaction SpendWise can
+  /// read, and dismissing is the honest option.
+  final bool needsAccount;
 }
 
 final class LedgerSnapshot {
@@ -179,7 +206,7 @@ final class LocalLedger {
       db.execute('PRAGMA busy_timeout = 5000');
       db.execute('PRAGMA secure_delete = ON');
       final ledger = LocalLedger._(db, path);
-      ledger._migrate();
+      timed('migrate', ledger._migrate);
       return ledger;
     } catch (_) {
       db.close();
@@ -206,7 +233,7 @@ final class LocalLedger {
 
   @visibleForTesting
   void resetEvidenceRefreshForTests() => _db.execute(
-    "DELETE FROM app_settings WHERE key = 'refresh_stored_evidence_v1'",
+    "DELETE FROM app_settings WHERE key = 'refresh_stored_evidence_v5'",
   );
 
   T runAtomic<T>(T Function() operation) {
@@ -557,26 +584,55 @@ final class LocalLedger {
   /// reading — including counterparty and reference extraction the earlier
   /// parser lacked, which also helps transfer matching. Confirmed work is
   /// safe: reconciliation preserves locked and manual transactions.
-  void _refreshStoredEvidence() {
+  void _refreshStoredEvidence() =>
+      timed('refreshStoredEvidence', _refreshStoredEvidenceInner);
+
+  void _refreshStoredEvidenceInner() {
     final done = _db.select(
-      "SELECT 1 FROM app_settings WHERE key = 'refresh_stored_evidence_v1'",
+      "SELECT 1 FROM app_settings WHERE key = 'refresh_stored_evidence_v5'",
     );
     if (done.isNotEmpty) return;
     var refreshed = 0;
+    // Includes captures the old parser could not read: it rejected any text
+    // carrying a second amount, which is every bank SMS that quotes a
+    // running balance. Deliberately skips 'ignored' — the user dismissed
+    // those, and retrying them would undo that.
     for (final row in _db.select('''
       SELECT * FROM raw_observations
-      WHERE kind = 'notification' AND parse_status = 'parsed'
+      WHERE kind = 'notification'
+        AND parse_status IN ('parsed', 'review', 'error')
         AND account_id IS NOT NULL
       ''')) {
-      final candidate = const NotificationParser()
-          .parseDetailed(_rawFromRow(row))
-          .candidate;
-      if (candidate == null) continue;
+      final result = const NotificationParser().parseDetailed(_rawFromRow(row));
+      final candidate = result.candidate;
+      if (candidate == null) {
+        // Retire alerts that carry no amount at all: they were never
+        // transactions, and listing them as "needs setup" buried the few
+        // entries that genuinely needed a decision. Keep the explanation
+        // current for whatever remains.
+        _db.execute(
+          'UPDATE raw_observations SET parse_error = ?, parse_status = ? WHERE id = ?',
+          [
+            result.reasons.join(' '),
+            result.status == ParseStatus.unsupported
+                ? 'ignored'
+                : row['parse_status'],
+            row['id'],
+          ],
+        );
+        continue;
+      }
+      if (row['parse_status'] != 'parsed') {
+        _db.execute(
+          "UPDATE raw_observations SET parse_status = 'parsed', parse_error = NULL WHERE id = ?",
+          [row['id']],
+        );
+      }
       _insertCandidate(candidate);
       refreshed++;
     }
     _db.execute(
-      "INSERT OR REPLACE INTO app_settings(key,value) VALUES ('refresh_stored_evidence_v1','done')",
+      "INSERT OR REPLACE INTO app_settings(key,value) VALUES ('refresh_stored_evidence_v5','done')",
     );
     if (refreshed > 0) _reconcile();
   }
@@ -662,7 +718,9 @@ final class LocalLedger {
     }
   }
 
-  LedgerSnapshot snapshot() {
+  LedgerSnapshot snapshot() => timed('snapshot', _snapshotInner);
+
+  LedgerSnapshot _snapshotInner() {
     final accounts = _db
         .select(
           'SELECT * FROM accounts WHERE archived = 0 ORDER BY created_at, name',
@@ -675,11 +733,12 @@ final class LocalLedger {
       ))
         row['id'] as String: row['opening_balance_minor'] as int,
     };
+    final evidence = _evidenceByTransaction();
     final transactions = _db
         .select(
           'SELECT * FROM transactions WHERE deleted_at IS NULL ORDER BY occurred_at DESC, id',
         )
-        .map(_transactionFromRow)
+        .map((row) => _transactionFromRow(row, evidence: evidence))
         .toList(growable: false);
     final unparsed =
         _db
@@ -699,6 +758,49 @@ final class LocalLedger {
       onboardingComplete:
           onboarding.isNotEmpty && onboarding.first['value'] == 'true',
     );
+  }
+
+  /// Captured notifications that never produced a transaction, grouped by the
+  /// app they came from and split by whether mapping an account would fix it.
+  List<UnparsedSourceSummary> unparsedBySource() {
+    final rows = _db.select('''
+      SELECT r.source_package AS package,
+             COALESCE(s.display_name, r.source_package, 'Unknown app') AS label,
+             COUNT(*) AS count,
+             SUM(CASE WHEN r.account_id IS NULL THEN 1 ELSE 0 END) AS unmapped
+      FROM raw_observations r
+      LEFT JOIN sources s ON s.id = r.source_id
+      WHERE r.parse_status IN ('review', 'error')
+      GROUP BY r.source_package, label
+      ORDER BY count DESC
+    ''');
+    return [
+      for (final row in rows)
+        UnparsedSourceSummary(
+          packageName: row['package'] as String?,
+          displayName: row['label'] as String,
+          count: row['count'] as int,
+          needsAccount: (row['unmapped'] as int) > 0,
+          reason: _dominantParseError(row['package'] as String?),
+        ),
+    ];
+  }
+
+  String? _dominantParseError(String? packageName) {
+    final rows = _db.select(
+      '''
+      SELECT parse_error AS reason, COUNT(*) AS count
+      FROM raw_observations
+      WHERE parse_status IN ('review', 'error')
+        AND parse_error IS NOT NULL
+        AND (source_package = ? OR (? IS NULL AND source_package IS NULL))
+      GROUP BY parse_error
+      ORDER BY count DESC
+      LIMIT 1
+      ''',
+      [packageName, packageName],
+    );
+    return rows.isEmpty ? null : rows.first['reason'] as String?;
   }
 
   void completeOnboarding() {
@@ -1634,8 +1736,16 @@ final class LocalLedger {
     );
     final storedStatus = switch (result.status) {
       ParseStatus.parsed => 'parsed',
+      // No account is mapped yet — attaching one makes this readable, so it
+      // stays actionable.
       ParseStatus.invalid => 'error',
-      ParseStatus.unsupported || ParseStatus.ambiguous => 'review',
+      // An amount was present but could not be pinned down: this may well be
+      // a payment, so it is worth a person's attention.
+      ParseStatus.ambiguous => 'review',
+      // No amount at all. An enabled source carries everything the app posts
+      // — OTPs, delivery notices, personal messages — and none of that is a
+      // transaction. Kept on record, but never presented as pending work.
+      ParseStatus.unsupported => 'ignored',
     };
     _db.execute(
       'INSERT OR IGNORE INTO raw_observations(id,kind,external_id,source_package,account_id,observed_at,title,body,parse_status,parse_error,source_id,content_hash,payload_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
@@ -2081,9 +2191,19 @@ final class LocalLedger {
     return id;
   }
 
-  void dismissUnparsed() {
+  /// Dismisses unreadable captures. Scoped to one app when [packageName] is
+  /// given, so clearing noise from one source never silently discards
+  /// evidence from another.
+  void dismissUnparsed({String? packageName}) {
+    if (packageName == null) {
+      _db.execute(
+        "UPDATE raw_observations SET parse_status = 'ignored' WHERE parse_status IN ('review', 'error')",
+      );
+      return;
+    }
     _db.execute(
-      "UPDATE raw_observations SET parse_status = 'ignored' WHERE parse_status IN ('review', 'error')",
+      "UPDATE raw_observations SET parse_status = 'ignored' WHERE parse_status IN ('review', 'error') AND source_package = ?",
+      [packageName],
     );
   }
 
@@ -2168,7 +2288,12 @@ final class LocalLedger {
   void finishBatch({bool insideTransaction = false}) =>
       _reconcile(manageTransaction: !insideTransaction);
 
-  void _reconcile({bool manageTransaction = true}) {
+  void _reconcile({bool manageTransaction = true}) => timed(
+    'reconcile',
+    () => _reconcileInner(manageTransaction: manageTransaction),
+  );
+
+  void _reconcileInner({bool manageTransaction = true}) {
     final candidates = _db
         .select('''
       SELECT c.*, r.kind AS raw_kind, r.external_id, r.source_package,
@@ -2220,11 +2345,12 @@ final class LocalLedger {
           );
         })
         .toList();
+    final lockedEvidence = _evidenceByTransaction();
     final existingLocked = _db
         .select(
           "SELECT * FROM transactions WHERE locked = 1 OR origin = 'manual'",
         )
-        .map(_transactionFromRow)
+        .map((row) => _transactionFromRow(row, evidence: lockedEvidence))
         .toList();
     final result = Reconciler(ownIdentity: _ownIdentity())
         .reconcile(candidates, existing: existingLocked);
@@ -2348,7 +2474,27 @@ final class LocalLedger {
     archived: row['archived'] == 1,
   );
 
-  CanonicalTransaction _transactionFromRow(Row row) => CanonicalTransaction(
+  /// Evidence links for every transaction, in one query.
+  ///
+  /// Hydrating them per transaction meant a query per row, so reading the
+  /// ledger cost hundreds of round trips on every refresh — and a refresh
+  /// follows every capture.
+  Map<String, Set<String>> _evidenceByTransaction() {
+    final map = <String, Set<String>>{};
+    for (final row in _db.select(
+      'SELECT transaction_id, observation_id FROM transaction_evidence',
+    )) {
+      map
+          .putIfAbsent(row['transaction_id'] as String, () => <String>{})
+          .add(row['observation_id'] as String);
+    }
+    return map;
+  }
+
+  CanonicalTransaction _transactionFromRow(
+    Row row, {
+    Map<String, Set<String>>? evidence,
+  }) => CanonicalTransaction(
     id: row['id'] as String,
     kind: TransactionKind.values.byName(row['kind'] as String),
     amount: Money(
@@ -2371,13 +2517,17 @@ final class LocalLedger {
       row['reconcile_state'] as String? ??
           (row['needs_review'] == 1 ? 'needsReview' : 'confirmed'),
     ),
-    evidenceIds: _db
-        .select(
-          'SELECT observation_id FROM transaction_evidence WHERE transaction_id = ?',
-          [row['id']],
-        )
-        .map((item) => item['observation_id'] as String)
-        .toSet(),
+    evidenceIds:
+        evidence?[row['id'] as String] ??
+        (evidence != null
+            ? const <String>{}
+            : _db
+                  .select(
+                    'SELECT observation_id FROM transaction_evidence WHERE transaction_id = ?',
+                    [row['id']],
+                  )
+                  .map((item) => item['observation_id'] as String)
+                  .toSet()),
   );
 
   RawObservation _rawFromRow(Row row, {String? accountOverride}) =>

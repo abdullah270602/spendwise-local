@@ -33,8 +33,21 @@ void main() {
 
   test('refuses ambiguous observations', () {
     expect(parser.parse(observation('Balance is PKR 10,000')), isNull);
-    expect(parser.parse(observation('Paid PKR 100. Balance PKR 900')), isNull);
     expect(parser.parse(observation('Paid PKR 100', accountId: null)), isNull);
+    // Two amounts that could each be the transaction stay refused.
+    expect(
+      parser.parse(observation('Paid PKR 100 plus PKR 20 service fee')),
+      isNull,
+    );
+  });
+
+  test('reads the amount when the other figure is labelled as a balance', () {
+    // Bank SMS quote the running balance next to the amount. Refusing these
+    // as "ambiguous" silenced the entire SMS channel.
+    final result = parser.parse(observation('Paid PKR 100. Balance PKR 900'));
+    expect(result, isNotNull);
+    expect(result!.direction, EntryDirection.debit);
+    expect(result.amount.minorUnits, 10000);
   });
 
   test('extracts counterparty and TID from a real-shaped bank SMS', () {

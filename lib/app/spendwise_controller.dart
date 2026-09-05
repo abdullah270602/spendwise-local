@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import '../core/perf.dart';
 import '../data/csv_importer.dart';
 import '../data/csv_import_wizard.dart';
 import '../data/ledger_exporter.dart';
@@ -43,7 +44,7 @@ final class SpendWiseController extends ChangeNotifier
   List<ReviewViewData>? _reviewsCache;
 
   static Future<SpendWiseController> create() async {
-    final ledger = await LocalLedger.open();
+    final ledger = await timedAsync('ledgerOpen', LocalLedger.open);
     final controller = SpendWiseController._(
       ledger,
       const NotificationBridge(),
@@ -353,14 +354,17 @@ final class SpendWiseController extends ChangeNotifier
             transactions: [item],
           ),
         ),
-    if (_snapshot.unparsedCount > 0)
+    // Grouped per app: a single "N observations need setup" total gave no
+    // clue which app to fix, so the whole pile stayed untouched.
+    for (final source in _ledger.unparsedBySource())
       ReviewViewData(
-        id: 'unparsed',
+        id: '$_unparsedPrefix${source.packageName ?? ''}',
         reason: ReviewReason.parseFailed,
         title:
-            '${_snapshot.unparsedCount} observation${_snapshot.unparsedCount == 1 ? '' : 's'} need setup',
-        description:
-            'Map its source to an account, or dismiss unsupported events.',
+            '${source.count} unread alert${source.count == 1 ? '' : 's'} from ${source.displayName}',
+        description: source.needsAccount
+            ? 'These are not linked to an account yet, so nothing from ${source.displayName} reaches your ledger. Attach it to an account to capture them.'
+            : '${source.reason ?? 'SpendWise could not read these as transactions.'} If ${source.displayName} does not send payment alerts, dismiss them.',
         transactions: const [],
       ),
   ];
@@ -644,11 +648,18 @@ final class SpendWiseController extends ChangeNotifier
     _reload();
   }
 
+  static const _unparsedPrefix = 'unparsed:';
+
   @override
   Future<void> resolveReview(String id, {required bool merge}) async {
-    id == 'unparsed'
-        ? _ledger.dismissUnparsed()
-        : _ledger.confirmTransaction(id);
+    if (id == 'unparsed') {
+      _ledger.dismissUnparsed();
+    } else if (id.startsWith(_unparsedPrefix)) {
+      final package = id.substring(_unparsedPrefix.length);
+      _ledger.dismissUnparsed(packageName: package.isEmpty ? null : package);
+    } else {
+      _ledger.confirmTransaction(id);
+    }
     _reload();
   }
 

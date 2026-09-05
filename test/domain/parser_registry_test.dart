@@ -52,12 +52,25 @@ void main() {
     expect(result.reasons.single, contains('outgoing'));
   });
 
-  test('ambiguous multi-amount notification is not guessed', () {
+  test('a quoted available balance does not make the amount ambiguous', () {
     final raw = RawObservation(
       id: 'n2',
       kind: ObservationKind.notification,
       observedAt: observedAt,
       body: 'Paid PKR 100. Available balance PKR 900.',
+      accountId: 'bank',
+    );
+    final result = const NotificationParser().parseDetailed(raw);
+    expect(result.status, ParseStatus.parsed);
+    expect(result.candidate!.amount.minorUnits, 10000);
+  });
+
+  test('two candidate amounts are still not guessed', () {
+    final raw = RawObservation(
+      id: 'n3',
+      kind: ObservationKind.notification,
+      observedAt: observedAt,
+      body: 'Paid PKR 100 and PKR 20 fee.',
       accountId: 'bank',
     );
     final result = const NotificationParser().parseDetailed(raw);

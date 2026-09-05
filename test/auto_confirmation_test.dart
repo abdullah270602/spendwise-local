@@ -127,6 +127,51 @@ void main() {
     expect(after.every((item) => !item.needsReview), isTrue);
   });
 
+  test('a bank SMS quoting a balance becomes a transaction, not a stuck '
+      'observation', () {
+    final ledger = ledgerWithBankAccount();
+    addTearDown(ledger.close);
+
+    ingest(
+      ledger,
+      'Your a/c ****1234 has been debited with PKR 80.00. Avl Bal: PKR 12,345.67',
+    );
+
+    final snapshot = ledger.snapshot();
+    expect(
+      snapshot.unparsedCount,
+      0,
+      reason: 'a quoted balance must not make the alert unreadable',
+    );
+    expect(snapshot.transactions.single.amount.minorUnits, 8000);
+    expect(ledger.unparsedBySource(), isEmpty);
+  });
+
+  test('an alert with no amount is not treated as pending work', () {
+    final ledger = ledgerWithBankAccount();
+    addTearDown(ledger.close);
+
+    // An enabled source carries everything that app posts. None of this is a
+    // transaction, and none of it is actionable, so it must not accumulate
+    // in the Review inbox.
+    ingest(ledger, 'Your one-time passcode is 123456', key: 'otp');
+    ingest(ledger, 'Your parcel is out for delivery', key: 'parcel');
+
+    final snapshot = ledger.snapshot();
+    expect(snapshot.unparsedCount, 0);
+    expect(snapshot.transactions, isEmpty);
+    expect(ledger.unparsedBySource(), isEmpty);
+  });
+
+  test('an alert with two amounts still asks, because it may be a payment', () {
+    final ledger = ledgerWithBankAccount();
+    addTearDown(ledger.close);
+
+    ingest(ledger, 'Paid PKR 100 and PKR 20 fee', key: 'two-amounts');
+
+    expect(ledger.snapshot().unparsedCount, 1);
+  });
+
   test('marketing copy that reads like a transaction still asks first', () {
     final ledger = ledgerWithBankAccount();
     addTearDown(ledger.close);
