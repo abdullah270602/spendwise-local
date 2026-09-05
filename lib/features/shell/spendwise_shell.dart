@@ -88,11 +88,15 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
     if (box == null || !box.attached || !box.hasSize) return null;
     final origin = box.localToGlobal(Offset.zero);
     final width = box.size.width / _destinations;
+    // Stop short of the gesture inset: the bar's box runs under Android's own
+    // navigation, and a spotlight drawn down there frames the system buttons
+    // as though they were part of the app.
+    final inset = MediaQuery.viewPaddingOf(context).bottom;
     return Rect.fromLTWH(
       origin.dx + width * destination,
       origin.dy,
       width,
-      box.size.height,
+      (box.size.height - inset).clamp(24.0, box.size.height),
     );
   }
 

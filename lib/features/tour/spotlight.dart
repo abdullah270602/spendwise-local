@@ -189,7 +189,7 @@ class _ScrimPainter extends CustomPainter {
     }
     canvas.drawPath(
       path,
-      Paint()..color = SpendWiseColors.bg.withValues(alpha: .86),
+      Paint()..color = SpendWiseColors.bg.withValues(alpha: .78),
     );
     if (hole case final rect?) {
       canvas.drawRect(
