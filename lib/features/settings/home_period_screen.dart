@@ -38,6 +38,7 @@ class _HomePeriodScreenState extends State<HomePeriodScreen> {
     final options = <HomePeriod>[
       HomePeriod.calendarMonth,
       HomePeriod.lastThirtyDays,
+      HomePeriod.lastFourteenDays,
       HomePeriod.lastSevenDays,
       HomePeriod(
         kind: HomePeriodKind.dayRange,

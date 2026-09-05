@@ -25,6 +25,16 @@ void main() {
     expect(to.difference(from).inDays, 30);
   });
 
+  test('a rolling fortnight looks back fourteen days', () {
+    // Paid every two weeks: any 14-day window holds exactly one pay cycle,
+    // which a calendar month never does.
+    final (from, to) = HomePeriod.lastFourteenDays.resolve(
+      DateTime(2026, 11, 4),
+    );
+    expect(from, DateTime(2026, 10, 22));
+    expect(to.difference(from).inDays, 14);
+  });
+
   test('a rolling week looks back seven days', () {
     final (from, to) = HomePeriod.lastSevenDays.resolve(DateTime(2026, 11, 4));
     expect(to.difference(from).inDays, 7);
@@ -101,6 +111,7 @@ void main() {
     const cases = [
       HomePeriod.calendarMonth,
       HomePeriod.lastSevenDays,
+      HomePeriod.lastFourteenDays,
       HomePeriod.lastThirtyDays,
       HomePeriod(kind: HomePeriodKind.dayRange, startDay: 3),
       HomePeriod(kind: HomePeriodKind.dayRange, startDay: 3, endDay: 27),

@@ -14,6 +14,10 @@ enum HomePeriodKind {
   /// A rolling week.
   lastSevenDays,
 
+  /// A rolling fortnight, for anyone paid every two weeks: it contains
+  /// exactly one pay cycle whatever day of the month that falls on.
+  lastFourteenDays,
+
   /// A rolling month. Always contains one pay cycle, whatever day that lands.
   lastThirtyDays,
 
@@ -41,6 +45,9 @@ class HomePeriod {
 
   static const calendarMonth = HomePeriod();
   static const lastSevenDays = HomePeriod(kind: HomePeriodKind.lastSevenDays);
+  static const lastFourteenDays = HomePeriod(
+    kind: HomePeriodKind.lastFourteenDays,
+  );
   static const lastThirtyDays = HomePeriod(kind: HomePeriodKind.lastThirtyDays);
 
   /// The stored form, kept short and human so a person reading the database
@@ -48,6 +55,7 @@ class HomePeriod {
   String encode() => switch (kind) {
     HomePeriodKind.calendarMonth => 'month',
     HomePeriodKind.lastSevenDays => 'd7',
+    HomePeriodKind.lastFourteenDays => 'd14',
     HomePeriodKind.lastThirtyDays => 'd30',
     HomePeriodKind.dayRange =>
       endDay > 0 ? 'range:$startDay-$endDay' : 'range:$startDay',
@@ -57,6 +65,8 @@ class HomePeriod {
     switch (value) {
       case 'd7':
         return lastSevenDays;
+      case 'd14':
+        return lastFourteenDays;
       case 'd30':
         return lastThirtyDays;
       case null:
@@ -81,6 +91,8 @@ class HomePeriod {
         return (DateTime(today.year, today.month), tomorrow);
       case HomePeriodKind.lastSevenDays:
         return (today.subtract(const Duration(days: 6)), tomorrow);
+      case HomePeriodKind.lastFourteenDays:
+        return (today.subtract(const Duration(days: 13)), tomorrow);
       case HomePeriodKind.lastThirtyDays:
         return (today.subtract(const Duration(days: 29)), tomorrow);
       case HomePeriodKind.dayRange:
@@ -108,6 +120,8 @@ class HomePeriod {
         return _monthName(from.month);
       case HomePeriodKind.lastSevenDays:
         return 'Last 7 days';
+      case HomePeriodKind.lastFourteenDays:
+        return 'Last 14 days';
       case HomePeriodKind.lastThirtyDays:
         return 'Last 30 days';
       case HomePeriodKind.dayRange:
@@ -122,6 +136,7 @@ class HomePeriod {
   String get title => switch (kind) {
     HomePeriodKind.calendarMonth => 'This calendar month',
     HomePeriodKind.lastSevenDays => 'Last 7 days',
+    HomePeriodKind.lastFourteenDays => 'Last 14 days',
     HomePeriodKind.lastThirtyDays => 'Last 30 days',
     HomePeriodKind.dayRange => endDay > 0
         ? 'The ${_ordinal(startDay)} to the ${_ordinal(endDay)}'
@@ -132,6 +147,8 @@ class HomePeriod {
     HomePeriodKind.calendarMonth =>
       'The 1st up to today. Thin until payday lands.',
     HomePeriodKind.lastSevenDays => 'A rolling week.',
+    HomePeriodKind.lastFourteenDays =>
+      'A rolling fortnight, for pay that arrives every two weeks.',
     HomePeriodKind.lastThirtyDays =>
       'Always contains one pay cycle, whatever day it lands on.',
     HomePeriodKind.dayRange => endDay > 0
