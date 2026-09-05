@@ -245,6 +245,8 @@ class CopyPromptButton extends StatelessWidget {
 
   final String title;
   final String brief;
+
+  /// The icon-only form for an app bar.
   final bool dense;
 
   static const _preamble =
@@ -255,32 +257,142 @@ class CopyPromptButton extends StatelessWidget {
       'the device.\n\n'
       'Here is the part of its guide I am asking about.';
 
-  String get prompt => '$_preamble\n\n--- $title ---\n$brief\n\nMy question: ';
+  String get prompt =>
+      '$_preamble\n\n--- $title ---\n$brief\n\nMy question: ';
+
+  Future<void> _copy(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: prompt));
+    if (!context.mounted) return;
+    HapticFeedback.selectionClick();
+    // A dialog rather than a snackbar: nobody has met this idea before, so
+    // the first time it happens it has to say what was copied and what to do
+    // with it, not flash a line and vanish.
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Copied'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Paste it into ChatGPT, Claude, Gemini or any other assistant '
+              'and ask away.',
+              style: SpendWiseType.body.copyWith(fontSize: 13.5),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.fromLTRB(12, 11, 12, 12),
+              decoration: BoxDecoration(
+                border: Border.all(color: SpendWiseColors.line),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Eyebrow('What went on the clipboard'),
+                  const SizedBox(height: 9),
+                  const _Bullet(
+                    'What SpendWise is, and that it works offline',
+                  ),
+                  _Bullet('This whole section: $title'),
+                  _Bullet('A blank line for your question at the end'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Nothing was sent anywhere. SpendWise cannot reach the network; '
+              'it only put text on your clipboard.',
+              style: SpendWiseType.body.copyWith(fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    Future<void> copy() async {
-      await Clipboard.setData(ClipboardData(text: prompt));
-      if (!context.mounted) return;
-      HapticFeedback.selectionClick();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Prompt copied. Paste it to any AI assistant.'),
-        ),
-      );
-    }
-
     if (dense) {
       return IconButton(
-        onPressed: copy,
+        onPressed: () => _copy(context),
         tooltip: 'Copy a prompt about this',
         icon: const Icon(Icons.content_copy_rounded, size: 18),
       );
     }
-    return OutlinedButton.icon(
-      onPressed: copy,
-      icon: const Icon(Icons.content_copy_rounded, size: 16),
-      label: const Text('Copy a prompt to ask an AI'),
+    return InkWell(
+      onTap: () => _copy(context),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(15, 14, 15, 15),
+        decoration: BoxDecoration(
+          border: Border.all(color: SpendWiseColors.edge),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Icon(
+                Icons.auto_awesome_outlined,
+                size: 18,
+                color: SpendWiseColors.keep,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Ask an AI about this',
+                    style: SpendWiseType.rowStrong.copyWith(fontSize: 14.5),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Copies this section, ready to paste into any chatbot',
+                    style: SpendWiseType.body.copyWith(fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
+}
+
+class _Bullet extends StatelessWidget {
+  const _Bullet(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 5),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          margin: const EdgeInsets.only(top: 7),
+          width: 10,
+          height: 2,
+          color: SpendWiseColors.keep,
+        ),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Text(
+            text,
+            style: SpendWiseType.body.copyWith(fontSize: 12.5),
+          ),
+        ),
+      ],
+    ),
+  );
 }

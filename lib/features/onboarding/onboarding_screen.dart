@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
 import '../../widgets/shape_kit.dart';
+import '../../widgets/spendwise_components.dart';
 import '../settings/source_selection_screen.dart';
 import '../shell/spendwise_view_model.dart';
 import 'alert_demo.dart';
+import 'onboarding_figures.dart';
 
 /// First run: four cards, and every one of them changes something.
 ///
@@ -20,6 +22,11 @@ import 'alert_demo.dart';
 /// That needs exactly three things -- notification access, at least one app
 /// to watch, and somewhere for entries to land. Your name, a PIN, more
 /// accounts and everything else are reachable later and are not on the path.
+///
+/// Cutting the words is not the same as leaving the screen empty, so every
+/// card carries a figure that does the explaining the prose used to: the
+/// transformation itself, the shape of what the permission buys, the actual
+/// icons of the apps being watched, and where a digit sends an alert.
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key, required this.viewModel, this.onDone});
 
@@ -92,21 +99,40 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 controller: controller,
                 onPageChanged: (value) => setState(() => page = value),
                 children: [
-                  for (final card in pages)
-                    SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(
-                        SpendWiseTheme.gutter,
-                        6,
-                        SpendWiseTheme.gutter,
-                        16,
+                  for (var index = 0; index < pages.length; index++)
+                    // Short cards sit in the middle of the screen rather than
+                    // clinging to the top over a screenful of nothing; tall
+                    // ones scroll as usual.
+                    LayoutBuilder(
+                      builder: (context, constraints) => SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(
+                          SpendWiseTheme.gutter,
+                          6,
+                          SpendWiseTheme.gutter,
+                          16,
+                        ),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight - 22,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // Keyed so re-entering a card replays its
+                              // stagger instead of snapping into place.
+                              KeyedSubtree(
+                                key: ValueKey('$index-${page == index}'),
+                                child: pages[index],
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      child: card,
                     ),
                 ],
               ),
             ),
-            // The last card carries its own button, because what it does
-            // there is a result rather than a page turn.
             if (page < _cards - 1)
               Padding(
                 padding: const EdgeInsets.fromLTRB(
@@ -143,7 +169,7 @@ class _Progress extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(
       SpendWiseTheme.gutter,
-      14,
+      16,
       SpendWiseTheme.gutter,
       18,
     ),
@@ -174,12 +200,15 @@ class _Say extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Text(headline, style: SpendWiseType.statement),
+      Text(
+        headline,
+        style: SpendWiseType.statement.copyWith(fontSize: 29, height: 1.15),
+      ),
       if (detail case final text?) ...[
         const SizedBox(height: 10),
         Text(text, style: SpendWiseType.body.copyWith(fontSize: 14)),
       ],
-      const SizedBox(height: 22),
+      const SizedBox(height: 26),
     ],
   );
 }
@@ -191,9 +220,16 @@ class _ShowIt extends StatelessWidget {
   const _ShowIt();
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context) => Stagger(
     children: [
+      Row(
+        children: [
+          const SpendWiseMark(size: 24),
+          const SizedBox(width: 10),
+          Text('SpendWise', style: SpendWiseType.metaTight),
+        ],
+      ),
+      const SizedBox(height: 20),
       const _Say('Your bank already tells you everything.'),
       AlertDemo(example: AlertExample.purchase, compact: true),
     ],
@@ -207,7 +243,8 @@ class _ShowIt extends StatelessWidget {
 /// Android's own screen warns that this app could read every notification,
 /// and it is right to. Saying so before it appears is what the evidence
 /// shows converts; narrowing the scope converts better still than promising
-/// to behave, which is why the next card is the allowlist.
+/// to behave, which is why the figure ends in a wall and the next card is
+/// the allowlist.
 class _Access extends StatelessWidget {
   const _Access({required this.viewModel});
 
@@ -216,8 +253,7 @@ class _Access extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final granted = viewModel.notificationAccessGranted;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Stagger(
       children: [
         _Say(
           granted
@@ -228,6 +264,8 @@ class _Access extends StatelessWidget {
               : 'It will say SpendWise can read every notification. It reads '
                     'only the apps you pick next.',
         ),
+        ClosedCircuit(granted: granted),
+        const SizedBox(height: 26),
         if (granted)
           const _Done('Notification access on')
         else ...[
@@ -235,12 +273,7 @@ class _Access extends StatelessWidget {
             label: 'Open the setting',
             onPressed: viewModel.requestNotificationAccess,
           ),
-          const SizedBox(height: 22),
-          // The falsifiable half of the claim. A promise is worth less than
-          // something the reader can go and check.
-          const _Proof('No internet permission, which the guide will show you'),
-          const _Proof('Nothing syncs, uploads or backs up'),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           Text(
             'Toggle greyed out? App info, then the menu, then Allow '
             'restricted settings.',
@@ -250,32 +283,6 @@ class _Access extends StatelessWidget {
       ],
     );
   }
-}
-
-class _Proof extends StatelessWidget {
-  const _Proof(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 9),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          margin: const EdgeInsets.only(top: 7),
-          width: 14,
-          height: 2,
-          color: SpendWiseColors.keep,
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(text, style: SpendWiseType.body.copyWith(fontSize: 13)),
-        ),
-      ],
-    ),
-  );
 }
 
 class _Done extends StatelessWidget {
@@ -307,23 +314,14 @@ class _Sources extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chosen = viewModel.sources.where((item) => item.enabled).toList();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Stagger(
       children: [
         const _Say(
           'Which apps talk about money?',
           detail: 'Everything else on your phone stays invisible.',
         ),
-        for (final source in chosen.take(6)) _Done(source.label),
-        if (chosen.length > 6)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text(
-              'and ${chosen.length - 6} more',
-              style: SpendWiseType.body.copyWith(fontSize: 12.5),
-            ),
-          ),
-        if (chosen.isNotEmpty) const SizedBox(height: 18),
+        SourceGrid(sources: chosen),
+        const SizedBox(height: 26),
         OutlinedButton(
           onPressed: () => Navigator.push(
             context,
@@ -425,8 +423,7 @@ class _LandingState extends State<_Landing> {
 
     return Form(
       key: formKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stagger(
         children: [
           _Say(
             accounts.isEmpty
@@ -436,13 +433,9 @@ class _LandingState extends State<_Landing> {
                 ? 'The last digits are how an alert finds the right account.'
                 : null,
           ),
-          for (final account in accounts)
-            _Done(
-              account.suffix.isEmpty
-                  ? account.name
-                  : '${account.name} · ${account.suffix}',
-            ),
           if (accounts.isEmpty) ...[
+            RoutingFigure(suffix: suffix.text.trim()),
+            const SizedBox(height: 22),
             TextFormField(
               controller: name,
               textCapitalization: TextCapitalization.words,
@@ -469,6 +462,9 @@ class _LandingState extends State<_Landing> {
                   child: TextFormField(
                     controller: suffix,
                     keyboardType: TextInputType.number,
+                    // The figure above quotes whatever is typed here, so the
+                    // example is about this person's account within a keypress.
+                    onChanged: (_) => setState(() {}),
                     decoration: const InputDecoration(
                       labelText: 'Last digits',
                       hintText: '4821',
@@ -489,8 +485,14 @@ class _LandingState extends State<_Landing> {
               onPressed: saving ? null : _add,
               child: Text(saving ? 'Adding…' : 'Add it'),
             ),
-          ],
-          const SizedBox(height: 24),
+          ] else
+            for (final account in accounts)
+              _Done(
+                account.suffix.isEmpty
+                    ? account.name
+                    : '${account.name} · ${account.suffix}',
+              ),
+          const SizedBox(height: 26),
           if (found case final count?)
             Padding(
               padding: const EdgeInsets.only(bottom: 14),

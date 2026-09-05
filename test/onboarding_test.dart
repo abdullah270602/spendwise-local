@@ -75,8 +75,8 @@ void main() {
       find.textContaining('reads only the apps you pick next'),
       findsOneWidget,
     );
-    // Something checkable beside the promise.
-    expect(find.textContaining('No internet permission'), findsOneWidget);
+    // The figure carries the claim the two bullet lines used to.
+    expect(find.text('Nothing leaves the phone'), findsOneWidget);
     // And the dead end a sideloaded build walks into.
     expect(find.textContaining('Allow restricted settings'), findsOneWidget);
   });
@@ -143,8 +143,7 @@ const _onboardingCopy = [
   'Android is about to warn you.',
   'It will say SpendWise can read every notification. It reads only the apps '
       'you pick next.',
-  'No internet permission, which the guide will show you',
-  'Nothing syncs, uploads or backs up',
+  'Nothing leaves the phone',
   'Toggle greyed out? App info, then the menu, then Allow restricted '
       'settings.',
   'Done. It can see your alerts.',

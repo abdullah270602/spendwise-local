@@ -168,8 +168,16 @@ class AlertDemo extends StatelessWidget {
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.fromLTRB(14, 4, 14, 0),
+          // A coloured spine down the outcome, so the two boxes are not
+          // twins: one is the message that arrived, the other is what the
+          // ledger now holds, and the colour already says which way it went.
           decoration: BoxDecoration(
-            border: Border.all(color: SpendWiseColors.edge),
+            border: Border(
+              left: BorderSide(color: example.tone, width: 2),
+              top: const BorderSide(color: SpendWiseColors.edge),
+              right: const BorderSide(color: SpendWiseColors.edge),
+              bottom: const BorderSide(color: SpendWiseColors.edge),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -315,11 +323,38 @@ class _Arrow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.center,
     children: [
-      const SizedBox(width: 14),
-      Container(width: 1, height: 14, color: SpendWiseColors.edge),
-      const SizedBox(width: 9),
-      Text('becomes', style: SpendWiseType.metaTight),
+      SizedBox(
+        width: 18,
+        height: 26,
+        child: CustomPaint(painter: _ArrowPainter()),
+      ),
+      const SizedBox(width: 10),
+      const Eyebrow('Becomes'),
     ],
   );
+}
+
+class _ArrowPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final x = size.width / 2;
+    final paint = Paint()
+      ..color = SpendWiseColors.dim
+      ..strokeWidth = 1
+      ..style = PaintingStyle.stroke;
+    canvas
+      ..drawLine(Offset(x, 0), Offset(x, size.height - 5), paint)
+      ..drawPath(
+        Path()
+          ..moveTo(x - 4, size.height - 6)
+          ..lineTo(x, size.height)
+          ..lineTo(x + 4, size.height - 6),
+        paint,
+      );
+  }
+
+  @override
+  bool shouldRepaint(_ArrowPainter old) => false;
 }
