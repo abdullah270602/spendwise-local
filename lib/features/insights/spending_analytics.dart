@@ -95,6 +95,9 @@ final class SpendingAnalytics {
     var currency = transactions.firstOrNull?.amount.currency ?? 'PKR';
 
     for (final transaction in transactions) {
+      // Lending is not spending and borrowing is not income, on this screen
+      // for the same reason as on Home: the money is coming back.
+      if (transaction.isLoanMovement) continue;
       final occurred = transaction.occurredAt.toLocal();
       final amount = transaction.amount.minorUnits.abs();
       currency = transaction.amount.currency;

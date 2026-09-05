@@ -30,6 +30,11 @@ Future<String?> pickCategory(
 /// what the money was for, it becomes a list you skim. The groups are stated
 /// here rather than stored, so adding a seeded category never needs a
 /// migration to stay organised.
+/// Set by marking a transaction as a loan, never by picking a label: the
+/// money only stops counting as spending when there is a debt behind it, and
+/// offering these here promised an exclusion that would not happen.
+const _loanCategories = {'lent', 'borrowed'};
+
 const _groups = <String, List<String>>{
   'Day to day': ['groceries', 'food', 'transport', 'bills', 'home'],
   'Life': [
@@ -81,6 +86,7 @@ class _CategorySheetState extends State<_CategorySheet> {
   Widget build(BuildContext context) {
     final query = search.text.trim().toLowerCase();
     final usable = widget.viewModel.uiCategories
+        .where((item) => !_loanCategories.contains(item.id))
         .where((item) => item.suits(widget.kind))
         .where((item) => query.isEmpty || item.name.toLowerCase().contains(query))
         .toList();

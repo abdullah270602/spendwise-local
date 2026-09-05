@@ -131,7 +131,11 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
               ),
           ],
         ),
-        floatingActionButton: index <= 1 && widget.viewModel.accounts.isNotEmpty
+        // Ledger only: on Home it floated over the last line of the summary,
+        // and adding an entry by hand is something you do while reading the
+        // register, not while reading the month's shape.
+        floatingActionButton:
+            index == 1 && widget.viewModel.accounts.isNotEmpty
             ? FloatingActionButton.small(
                 onPressed: () => _showManual(context),
                 tooltip: 'Record something by hand',

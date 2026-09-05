@@ -472,14 +472,14 @@ class _LoansNote extends StatelessWidget {
               if (lentOut > 0)
                 _LoanLine(
                   amount: lentOut,
-                  tail: 'is out on loan — still yours, not spending.',
+                  tail: 'is out on loan',
                   tone: SpendWiseColors.keep,
                 ),
               if (lentOut > 0 && owed > 0) const SizedBox(height: 7),
               if (owed > 0)
                 _LoanLine(
                   amount: owed,
-                  tail: 'you owe — arrived, but not yours to keep.',
+                  tail: 'you owe',
                   tone: SpendWiseColors.spend,
                 ),
             ],
@@ -586,9 +586,10 @@ class _OwnMovesNote extends StatelessWidget {
                       ),
                       TextSpan(
                         text: moves.length == 1
-                            ? 'moved between your own accounts — not counted as spending.'
-                            : 'moved between your own accounts across '
-                                  '${moves.length} transfers — not counted as spending.',
+                            ? 'moved between your own accounts — not counted '
+                                  'as spending.'
+                            : 'moved between your own accounts — not counted '
+                                  'as spending.',
                         style: SpendWiseType.body.copyWith(fontSize: 13),
                       ),
                     ],
@@ -623,19 +624,30 @@ class _TrayScanState extends State<_TrayScan> {
     padding: const EdgeInsets.fromLTRB(SpendWiseTheme.gutter, 24, 0, 0),
     child: Align(
       alignment: Alignment.centerLeft,
-      child: TextButton(
-        onPressed: running ? null : _scan,
-        style: TextButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-          minimumSize: Size.zero,
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          foregroundColor: SpendWiseColors.dim,
-          textStyle: SpendWiseType.metaTight.copyWith(
-            color: SpendWiseColors.dim,
+      // A hairline box, so it reads as something you can press without
+      // becoming another thing competing for attention on the screen.
+      child: InkWell(
+        onTap: running ? null : _scan,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+          decoration: BoxDecoration(
+            border: Border.all(color: SpendWiseColors.line),
           ),
-        ),
-        child: Text(
-          running ? 'SCANNING TRAY…' : 'MISSING SOMETHING? SCAN THE TRAY',
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                running ? Icons.hourglass_empty_rounded : Icons.refresh_rounded,
+                size: 13,
+                color: SpendWiseColors.dim,
+              ),
+              const SizedBox(width: 7),
+              Text(
+                running ? 'SCANNING TRAY…' : 'MISSING SOMETHING? SCAN THE TRAY',
+                style: SpendWiseType.metaTight,
+              ),
+            ],
+          ),
         ),
       ),
     ),
