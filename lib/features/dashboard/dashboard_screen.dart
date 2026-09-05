@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../widgets/shape_kit.dart';
 import '../settings/settings_screen.dart';
+import '../tour/spotlight.dart';
 import '../shell/spendwise_view_model.dart';
 
 /// Home is one idea: of everything that arrived this month, this much is still
@@ -87,6 +88,9 @@ class DashboardScreen extends StatelessWidget {
               ),
             ),
           ),
+          if (viewModel.uiViewPreference('tour_seen') != 'true' &&
+              viewModel.accounts.isNotEmpty)
+            SliverToBoxAdapter(child: _TourOffer(viewModel: viewModel)),
           if (!anything && viewModel.uiShowSavingsOnHome)
             SliverToBoxAdapter(
               child: _SavingsStrip(
@@ -707,5 +711,58 @@ class _SpentOnly extends StatelessWidget {
         style: SpendWiseType.body.copyWith(fontSize: 13),
       ),
     ],
+  );
+}
+
+
+/// A single line, once, and then never again.
+///
+/// The evidence on walkthroughs is that the ones people finish are the ones
+/// they chose to start, so the tour needs somewhere to be offered -- but Home
+/// earns its keep by having nothing on it, so this leaves for good the moment
+/// it is taken or waved off.
+class _TourOffer extends StatelessWidget {
+  const _TourOffer({required this.viewModel});
+
+  final SpendWiseViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(
+      SpendWiseTheme.gutter,
+      6,
+      SpendWiseTheme.gutter,
+      2,
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: InkWell(
+            onTap: () => walkthroughRequested.value++,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 7),
+              child: Text(
+                'New here? Show me around',
+                style: SpendWiseType.body.copyWith(
+                  fontSize: 12.5,
+                  color: SpendWiseColors.keep,
+                ),
+              ),
+            ),
+          ),
+        ),
+        InkWell(
+          onTap: () => viewModel.uiSetViewPreference('tour_seen', 'true'),
+          child: const Padding(
+            padding: EdgeInsets.all(7),
+            child: Icon(
+              Icons.close_rounded,
+              size: 14,
+              color: SpendWiseColors.dim,
+            ),
+          ),
+        ),
+      ],
+    ),
   );
 }

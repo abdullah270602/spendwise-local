@@ -4,6 +4,7 @@ import '../../app/theme.dart';
 import '../../widgets/shape_kit.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../shell/spendwise_view_model.dart';
+import '../tour/spotlight.dart';
 import 'help_figures.dart';
 import 'help_topics.dart';
 
@@ -52,8 +53,17 @@ class HelpScreen extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 28),
-          const Eyebrow('From the beginning'),
+          const Eyebrow('Rather be shown'),
           const SizedBox(height: 12),
+          OutlinedButton(
+            // Asked for, not sprung on anyone. A tour someone chose from a
+            // list is the one configuration that actually gets finished; the
+            // same tour fired unbidden at launch is the one the research
+            // finds nobody reads.
+            onPressed: () => walkthroughRequested.value++,
+            child: const Text('Show me around the app'),
+          ),
+          const SizedBox(height: 10),
           OutlinedButton(
             onPressed: () => Navigator.push(
               context,

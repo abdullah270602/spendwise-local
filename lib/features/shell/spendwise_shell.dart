@@ -8,6 +8,7 @@ import '../onboarding/onboarding_screen.dart';
 import '../review/review_inbox_screen.dart';
 import '../review/review_rules.dart';
 import '../transactions/ledger_screen.dart';
+import '../tour/spotlight.dart';
 import '../transactions/manual_transaction_sheet.dart';
 import 'spendwise_view_model.dart';
 
@@ -25,9 +26,13 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
   late final PageController _pageController;
   late final List<Widget> _pages;
 
+  /// Measured to place the walkthrough's spotlight over each tab.
+  final _navKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
+    walkthroughRequested.addListener(_onWalkthroughRequested);
     _pageController = PageController();
     _pages = [
       _ReactivePage(
@@ -59,8 +64,79 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
 
   @override
   void dispose() {
+    walkthroughRequested.removeListener(_onWalkthroughRequested);
     _pageController.dispose();
     super.dispose();
+  }
+
+  /// The guide asks for the tour from two routes above here, so unwind back
+  /// to the tabs before pointing at them.
+  void _onWalkthroughRequested() {
+    if (!mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) startWalkthrough();
+    });
+  }
+
+  /// Where one tab sits on screen. The bar lays its destinations out in equal
+  /// columns, so the whole bar's box plus an index is enough -- and it stays
+  /// right if the bar moves, which a per-destination key could not be
+  /// attached to anyway.
+  Rect? _tabRect(int destination) {
+    final box = _navKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached || !box.hasSize) return null;
+    final origin = box.localToGlobal(Offset.zero);
+    final width = box.size.width / _destinations;
+    return Rect.fromLTWH(
+      origin.dx + width * destination,
+      origin.dy,
+      width,
+      box.size.height,
+    );
+  }
+
+  static const _destinations = 5;
+
+  /// Four stops over the live app, in the order money moves through it.
+  void startWalkthrough() {
+    Spotlight.run(
+      context,
+      [
+        SpotlightStop(
+          title: 'Home',
+          body: 'Of everything that arrived, how much is still yours. '
+              'Nothing else.',
+          rect: () => _tabRect(0) ?? Rect.zero,
+          onEnter: () => _selectPage(0),
+        ),
+        SpotlightStop(
+          title: 'Review',
+          body: 'Anything SpendWise is unsure of waits here. A badge of two '
+              'means two questions, not two alerts.',
+          rect: () => _tabRect(2) ?? Rect.zero,
+          onEnter: () => _selectPage(2),
+        ),
+        SpotlightStop(
+          title: 'Ledger',
+          body: 'Every entry, newest first. Tap one to fix its category, its '
+              'direction or its account.',
+          rect: () => _tabRect(1) ?? Rect.zero,
+          onEnter: () => _selectPage(1),
+        ),
+        SpotlightStop(
+          title: 'Accounts',
+          body: 'Where alerts land. Add the last digits and they file '
+              'themselves.',
+          rect: () => _tabRect(4) ?? Rect.zero,
+          onEnter: () => _selectPage(4),
+        ),
+      ],
+      onDone: () {
+        widget.viewModel.uiSetViewPreference('tour_seen', 'true');
+        if (mounted) _selectPage(0);
+      },
+    );
   }
 
   @override
@@ -147,6 +223,7 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
               )
             : null,
         bottomNavigationBar: DecoratedBox(
+          key: _navKey,
           decoration: const BoxDecoration(
             border: Border(top: BorderSide(color: SpendWiseColors.line)),
           ),
