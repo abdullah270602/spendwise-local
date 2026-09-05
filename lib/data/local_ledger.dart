@@ -577,7 +577,7 @@ final class LocalLedger {
         ('health','Health & medical','medical_services',4283215696,'expense',1),
         ('education','Education','school',4280391411,'expense',1),
         ('travel','Travel','flight',4286208615,'expense',1),
-        ('personal-care','Personal care','self_care',4294198070,'expense',1),
+        ('personal-care','Self care','self_care',4294198070,'expense',1),
         ('home','Home','home',4288585374,'expense',1),
         ('insurance','Insurance','verified_user',4280391411,'expense',1),
         ('gifts-charity','Gifts & charity','volunteer_activism',4286208615,'expense',1),
@@ -600,6 +600,9 @@ final class LocalLedger {
 
       UPDATE categories SET name = 'Between your accounts'
       WHERE id = 'transfer' AND is_system = 1;
+
+      UPDATE categories SET name = 'Self care'
+      WHERE id = 'personal-care' AND is_system = 1;
     ''');
     _recategorizeAutomaticTransactions();
     _dedupeRankingVolatileNotificationDuplicates();
@@ -1038,6 +1041,60 @@ final class LocalLedger {
         ),
       )
       .toList(growable: false);
+
+  /// Adds a category of the user's own. Returns the existing one when the
+  /// name is already taken, so adding "Groceries" twice is a no-op rather
+  /// than an error the user has to understand.
+  StoredCategory addCategory(String name, {String kind = 'expense'}) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError.value(name, 'name', 'A category needs a name');
+    }
+    final existing = _db.select(
+      'SELECT * FROM categories WHERE name = ? COLLATE NOCASE',
+      [trimmed],
+    );
+    if (existing.isNotEmpty) {
+      final row = existing.first;
+      return StoredCategory(
+        id: row['id'] as String,
+        name: row['name'] as String,
+        iconKey: row['icon_key'] as String,
+        colorValue: row['color_value'] as int,
+        kind: row['kind'] as String,
+      );
+    }
+    final id = 'custom:${_ids.v4()}';
+    _db.execute(
+      'INSERT INTO categories(id,name,icon_key,color_value,kind,is_system) '
+      'VALUES (?,?,?,?,?,0)',
+      [id, trimmed, 'label', 4288585374, kind],
+    );
+    return StoredCategory(
+      id: id,
+      name: trimmed,
+      iconKey: 'label',
+      colorValue: 4288585374,
+      kind: kind,
+    );
+  }
+
+  /// Removes a category the user added. System categories stay: the parser
+  /// and the classifier reference them by id. Anything filed under it falls
+  /// back to "Other" rather than losing its transaction.
+  void removeCategory(String id) {
+    final rows = _db.select(
+      'SELECT is_system FROM categories WHERE id = ?',
+      [id],
+    );
+    if (rows.isEmpty || (rows.first['is_system'] as int) == 1) return;
+    _db.execute(
+      "UPDATE transactions SET category_id = 'other' WHERE category_id = ?",
+      [id],
+    );
+    _db.execute('DELETE FROM category_rules WHERE category_id = ?', [id]);
+    _db.execute('DELETE FROM categories WHERE id = ?', [id]);
+  }
 
   CategoryClassification classifyDescription({
     required String text,

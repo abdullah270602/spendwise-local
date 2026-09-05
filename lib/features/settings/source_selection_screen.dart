@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
+import '../../widgets/shape_kit.dart';
 import '../../widgets/spendwise_components.dart';
 import '../shell/spendwise_view_model.dart';
 
@@ -47,14 +48,19 @@ class _SourceSelectionScreenState extends State<SourceSelectionScreen> {
   Widget build(BuildContext context) {
     final query = _search.text.trim().toLowerCase();
     final all = widget.viewModel.sources;
-    final visible = all
-        .where((source) {
-          if (query.isEmpty) return true;
-          return source.label.toLowerCase().contains(query) ||
-              source.packageName.toLowerCase().contains(query);
-        })
-        .toList(growable: false);
+    final matching = all.where((source) {
+      if (query.isEmpty) return true;
+      return source.label.toLowerCase().contains(query) ||
+          source.packageName.toLowerCase().contains(query);
+    }).toList();
+    // What you already trust comes first. The device lists a hundred apps and
+    // the handful you enabled are the ones you came back to check.
+    final visible = [
+      ...matching.where(_isEnabled),
+      ...matching.where((source) => !_isEnabled(source)),
+    ];
     final enabledCount = all.where(_isEnabled).length;
+    final firstDisabled = matching.where(_isEnabled).length;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Notification sources')),
@@ -120,7 +126,9 @@ class _SourceSelectionScreenState extends State<SourceSelectionScreen> {
                 Row(
                   children: [
                     Text(
-                      '$enabledCount enabled',
+                      enabledCount == 0
+                          ? 'Nothing enabled yet'
+                          : '$enabledCount enabled, shown first',
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                     const Spacer(),
@@ -168,7 +176,24 @@ class _SourceSelectionScreenState extends State<SourceSelectionScreen> {
                 itemCount: visible.length,
                 separatorBuilder: (_, _) =>
                     const Divider(height: 1, indent: 62),
-                itemBuilder: (context, index) => _sourceTile(visible[index]),
+                itemBuilder: (context, index) {
+                  final tile = _sourceTile(visible[index]);
+                  // One heading where the enabled run ends, so the split is
+                  // stated rather than left for the user to infer.
+                  if (index != firstDisabled || firstDisabled == 0) {
+                    return tile;
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(0, 18, 0, 6),
+                        child: Eyebrow('Everything else'),
+                      ),
+                      tile,
+                    ],
+                  );
+                },
               ),
             ),
           const SliverPadding(

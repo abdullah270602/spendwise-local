@@ -41,6 +41,7 @@ final class SpendWiseController extends ChangeNotifier
   // Read on every shell rebuild for the Review badge, so it is cached
   // alongside the rest and invalidated by the same reload.
   List<AlertViewData>? _unroutedAlertsCache;
+  List<CategoryViewData>? _categoriesCache;
 
   static Future<SpendWiseController> create() async {
     final ledger = await timedAsync('ledgerOpen', LocalLedger.open);
@@ -135,6 +136,7 @@ final class SpendWiseController extends ChangeNotifier
     _dashboardCache = null;
     _reviewsCache = null;
     _unroutedAlertsCache = null;
+    _categoriesCache = null;
     notifyListeners();
   }
 
@@ -844,6 +846,34 @@ final class SpendWiseController extends ChangeNotifier
     reason: alert.reason,
     accountName: alert.accountName,
   );
+
+  @override
+  List<CategoryViewData> get categories => _categoriesCache ??= _ledger
+      .categories()
+      .map(
+        (item) => CategoryViewData(
+          id: item.id,
+          name: item.name,
+          kind: item.kind,
+          isSystem: !item.id.startsWith('custom:'),
+        ),
+      )
+      .toList(growable: false);
+
+  @override
+  Future<String> addCategory(String name, {String kind = 'expense'}) async {
+    final created = _ledger.addCategory(name, kind: kind);
+    _categoriesCache = null;
+    notifyListeners();
+    return created.name;
+  }
+
+  @override
+  Future<void> removeCategory(String id) async {
+    _ledger.removeCategory(id);
+    _categoriesCache = null;
+    _reload();
+  }
 
   @override
   String? viewPreference(String key) => _ledger.viewPreference(key);

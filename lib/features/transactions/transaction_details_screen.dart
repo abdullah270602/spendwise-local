@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
+import '../../widgets/category_picker.dart';
 import '../../widgets/spendwise_components.dart';
 import '../shell/spendwise_view_model.dart';
 
@@ -261,34 +262,35 @@ class TransactionDetailsScreen extends StatelessWidget {
                         }),
                 ),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: category,
-                  decoration: const InputDecoration(labelText: 'Category'),
-                  items:
-                      {
-                            'Food & dining',
-                            'Shopping',
-                            'Transport',
-                            'Bills & utilities',
-                            'Entertainment',
-                            'Subscriptions & digital services',
-                            'Cash withdrawal',
-                            'Fees',
-                            'Income',
-                            'Transfer',
-                            'Other',
-                            transaction.category,
-                          }
-                          .map(
-                            (value) => DropdownMenuItem(
-                              value: value,
-                              child: Text(value),
-                            ),
-                          )
-                          .toList(),
-                  onChanged: saving
+                InkWell(
+                  onTap: saving
                       ? null
-                      : (value) => category = value ?? category,
+                      : () async {
+                          final picked = await pickCategory(
+                            context,
+                            viewModel: viewModel,
+                            kind: kind,
+                            current: category,
+                          );
+                          if (picked != null) {
+                            setModalState(() => category = picked);
+                          }
+                        },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(labelText: 'Category'),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(category, style: SpendWiseType.row),
+                        ),
+                        const Icon(
+                          Icons.expand_more_rounded,
+                          size: 18,
+                          color: SpendWiseColors.dim,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(

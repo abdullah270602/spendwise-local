@@ -493,6 +493,19 @@ class _BatchImportViewModel extends _FakeViewModel
   bool isSharedSource(String packageName) => false;
 
   @override
+  List<CategoryViewData> get categories => const [
+    CategoryViewData(id: 'food', name: 'Food & dining', kind: 'expense'),
+    CategoryViewData(id: 'other', name: 'Other', kind: 'both'),
+  ];
+
+  @override
+  Future<String> addCategory(String name, {String kind = 'expense'}) async =>
+      name;
+
+  @override
+  Future<void> removeCategory(String id) async {}
+
+  @override
   String? viewPreference(String key) => viewPreferences[key];
 
   @override

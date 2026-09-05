@@ -357,14 +357,25 @@ class RegisterDay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(0, 14, 0, 6),
+    padding: const EdgeInsets.fromLTRB(0, 15, 0, 7),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,
       children: [
-        Expanded(
-          child: Text(label.toUpperCase(), style: SpendWiseType.metaTight),
+        // The date carries the sage tone the rest of the register never uses,
+        // so the eye finds the day boundary without a heavier rule or a gap.
+        Text(
+          label.toUpperCase(),
+          style: SpendWiseType.metaTight.copyWith(
+            color: SpendWiseColors.keep,
+            fontWeight: FontWeight.w500,
+          ),
         ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Container(height: 1, color: SpendWiseColors.line),
+        ),
+        const SizedBox(width: 10),
         Text(total, style: SpendWiseType.metaTight),
       ],
     ),

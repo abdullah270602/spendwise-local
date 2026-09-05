@@ -235,6 +235,31 @@ class ReviewDecision {
       alertIds.isEmpty ? transactionIds.length : alertIds.length;
 }
 
+/// A category the user can file a transaction under. System categories are
+/// the ones the classifier knows by name; the rest the user added.
+@immutable
+class CategoryViewData {
+  const CategoryViewData({
+    required this.id,
+    required this.name,
+    required this.kind,
+    this.isSystem = true,
+  });
+
+  final String id;
+  final String name;
+
+  /// 'expense', 'income' or 'both'.
+  final String kind;
+  final bool isSystem;
+
+  bool suits(TransactionKind transactionKind) => switch (transactionKind) {
+    TransactionKind.income => kind == 'income' || kind == 'both',
+    TransactionKind.expense => kind == 'expense' || kind == 'both',
+    TransactionKind.transfer => true,
+  };
+}
+
 /// One captured notification as it arrived. Review groups alerts into rules,
 /// but the raw text has to stay reachable -- a summary the user cannot check
 /// is just an assertion.
@@ -431,6 +456,15 @@ abstract class SpendWiseAdvancedViewModel implements SpendWiseViewModel {
   Future<NotificationTrayScanViewData> scanNotificationTray();
   Future<void> applyReviewDecision(ReviewDecision decision);
 
+  /// Every category available to file under, system and user-added.
+  List<CategoryViewData> get categories;
+
+  /// Adds one of the user's own. Returns the name actually stored, which may
+  /// be an existing category if the name was already taken.
+  Future<String> addCategory(String name, {String kind});
+
+  Future<void> removeCategory(String id);
+
   /// Captured alerts, newest first. Defaults to the ones still unresolved.
   List<AlertViewData> alerts({String? packageName, bool onlyUnresolved = true});
 
@@ -528,6 +562,12 @@ extension SpendWiseAdvancedAccess on SpendWiseViewModel {
       _advanced?.unroutedAlerts ?? const [];
   bool uiIsSharedSource(String packageName) =>
       _advanced?.isSharedSource(packageName) ?? false;
+  List<CategoryViewData> get uiCategories => _advanced?.categories ?? const [];
+  Future<String> uiAddCategory(String name, {String kind = 'expense'}) =>
+      _advanced?.addCategory(name, kind: kind) ??
+      Future.error(UnsupportedError('Categories cannot be added'));
+  Future<void> uiRemoveCategory(String id) =>
+      _advanced?.removeCategory(id) ?? Future.value();
   Future<void> uiApplyReviewDecision(ReviewDecision decision) =>
       _advanced?.applyReviewDecision(decision) ??
       Future.error(UnsupportedError('Review rules are not available'));

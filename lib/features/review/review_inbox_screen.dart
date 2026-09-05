@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
+import '../../widgets/category_picker.dart';
 import '../../widgets/shape_kit.dart';
 import '../settings/source_selection_screen.dart';
 import '../shell/spendwise_view_model.dart';
@@ -68,7 +69,8 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
               hasScrollBody: false,
               child: RestState(
                 headline: 'Nothing needs you.',
-                detail: 'Every alert SpendWise captured was clear enough to '
+                detail:
+                    'Every alert SpendWise captured was clear enough to '
                     'file on its own. Anything it cannot read will show up '
                     'here as a question, not a pile.',
               ),
@@ -156,9 +158,9 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not apply that: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not apply that: $error')));
     } finally {
       if (mounted) setState(() => applying = null);
     }
@@ -264,9 +266,8 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not confirm: $error')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Could not confirm: $error')));
     }
   }
 
@@ -312,57 +313,75 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
         expand: false,
         initialChildSize: .78,
         maxChildSize: .94,
-        builder: (context, controller) => ListView.builder(
-          controller: controller,
-          padding: const EdgeInsets.fromLTRB(
-            SpendWiseTheme.gutter,
-            0,
-            SpendWiseTheme.gutter,
-            28,
-          ),
-          itemCount: alerts.length + 2,
-          itemBuilder: (context, index) {
-            if (index == 0) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      alerts.length == 1
-                          ? 'The alert, verbatim'
-                          : '${alerts.length} alerts, verbatim',
-                      style: SpendWiseType.title,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Exactly what arrived, and what SpendWise made of it.',
-                      style: SpendWiseType.body.copyWith(fontSize: 13),
-                    ),
-                  ],
+        builder: (context, controller) => Column(
+          children: [
+            Expanded(
+              child: ListView.builder(
+                controller: controller,
+                padding: const EdgeInsets.fromLTRB(
+                  SpendWiseTheme.gutter,
+                  0,
+                  SpendWiseTheme.gutter,
+                  12,
                 ),
-              );
-            }
-            if (index == alerts.length + 1) {
-              return Padding(
-                padding: const EdgeInsets.only(top: 16),
-                child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.pop(sheetContext);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute<void>(
-                        builder: (_) =>
-                            SourceSelectionScreen(viewModel: widget.viewModel),
+                itemCount: alerts.length + 1,
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            alerts.length == 1
+                                ? 'The alert, verbatim'
+                                : '${alerts.length} alerts, verbatim',
+                            style: SpendWiseType.title,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Exactly what arrived, and what SpendWise made of it.',
+                            style: SpendWiseType.body.copyWith(fontSize: 13),
+                          ),
+                        ],
                       ),
                     );
-                  },
-                  child: const Text('Manage notification sources'),
+                  }
+                  return _AlertCard(alert: alerts[index - 1]);
+                },
+              ),
+            ),
+            // Pinned: on a pile of twenty alerts this was previously the last
+            // row of the list, which is to say invisible.
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  SpendWiseTheme.gutter,
+                  8,
+                  SpendWiseTheme.gutter,
+                  12,
                 ),
-              );
-            }
-            return _AlertCard(alert: alerts[index - 1]);
-          },
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.pop(sheetContext);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => SourceSelectionScreen(
+                            viewModel: widget.viewModel,
+                          ),
+                        ),
+                      );
+                    },
+                    child: const Text('Manage notification sources'),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -373,7 +392,9 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
     if (accounts.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Add an account first — there is nowhere to file these.'),
+          content: Text(
+            'Add an account first — there is nowhere to file these.',
+          ),
         ),
       );
       return Future.value();
@@ -414,67 +435,10 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
     );
   }
 
-  Future<String?> _pickCategory() {
-    final categories =
-        widget.viewModel.transactions
-            .map((item) => item.category.trim())
-            .where(
-              (value) =>
-                  value.isNotEmpty &&
-                  !const {
-                    'Uncategorized',
-                    'Unknown',
-                    'Other',
-                  }.contains(value),
-            )
-            .toSet()
-            .toList()
-          ..sort();
-    final options = categories.isEmpty
-        ? const [
-            'Groceries',
-            'Food & dining',
-            'Transport',
-            'Bills',
-            'Shopping',
-            'Health',
-          ]
-        : categories;
-    return showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  SpendWiseTheme.gutter,
-                  0,
-                  SpendWiseTheme.gutter,
-                  14,
-                ),
-                child: Text('File them under', style: SpendWiseType.title),
-              ),
-              for (final value in options)
-                ListTile(
-                  title: Text(value, style: SpendWiseType.row),
-                  onTap: () => Navigator.pop(sheetContext, value),
-                ),
-              const SizedBox(height: 10),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  Future<String?> _pickCategory() =>
+      pickCategory(context, viewModel: widget.viewModel);
 }
 
-/// One-by-one review, kept fast: right confirms, left deletes with an undo.
-/// A tap still opens the full alert. The rule above this sheet remains the
-/// quick path -- this is for when a group genuinely is not one group.
 class _Swipeable extends StatelessWidget {
   const _Swipeable({
     required this.id,
@@ -597,10 +561,7 @@ class _AlertCard extends StatelessWidget {
           ),
           if (alert.reason case final reason? when reason.isNotEmpty) ...[
             const SizedBox(height: 7),
-            Text(
-              reason,
-              style: SpendWiseType.body.copyWith(fontSize: 12),
-            ),
+            Text(reason, style: SpendWiseType.body.copyWith(fontSize: 12)),
           ],
         ],
       ),
@@ -608,8 +569,18 @@ class _AlertCard extends StatelessWidget {
   }
 
   static const _months = [
-    'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
-    'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
+    'JAN',
+    'FEB',
+    'MAR',
+    'APR',
+    'MAY',
+    'JUN',
+    'JUL',
+    'AUG',
+    'SEP',
+    'OCT',
+    'NOV',
+    'DEC',
   ];
 
   static String _statusLabel(AlertViewData alert) {

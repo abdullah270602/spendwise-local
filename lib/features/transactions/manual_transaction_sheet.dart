@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/money.dart';
+import '../../app/theme.dart';
+import '../../widgets/category_picker.dart';
 import '../shell/spendwise_view_model.dart';
 
 class ManualTransactionSheet extends StatefulWidget {
@@ -142,28 +144,17 @@ class _ManualTransactionSheetState extends State<ManualTransactionSheet> {
                   validator: (v) => v == null ? 'Add an account first' : null,
                 ),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: category,
-                  decoration: const InputDecoration(labelText: 'Category'),
-                  items:
-                      const [
-                            'Food & dining',
-                            'Shopping',
-                            'Transport',
-                            'Bills & utilities',
-                            'Entertainment',
-                            'Subscriptions & digital services',
-                            'Cash withdrawal',
-                            'Fees',
-                            'Income',
-                            'Transfer',
-                            'Other',
-                          ]
-                          .map(
-                            (v) => DropdownMenuItem(value: v, child: Text(v)),
-                          )
-                          .toList(),
-                  onChanged: (v) => category = v ?? category,
+                _CategoryField(
+                  value: category,
+                  onTap: () async {
+                    final picked = await pickCategory(
+                      context,
+                      viewModel: widget.viewModel,
+                      kind: kind,
+                      current: category,
+                    );
+                    if (picked != null) setState(() => category = picked);
+                  },
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -241,4 +232,32 @@ class _ManualTransactionSheetState extends State<ManualTransactionSheet> {
 
   String _formatDateTime(DateTime value) =>
       '${value.day}/${value.month}/${value.year} · ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+}
+
+/// Categories are a growing list the user controls, so this is a tap into the
+/// shared picker rather than a dropdown that has to be edited in two places
+/// every time a category is added.
+class _CategoryField extends StatelessWidget {
+  const _CategoryField({required this.value, required this.onTap});
+
+  final String value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    child: InputDecorator(
+      decoration: const InputDecoration(labelText: 'Category'),
+      child: Row(
+        children: [
+          Expanded(child: Text(value, style: SpendWiseType.row)),
+          const Icon(
+            Icons.expand_more_rounded,
+            size: 18,
+            color: SpendWiseColors.dim,
+          ),
+        ],
+      ),
+    ),
+  );
 }
