@@ -22,11 +22,15 @@ final class NotificationParser {
     caseSensitive: false,
   );
   static final RegExp _debitWords = RegExp(
-    r'\b(debit(?:ed)?|paid|sent|spent|purchase(?:d)?|withdrawn?|deducted|transferred\s+to)\b',
+    r'\b(?:debit(?:ed)?|paid|sent|spent|purchase(?:d)?|withdrawn?|withdrawal|'
+    r'deducted|charged|transfer(?:red)?\s+to|used\s+(?:at|for|on))\b',
     caseSensitive: false,
   );
+  // "Credit Card" names the instrument, not the direction. Counting it as
+  // money-in filed card purchases as income.
   static final RegExp _creditWords = RegExp(
-    r'\b(credit(?:ed)?|received|deposited|refunded|transferred\s+from)\b',
+    r'\b(?:credited|received|deposited|refunded|transfer(?:red)?\s+from|'
+    r'credit(?!\s+card\b))\b',
     caseSensitive: false,
   );
   static final RegExp _referencePattern = RegExp(
@@ -42,12 +46,12 @@ final class NotificationParser {
       r'(?=\s*[.,;]|\s+(?:of|on|via|as|for|using|by|dated|IBAN|A\/?c|Ref|'
       r'Reference|TID|Trx|Rs\.?|PKR|₨)|$)';
   static final RegExp _debitCounterpartyPattern = RegExp(
-    r'\b(?:sent|paid|transferred)\s+to\s+([A-Za-z][A-Za-z.\s]{1,40}?)' +
+    r'\b(?:sent|paid|transfer(?:red)?)\s+to\s+([A-Za-z][A-Za-z.\s]{1,40}?)' +
         _counterpartyStop,
     caseSensitive: false,
   );
   static final RegExp _creditCounterpartyPattern = RegExp(
-    r'\b(?:received|transferred)\s+from\s+([A-Za-z][A-Za-z.\s]{1,40}?)' +
+    r'\b(?:received|transfer(?:red)?)\s+from\s+([A-Za-z][A-Za-z.\s]{1,40}?)' +
         _counterpartyStop,
     caseSensitive: false,
   );

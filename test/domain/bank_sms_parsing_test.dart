@@ -102,6 +102,23 @@ void main() {
     expect(candidate!.description, 'JENPHARM RETAIL');
   });
 
+  test('a card purchase is a debit even though "credit card" is named', () {
+    // "Credit Card" is the instrument, not the direction. Reading it as
+    // money-in cancelled the debit signal and left the alert unreadable.
+    final candidate = parse(
+      'Your Credit Card was used for PKR 3,200.00 at METRO. Avl Bal PKR 40,000',
+    );
+    expect(candidate, isNotNull);
+    expect(candidate!.direction, EntryDirection.debit);
+    expect(candidate.amount.minorUnits, 320000);
+  });
+
+  test('reads "Transfer to" as a debit', () {
+    final candidate = parse('PKR 4,000 Funds Transfer to ALI. Bal PKR 1,000');
+    expect(candidate, isNotNull);
+    expect(candidate!.direction, EntryDirection.debit);
+  });
+
   test('a lone amount is unaffected', () {
     final candidate = parse('Your account was debited PKR 1,500 at SHOP');
     expect(candidate, isNotNull);
