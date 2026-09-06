@@ -391,6 +391,16 @@ final class LocalLedger {
         category TEXT,
         deleted_at INTEGER
       );
+      -- Deletions the user made, kept apart from the rows themselves.
+      -- Reconcile rebuilds automatic transactions from their evidence, so a
+      -- marker stored on the row cannot survive it; this can. Ids are derived
+      -- from the evidence, so the same alert arriving again lands on the same
+      -- id and stays deleted.
+      CREATE TABLE IF NOT EXISTS deleted_transactions (
+        id TEXT PRIMARY KEY,
+        fingerprint TEXT,
+        deleted_at INTEGER NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS transaction_evidence (
         transaction_id TEXT NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
         observation_id TEXT NOT NULL UNIQUE REFERENCES raw_observations(id),
@@ -2613,18 +2623,60 @@ final class LocalLedger {
     }
   }
 
+  /// Removes a transaction, and remembers that it was removed.
+  ///
+  /// The soft-delete marker alone is not enough for anything reconcile
+  /// rebuilds. Reconcile drops every unlocked automatic row and re-derives it
+  /// from the evidence, so the marker went with the row and the transaction
+  /// reappeared on the next alert -- and on the one after that. A tombstone
+  /// outlives the row, because it is the deletion we have to remember, not
+  /// the record.
   void deleteTransaction(String id) {
     _db.execute('UPDATE transactions SET deleted_at = ? WHERE id = ?', [
       _now,
       id,
     ]);
+    final row = _db.select(
+      'SELECT kind,account_id,from_account_id,to_account_id,amount_minor,'
+      'occurred_at FROM transactions WHERE id = ? LIMIT 1',
+      [id],
+    );
+    _db.execute(
+      'INSERT OR REPLACE INTO deleted_transactions(id,fingerprint,deleted_at) '
+      'VALUES (?,?,?)',
+      [id, row.isEmpty ? null : _deletionFingerprint(row.first), _now],
+    );
   }
 
+  /// What the deletion was actually about: this money, on this account, at
+  /// this moment.
+  ///
+  /// The transaction id is derived from the evidence, and evidence identity
+  /// falls back to the capture key -- so the same alert captured twice yields
+  /// two different ids for one payment. Matching on the money instead keeps a
+  /// deletion meaningful across a re-capture. The timestamp is what keeps it
+  /// narrow: two genuine payments of the same amount, from the same account,
+  /// at the same millisecond, are the same payment.
+  static String _deletionFingerprint(Map<String, Object?> row) => [
+    row['kind'],
+    row['account_id'] ?? row['from_account_id'] ?? '',
+    row['to_account_id'] ?? '',
+    row['amount_minor'],
+    row['occurred_at'],
+  ].join('|');
+
   /// Undoes [deleteTransaction] within the same session (e.g. a swipe-to-
-  /// delete "Undo" snackbar). Only clears the soft-delete marker; does not
-  /// resurrect a row some other process already hard-deleted.
+  /// delete "Undo" snackbar). Lifting the tombstone is what makes undo work
+  /// even when a reconcile has already hard-deleted the row: the evidence is
+  /// still there, so the next pass rebuilds it.
   void restoreTransaction(String id) {
+    _db.execute('DELETE FROM deleted_transactions WHERE id = ?', [id]);
     _db.execute('UPDATE transactions SET deleted_at = NULL WHERE id = ?', [id]);
+    if (_db.select('SELECT 1 FROM transactions WHERE id = ? LIMIT 1', [
+      id,
+    ]).isEmpty) {
+      _reconcile();
+    }
   }
 
   void confirmTransaction(String id) {
@@ -2990,6 +3042,17 @@ final class LocalLedger {
         .toList();
     final result = Reconciler(ownIdentity: _ownIdentity())
         .reconcile(candidates, existing: existingLocked);
+    // Everything the user has already thrown away. Reconcile is free to
+    // re-derive these from evidence that is still on file; it is not free to
+    // put them back.
+    final tombstones = _db.select(
+      'SELECT id, fingerprint FROM deleted_transactions',
+    );
+    final tombstonedIds = {for (final row in tombstones) row['id'] as String};
+    final tombstonedMoney = {
+      for (final row in tombstones)
+        if (row['fingerprint'] != null) row['fingerprint'] as String,
+    };
     if (manageTransaction) _db.execute('BEGIN IMMEDIATE');
     try {
       _db.execute(
@@ -2998,6 +3061,19 @@ final class LocalLedger {
       for (final item in result.transactions.where(
         (item) => item.origin == TransactionOrigin.automatic,
       )) {
+        if (tombstonedIds.contains(item.id)) continue;
+        if (tombstonedMoney.contains(
+          _deletionFingerprint({
+            'kind': item.kind.name,
+            'account_id': item.accountId,
+            'from_account_id': item.fromAccountId,
+            'to_account_id': item.toAccountId,
+            'amount_minor': item.amount.minorUnits,
+            'occurred_at': item.occurredAt.toUtc().millisecondsSinceEpoch,
+          }),
+        )) {
+          continue;
+        }
         final locked = _db.select(
           'SELECT 1 FROM transactions WHERE id = ? AND locked = 1 LIMIT 1',
           [item.id],
