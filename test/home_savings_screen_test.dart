@@ -259,6 +259,53 @@ void main() {
       expect(find.text('STILL YOURS'), findsNothing);
     });
 
+    testWidgets('the figure travels to its new value rather than snapping', (
+      tester,
+    ) async {
+      // The shape and the figure are one statement. A ribbon that redraws
+      // beside a number that jumps reads as two unrelated things happening.
+      final viewModel = _Fake(style: 'off');
+      await pump(tester, HomeSavingsScreen(viewModel: viewModel));
+      final before = formatMinor(18000000 - 3500000, cents: false);
+      final after = formatMinor(18000000 - 3500000 - 4000000, cents: false);
+      expect(find.text(before), findsOneWidget);
+
+      final option = find.text(HomeSavingsStyle.available.title);
+      await tester.ensureVisible(option);
+      await tester.pumpAndSettle();
+      await tester.tap(option);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(
+        find.text(after),
+        findsNothing,
+        reason: 'still on its way there a tenth of a second in',
+      );
+      expect(
+        find.text(before),
+        findsNothing,
+        reason: 'and no longer where it was',
+      );
+
+      await tester.pumpAndSettle();
+      expect(find.text(after), findsOneWidget);
+    });
+
+    testWidgets('and the ribbon redraws with it', (tester) async {
+      // A fresh key each time, so the shape draws itself in again instead of
+      // blinking into its new arrangement.
+      final viewModel = _Fake(style: 'off');
+      await pump(tester, HomeSavingsScreen(viewModel: viewModel));
+      final first = tester.widget<FlowShape>(find.byType(FlowShape)).key;
+
+      await choose(tester, HomeSavingsStyle.seam.title);
+
+      final second = tester.widget<FlowShape>(find.byType(FlowShape)).key;
+      expect(second, isNot(first));
+      expect(second, isNotNull);
+    });
+
     testWidgets('and it shows the real figures, not an abstraction', (
       tester,
     ) async {

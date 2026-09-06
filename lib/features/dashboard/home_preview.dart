@@ -51,8 +51,12 @@ class HomePreview extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         FlowShape(
+          // A new key on every choice, so the ribbon draws itself in again
+          // rather than blinking into its new arrangement. The choice and its
+          // answer then feel like one gesture.
+          key: ValueKey('${style.id}|${extra.id}'),
           height: 132,
-          animate: false,
+          duration: const Duration(milliseconds: 460),
           receivedMinor: figures.received,
           keptMinor: kept - asideFromShape,
           spentMinor: figures.spent,

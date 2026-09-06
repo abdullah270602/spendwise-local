@@ -333,7 +333,7 @@ class MonthLegend extends StatelessWidget {
                 : aside > 0
                 ? 'Available'
                 : 'Still yours',
-            value: formatMinor(headline, cents: false),
+            minor: headline,
             note: received > 0
                 ? '${DashboardScreen._percent(headline.abs(), received)} of what came in'
                 : 'nothing came in this month',
@@ -346,7 +346,7 @@ class MonthLegend extends StatelessWidget {
               alignment: Alignment.topCenter,
               child: _LegendEntry(
                 label: 'Saved',
-                value: formatMinor(aside, cents: false),
+                minor: aside,
                 note: DashboardScreen._percent(aside, received),
                 color: SpendWiseColors.mine,
               ),
@@ -354,7 +354,7 @@ class MonthLegend extends StatelessWidget {
           ),
         _LegendEntry(
           label: 'Gone',
-          value: formatMinor(spent, cents: false),
+          minor: spent,
           note: DashboardScreen._percent(spent, received),
           color: SpendWiseColors.spend,
           alignRight: true,
@@ -367,14 +367,14 @@ class MonthLegend extends StatelessWidget {
 class _LegendEntry extends StatelessWidget {
   const _LegendEntry({
     required this.label,
-    required this.value,
+    required this.minor,
     required this.note,
     required this.color,
     this.alignRight = false,
   });
 
   final String label;
-  final String value;
+  final int minor;
   final String note;
   final Color color;
   final bool alignRight;
@@ -387,7 +387,11 @@ class _LegendEntry extends StatelessWidget {
     children: [
       Eyebrow(label),
       const SizedBox(height: 4),
-      Text(value, style: SpendWiseType.amount.copyWith(color: color)),
+      AnimatedMinor(
+        minor,
+        cents: false,
+        style: SpendWiseType.amount.copyWith(color: color),
+      ),
       const SizedBox(height: 2),
       Text(note, style: SpendWiseType.body.copyWith(fontSize: 12.5)),
     ],

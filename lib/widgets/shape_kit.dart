@@ -128,6 +128,36 @@ enum SavedTreatment {
   seam,
 }
 
+/// An amount that travels to its new value instead of jumping to it.
+///
+/// The figure and the shape are the same statement, so they have to move
+/// together -- a ribbon that redraws beside a number that snaps reads as two
+/// unrelated things happening at once. First build sets the value outright;
+/// only a change animates.
+class AnimatedMinor extends StatelessWidget {
+  const AnimatedMinor(
+    this.minorUnits, {
+    super.key,
+    this.style,
+    this.cents = true,
+    this.duration = const Duration(milliseconds: 460),
+  });
+
+  final int minorUnits;
+  final TextStyle? style;
+  final bool cents;
+  final Duration duration;
+
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<int>(
+    tween: IntTween(end: minorUnits),
+    duration: duration,
+    curve: Curves.easeOutCubic,
+    builder: (context, value, _) =>
+        Text(formatMinor(value, cents: cents), style: style),
+  );
+}
+
 class FlowShape extends StatelessWidget {
   const FlowShape({
     super.key,
@@ -138,6 +168,7 @@ class FlowShape extends StatelessWidget {
     this.saved = SavedTreatment.none,
     this.height = 168,
     this.animate = true,
+    this.duration = const Duration(milliseconds: 620),
   });
 
   final int receivedMinor;
@@ -150,6 +181,11 @@ class FlowShape extends StatelessWidget {
   final SavedTreatment saved;
   final double height;
   final bool animate;
+
+  /// How long the ribbon takes to draw itself in. Shorter where the drawing
+  /// is a response to a tap rather than an arrival: a settings preview that
+  /// takes two thirds of a second to answer feels broken, not considered.
+  final Duration duration;
 
   @override
   Widget build(BuildContext context) {
@@ -167,7 +203,7 @@ class FlowShape extends StatelessWidget {
     final treatment = savedMinor <= 0 ? SavedTreatment.none : saved;
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: animate ? 0 : 1, end: 1),
-      duration: const Duration(milliseconds: 620),
+      duration: duration,
       curve: Curves.easeOutCubic,
       builder: (context, t, _) => CustomPaint(
         size: Size.infinite,
