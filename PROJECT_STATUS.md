@@ -1,27 +1,38 @@
 # SpendWise project handoff
 
-Last updated: 2026-08-22
+Last updated: 2026-09-07
 
 ## Current release
 
-- Version: `0.9.7+22`
+- Version: `0.9.11+26`
 - Android package: `com.spendwise.app` — keep this stable so upgrades retain data.
 - Public repository: <https://github.com/abdullah270602/spendwise-local>
-- Latest release: <https://github.com/abdullah270602/spendwise-local/releases/tag/v0.9.7>
-- Shipped APK is the optimized `app-release.apk`, not a Flutter debug build.
-- Latest commit at the time of this handoff: `8d2ae69` (`chore: bump version to 0.9.7+22 for release`).
-- Not yet installed on the connected Pixel 9 — the user has not asked for the
-  device upgrade yet; do it only with `adb install -r` when explicitly requested.
+- Latest release: <https://github.com/abdullah270602/spendwise-local/releases/tag/v0.9.11>
+- Shipped APK is the optimized split-per-ABI release build, not a Flutter debug
+  build. Build with `flutter build apk --release --split-per-abi`; a plain
+  `--release` writes only the universal APK and leaves the per-ABI files from
+  the *previous* build sitting in the output directory, which is an easy way to
+  install a stale binary and believe it is current. Check the APK's mtime
+  against the commit before installing.
+- Split-per-ABI adds 2000 to the version code for arm64: `26` becomes `2026`.
+- Installed on the connected Pixel 9 at this version, with `adb install -r`.
 
-## Known reliability issues (open)
+## Known reliability issues
 
-Reported by the user on `0.9.6+21`: automatic background notification capture
-sometimes silently misses events, manual "scan tray" reports events found but
-the ledger/Review UI never updates, and the app freezes or shows "not
-responding" — most consistently right after tapping manual scan, and
-sometimes at cold start on the way to Home.
+**Capture silently stopping — root-caused.** Symptom: accounts update but
+nothing reaches the Ledger, with `outcome=SKIPPED (not configured)` and
+`drain peeked 0` in logcat. Capture is gated natively by
+`sourceStore.isConfigured(pkg)` in `SpendWiseNotificationListenerService.kt`,
+and that list is written *only* by `setNotificationSources` / `setSourceEnabled`
+from Settings → Notification sources. Anything that clears it — including
+`NotificationBridge().clear()` — silently disables all capture, and sources do
+**not** re-attach themselves. Recovery is re-enabling the apps in Settings →
+Notification sources. Never call `clear()` against a real install.
 
-Root cause fixed in this pass: `SpendWiseNotificationListenerService.scanCurrentTray()`
+**Historic (fixed at `0.9.6`):** manual "scan tray" froze the app because
+`scanCurrentTray()` blocked on the main thread.
+
+Detail on that fix: `SpendWiseNotificationListenerService.scanCurrentTray()`
 blocked with `writer.submit(...).get(15, TimeUnit.SECONDS)`, and that call ran
 directly on Android's main thread because the `com.spendwise.app/notifications`
 `MethodChannel` had no background `TaskQueue`. `MainActivity.kt` now creates
@@ -105,6 +116,21 @@ in `AGENTS.md`. In particular:
   including duplicate legs and internal transfers.
 - Manual transactions, transaction correction/deletion, review actions, account
   creation/edit/archive/restore, savings accounts, and current-balance correction.
+- Three debt stories: lent out, borrowed, and **held for someone else** — money
+  that landed in an account and was never the user's. Held money is subtracted
+  from available-to-spend and excluded from both sides of Home's flow; borrowed
+  money is not, because it is spendable until repaid. `changeDebtKind` re-files
+  history recorded before the third story existed.
+- Home reports the change in the spendable balance: what came in, minus
+  everything that left. Loans made, borrowings repaid and transfers into
+  savings all leave without being spending, and each is counted.
+- Home's appearance is chosen through one shared pattern — a pinned live
+  preview of Home drawn by Home's own widgets, with plain option rows beneath.
+  It covers the window ("How much time Home shows"), savings (two independent
+  questions: whether saving comes out of the figure, and what line sits
+  underneath), and colour.
+- Deleted transactions stay deleted: `deleted_transactions` tombstones survive
+  the reconciler's rebuild of automatic entries.
 - `Adjust balance` changes only an account's baseline by the difference; it keeps
   existing transactions and avoids fake income/spending.
 - CSV/XLS/XLSX statement import with preview, multi-file/multi-sheet selection,
@@ -134,12 +160,13 @@ invalidation behavior when changing the shell/controller.
 
 ## Verification baseline
 
-At `0.9.6`, the analyzer was clean and all 78 tests passed. Before shipping:
+At `0.9.11`, the analyzer is clean and all 364 tests pass. Before shipping:
 
 1. Run `dart format` on changed Dart files.
 2. Run `flutter analyze --no-pub`.
 3. Run focused tests while iterating, then `flutter test --no-pub`.
-4. Build with `flutter build apk --release --no-pub`.
+4. Build with `flutter build apk --release --split-per-abi`, after deleting the
+   previous per-ABI APKs so a stale file cannot be installed by mistake.
 5. Inspect the APK with `aapt dump badging`; require package
    `com.spendwise.app`, the intended higher version code, and no `INTERNET`.
 6. Hash the APK with SHA-256 and include it in release notes.
@@ -150,6 +177,20 @@ At `0.9.6`, the analyzer was clean and all 78 tests passed. Before shipping:
 The local toolchain previously used Flutter 3.47.1 / Dart 3.13.1, Android SDK at
 `C:\Android\Sdk`, and Android Studio's bundled JDK. Agents should discover the
 current configured paths rather than assume another user's home directory.
+
+## Open work
+
+- **Screenshots are stale.** `assets/screenshots/*` still show the pre-`0.9.8`
+  Home and Accounts, including the retired "TOTAL TRACKED" and
+  "HELD BACK · SAVINGS" labels. Retake from the sandbox install with demo data
+  (`local/sandbox-flavour.patch`); never from the real app.
+- **CSV/XLS import is slated for removal.** The user has asked for the whole
+  import path to be carved out, along with the orphaned `csv_mappings`,
+  `csv.user-mapping` and the dead `parser_definitions` table.
+- **Home's wording.** "Available" reads as a balance when it is a change over
+  the selected window, and Accounts legitimately differs from it by whatever
+  was carried in from before that window. The agreed fix is to show both
+  figures on Home rather than to reword one of them; not yet built.
 
 ## Important known risk
 
@@ -171,6 +212,8 @@ ID and compatible signing lineage remain stable.
   updates during longer operations.
 - Commit completed work locally and keep the public repository/releases current.
 - Prefer a small complete feature with regression coverage over broad scaffolding.
-- README cleanup is intentionally deferred unless the user asks to resume it.
+- Verify by exit code, never by grepping command output: a grep that fails to
+  match reads exactly like a clean run.
+- The user requires explicit approval before pushing or publishing a release.
 - Preserve the established near-black/navy UI, restrained green accent, compact
   financial hierarchy, and the line `Private. Local. Yours.`

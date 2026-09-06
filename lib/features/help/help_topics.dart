@@ -92,15 +92,25 @@ List<HelpTopic> helpTopics(SpendWiseViewModel viewModel) => [
         'Home answers a single question and draws the answer to true '
         'proportion: of everything that came in over a stretch of time, this '
         'much stayed and this much left. Underneath, the part that left is '
-        'broken down by category. Which stretch of time is yours to choose, '
-        'because a proportion needs a denominator that exists. A calendar '
-        'month has an unstable one: nearly nothing on the 1st, full after '
-        'payday. If you are paid on the 3rd, then on the 1st of the next '
-        'month the money you are spending arrived four weeks ago. Options '
-        'include the calendar month, rolling 7, 14 or 30 days, and a window '
-        'anchored to the day you get paid. Each option shows the figures it '
-        'would produce from your own ledger before you pick it. Anyone paid '
-        'every two weeks should choose the rolling fortnight.',
+        'broken down by category. "Left" means everything that left, not only '
+        'what was spent: money lent out, a borrowing handed back and money '
+        'moved into savings all empty the account without being spending, and '
+        'leaving any of them out makes the figure drift from the balances. '
+        'Home shows a change over a window, never a balance, so it will not '
+        'match Accounts and is not meant to — Accounts also carries '
+        'everything from before the window opened. Which stretch of time is '
+        'yours to choose, because a proportion needs a denominator that '
+        'exists. A calendar month has an unstable one: nearly nothing on the '
+        '1st, full after payday. If you are paid on the 3rd, then on the 1st '
+        'of the next month the money you are spending arrived four weeks ago. '
+        'Options include the calendar month, rolling 7, 14 or 30 days, and a '
+        'window anchored to the day you get paid; anyone paid every two weeks '
+        'should choose the rolling fortnight. Savings are two further '
+        'choices, kept apart because they do different work: whether saving '
+        'comes out of the figure, and whether a line appears beneath the '
+        'shape. They combine freely. Every one of these settings shows a live '
+        'preview of Home itself, so you can see the answer before you keep '
+        'it.',
     body: () => [
       HelpExample(
         caption:
@@ -135,10 +145,21 @@ List<HelpTopic> helpTopics(SpendWiseViewModel viewModel) => [
         right: 'A window that opens on payday always has one full cycle in it.',
       ),
       const HelpProse(
-        'Every option shows the figures it would produce from your own ledger '
-        'before you pick it.',
+        'Each of these settings previews Home itself, drawn from your own '
+        'figures, and redraws as you choose.',
       ),
-      const HelpWhere('Settings · What Home covers'),
+      const HelpHeading('Home is a change, not a balance'),
+      const HelpContrast(
+        leftLabel: 'Home',
+        left:
+            'What happened inside the window you picked. Nothing from before '
+            'it counts.',
+        rightLabel: 'Accounts',
+        right:
+            'What you have right now, carried in from before the window and '
+            'all. The two are meant to differ.',
+      ),
+      const HelpWhere('Settings · Home'),
     ],
   ),
 
@@ -248,9 +269,13 @@ List<HelpTopic> helpTopics(SpendWiseViewModel viewModel) => [
         'single most useful field on the account form. Marking an account as '
         'Savings takes it out of the available-to-spend figure without hiding '
         'it, and savings are drawn as a separate zone in Accounts, scaled on '
-        'its own so a large balance does not squash everything else. An app '
+        'its own so a large balance does not squash everything else. Money '
+        'you are holding for somebody else comes off that figure too, with a '
+        'line saying so, because a balance is not a permission to spend. An '
+        'app that carries several banks, such as your messages app, is never '
+        'tied to one account: its alerts are filed by what each one says. '
         'that carries several banks, such as your messages app, is never tied '
-        'to one account: its alerts are filed by what each one says. When a '
+        'When a '
         'balance drifts from what the bank says, correcting it writes a '
         'Balance adjustment entry for the difference rather than quietly '
         'moving the number, so the ledger still explains itself.',
@@ -307,20 +332,30 @@ List<HelpTopic> helpTopics(SpendWiseViewModel viewModel) => [
   ),
 
   HelpTopic(
-    title: 'Lent and borrowed',
-    summary: 'Money that left but is coming back',
+    title: 'Lent, borrowed and held',
+    summary: 'Money that moved but was never spent',
     glyph: Icons.swap_horiz_rounded,
     brief:
         'A bank alert cannot tell a loan from a purchase. Both read "Rs '
-        '20,000 sent". Only you know it is coming back, so it is marked by '
-        'hand: open the entry in Ledger and say "I lent this out", or "I '
-        'borrowed this" for money arriving that is not yours to keep. Once '
-        'marked, the money stops counting as spending. Record repayments in '
-        'part or in full whenever they happen; a repayment that went through '
-        'an account can be attached to the real entry, and cash that never '
-        'touched a bank can simply be recorded. Loans are left out of Home, '
-        'out of the category breakdown and out of Insights, because counting '
-        'them would say you spent money you are getting back.',
+        '20,000 sent". Only you know what it was, so it is marked by hand: '
+        'open the entry in Ledger and answer one question — whose money was '
+        'it. There are three answers. "I lent it out" is money that left and '
+        'is coming back, still yours meanwhile. "I borrowed it" is money that '
+        'came in and goes back later, yours to spend until it does. "I am '
+        'holding it for someone" is money that landed in your account and was '
+        'never yours: a relative sending funds for you to pass on, a friend '
+        'parking money with you, a group collection you are the keeper of. '
+        'That third one is not a kind of borrowing, and the difference is the '
+        'one that matters — borrowed money is available to spend and held '
+        'money never is, so held money comes off the top of Available to '
+        'spend and both its legs stay out of Home entirely. Record repayments '
+        'or hand-overs in part or in full whenever they happen; one that went '
+        'through an account can be attached to the real entry, and cash that '
+        'never touched a bank can simply be recorded. None of the three '
+        'counts as spending, because counting them would say you spent money '
+        'that was never yours to spend. Anything filed under the wrong one '
+        'can be re-filed later from the same sheet, keeping its amount, date '
+        'and counterparty.',
     body: () => [
       HelpExample(
         caption: 'Marked as a loan, it stops counting against your month.',
@@ -356,13 +391,22 @@ List<HelpTopic> helpTopics(SpendWiseViewModel viewModel) => [
       ),
       const HelpStep(
         index: 2,
-        title: 'Say what it was',
-        detail: 'Lent out, or borrowed.',
+        title: 'Say whose money it was',
+        detail: 'Lent out, borrowed, or held for somebody else.',
       ),
       const HelpStep(
         index: 3,
-        title: 'Record it coming back',
+        title: 'Record it moving on',
         detail: 'In part or in full, whenever it happens.',
+      ),
+      const HelpHeading('Borrowed is not the same as held'),
+      const HelpContrast(
+        leftLabel: 'Borrowed',
+        left: 'It came in and it is yours to spend until you give it back.',
+        rightLabel: 'Held',
+        right:
+            'It came in and it was never yours. It stays out of what you can '
+            'spend.',
       ),
     ],
   ),

@@ -37,6 +37,15 @@ actually invalidated. Say which ones you checked and which needed nothing;
   test to fix"; it is the old contract, and it needs rewriting to state the
   new one deliberately. Never edit an assertion merely to make it pass.
 
+**Installing on the device.** Build with
+`flutter build apk --release --split-per-abi`. A plain `--release` writes only
+the universal APK and leaves the previous build's per-ABI files in place, so
+`adb install -r .../app-arm64-v8a-release.apk` will happily install a stale
+binary and report `Success`. Delete the per-ABI APKs first, then check the
+file's mtime is later than the commit before installing, and check the
+package's `lastUpdateTime` after. `Success` alone proves nothing about *what*
+was installed.
+
 **Screenshots.** Take them from the sandbox install with demo data on
 (`local/sandbox-flavour.patch`, a separate application id), never from the
 real app — see the device rules below. Frame them with

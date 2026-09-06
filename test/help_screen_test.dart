@@ -62,10 +62,38 @@ void main() {
         home: HelpScreen(viewModel: _Stub()),
       ),
     );
-    await tester.tap(find.text('Lent and borrowed'));
+    await tester.tap(find.text('Lent, borrowed and held'));
     await tester.pumpAndSettle();
     expect(find.text('Lent to a friend'), findsOneWidget);
-    expect(find.text('Say what it was'), findsOneWidget);
+    expect(find.text('Say whose money it was'), findsOneWidget);
+  });
+
+  testWidgets('the manual covers money that was never yours', (tester) async {
+    // The chapter is the app explaining itself, and its brief is also the text
+    // handed to an AI by the copy-prompt button. A story the app supports but
+    // the manual never mentions is the app keeping a secret from its reader.
+    final loans = helpTopics(_Stub())
+        .firstWhere((topic) => topic.title == 'Lent, borrowed and held');
+    expect(loans.brief, contains('holding it for someone'));
+    expect(
+      loans.brief,
+      contains('never yours'),
+      reason: 'the distinction from borrowing is the whole point',
+    );
+  });
+
+  testWidgets('the manual does not promise a preview per option', (
+    tester,
+  ) async {
+    // The settings screens show one live preview of Home, not a set of
+    // figures on every row. The old wording described a screen that is gone.
+    final home = helpTopics(_Stub()).firstWhere((t) => t.title == 'Home');
+    expect(home.brief, isNot(contains('before you pick it')));
+    expect(
+      home.brief,
+      contains('never a balance'),
+      reason: 'Home and Accounts are meant to differ, and it has to say so',
+    );
   });
 }
 

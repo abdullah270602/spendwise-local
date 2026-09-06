@@ -79,13 +79,23 @@ neither income nor spending.
 
 **Answers one question on Home.** Of everything that arrived, how much is still
 yours — drawn to true proportion, over whatever stretch of time matches your
-pay cycle.
+pay cycle. *Left* means everything that left, not only what was spent: a loan
+made, a borrowing handed back and money moved into savings all empty the
+account without being spending, and Home counts them.
 
 **Separates savings from spendable.** Savings stay visible and stay out of
-*available to spend*.
+*available to spend*. How they appear on Home is two choices, not one —
+whether saving comes out of the figure, and whether a line sits beneath the
+shape — and each shows a live preview of Home before you keep it.
 
 **Knows lending from spending.** Money you lent is coming back, so it stops
 counting against your month.
+
+**And knows money that was never yours.** A relative sending funds for you to
+pass on, a friend parking money with you, a collection you are keeper of. That
+is not borrowing: borrowed money is yours to spend until you give it back, and
+held money never is — so it comes off the top of *available to spend* and stays
+out of Home entirely.
 
 **Learns where things go.** File the same shop or person under the same
 category three times and SpendWise starts doing it for you. Disagree once and
