@@ -116,12 +116,11 @@ void main() {
       expect(find.text('AVAILABLE'), findsOneWidget);
       expect(find.text('SAVED'), findsNothing);
       expect(find.textContaining('put away'), findsNothing);
-      // The shape still accounts for it -- a picture that does not add up is
-      // worse than one mentioning something you would rather not see.
-      expect(
-        tester.widget<FlowShape>(find.byType(FlowShape)).saved,
-        SavedTreatment.branch,
-      );
+      // And the shape stays two branches. Choosing not to see savings means
+      // not seeing them; the ribbon divides available against gone.
+      final shape = tester.widget<FlowShape>(find.byType(FlowShape));
+      expect(shape.saved, SavedTreatment.none);
+      expect(shape.keptMinor, (18000000 - 3500000) - 4000000);
     });
 
     testWidgets('money taken back out is a different sentence', (tester) async {

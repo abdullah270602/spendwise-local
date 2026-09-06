@@ -46,6 +46,14 @@ class DashboardScreen extends StatelessWidget {
     );
 
     final (windowFrom, windowTo) = period.resolve(now);
+    // Money that left settling something you owed. It is not spending -- it
+    // was never yours -- but it did leave the account, and Home said nothing
+    // about it at all, which is the largest reason its figure and the account
+    // balances could not be reconciled by hand.
+    final borrowedDebtIds = {
+      for (final debt in viewModel.uiDebts)
+        if (!debt.lent) debt.id,
+    };
     final savingsStyle = HomeSavingsStyle.fromId(
       viewModel.uiViewPreference('home_savings'),
       legacyOn: viewModel.uiShowSavingsOnHome,
@@ -61,6 +69,16 @@ class DashboardScreen extends StatelessWidget {
       from: windowFrom,
       to: windowTo,
     );
+    final handedBack = viewModel.transactions
+        .where((item) {
+          final local = item.occurredAt.toLocal();
+          return item.debtId != null &&
+              borrowedDebtIds.contains(item.debtId) &&
+              item.kind == TransactionKind.expense &&
+              !local.isBefore(windowFrom) &&
+              local.isBefore(windowTo);
+        })
+        .fold<int>(0, (sum, item) => sum + item.amount.minorUnits.abs());
     final ownMoves = viewModel.transactions.where((item) {
       final local = item.occurredAt.toLocal();
       return item.kind == TransactionKind.transfer &&
@@ -158,11 +176,16 @@ class DashboardScreen extends StatelessWidget {
                             '${formatMinor(spent)} was spent.',
                         child: FlowShape(
                           receivedMinor: received,
-                          keptMinor: kept,
+                          // Taking saving out of the headline takes it out
+                          // of the ribbon too: the shape then divides what is
+                          // available against what went, and never shows a
+                          // slice the figures do not mention.
+                          keptMinor: savingsStyle == HomeSavingsStyle.available
+                              ? kept - savedMinor.clamp(0, kept < 0 ? 0 : kept)
+                              : kept,
                           spentMinor: spent,
                           savedMinor: savedMinor,
                           saved: switch (savingsStyle) {
-                            HomeSavingsStyle.available ||
                             HomeSavingsStyle.siblings => SavedTreatment.branch,
                             HomeSavingsStyle.divided => SavedTreatment.inset,
                             HomeSavingsStyle.seam => SavedTreatment.seam,
@@ -263,6 +286,13 @@ class DashboardScreen extends StatelessWidget {
               SliverToBoxAdapter(
                 child: _OwnMovesNote(moves: ownMoves, onTap: onOpenAccounts),
               ),
+            if (handedBack > 0)
+              SliverToBoxAdapter(
+                child: _HandedBackNote(
+                  amountMinor: handedBack,
+                  onTap: onSeeLedger,
+                ),
+              ),
             SliverToBoxAdapter(child: _TrayScan(viewModel: viewModel)),
           ],
           SliverToBoxAdapter(
@@ -337,14 +367,15 @@ class MonthLegend extends StatelessWidget {
           ),
         ),
         if (aside > 0 && namesTheSaving)
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: _LegendEntry(
-              label: 'Saved',
-              value: formatMinor(aside, cents: false),
-              note: DashboardScreen._percent(aside, received),
-              color: SpendWiseColors.mine,
-              alignRight: true,
+          Expanded(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: _LegendEntry(
+                label: 'Saved',
+                value: formatMinor(aside, cents: false),
+                note: DashboardScreen._percent(aside, received),
+                color: SpendWiseColors.mine,
+              ),
             ),
           ),
         _LegendEntry(
@@ -677,6 +708,70 @@ class _LoanLine extends StatelessWidget {
 
 /// The one place Home mentions own-account transfers: they are the reason the
 /// spend figure above is smaller than a naive sum of outgoing alerts, so the
+/// Money that left settling something you owed.
+///
+/// Not spending -- it was never yours -- so it is absent from the month's
+/// figures. But it did leave the account, and without a line saying so the
+/// figures on Home cannot be reconciled against the balances in Accounts by
+/// anyone doing the arithmetic by hand. Which is exactly what people do when
+/// two numbers disagree.
+class _HandedBackNote extends StatelessWidget {
+  const _HandedBackNote({required this.amountMinor, required this.onTap});
+
+  final int amountMinor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(
+      SpendWiseTheme.gutter,
+      18,
+      SpendWiseTheme.gutter,
+      0,
+    ),
+    child: InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.only(top: 13),
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: SpendWiseColors.line)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(top: 3, right: 9),
+              child: Icon(
+                Icons.south_west_rounded,
+                size: 15,
+                color: SpendWiseColors.dim,
+              ),
+            ),
+            Expanded(
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: formatMinor(amountMinor, cents: false),
+                      style: SpendWiseType.rowStrong.copyWith(fontSize: 15),
+                    ),
+                    TextSpan(
+                      text:
+                          ' left settling money you owed — not counted as '
+                          'spending.',
+                      style: SpendWiseType.body.copyWith(fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 /// number is worth stating rather than hiding.
 class _OwnMovesNote extends StatelessWidget {
   const _OwnMovesNote({required this.moves, required this.onTap});

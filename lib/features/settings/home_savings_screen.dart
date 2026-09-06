@@ -60,7 +60,7 @@ class _HomeSavingsScreenState extends State<HomeSavingsScreen> {
     final kept = received - spent;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Savings on Home')),
+      appBar: AppBar(title: const Text('How Home counts savings')),
       body: ListView(
         padding: EdgeInsets.fromLTRB(
           SpendWiseTheme.gutter,
@@ -207,77 +207,83 @@ class _Preview extends StatelessWidget {
   final int heldMinor;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
-    decoration: BoxDecoration(
-      border: Border.all(color: SpendWiseColors.edge),
-      borderRadius: BorderRadius.circular(10),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Eyebrow('On Home  ${formatMinor(receivedMinor, cents: false)} in'),
-        const SizedBox(height: 10),
-        FlowShape(
-          height: 150,
-          animate: false,
-          receivedMinor: receivedMinor,
-          keptMinor: keptMinor,
-          spentMinor: spentMinor,
-          savedMinor: savedMinor,
-          saved: switch (style) {
-            HomeSavingsStyle.available ||
-            HomeSavingsStyle.siblings => SavedTreatment.branch,
-            HomeSavingsStyle.divided => SavedTreatment.inset,
-            HomeSavingsStyle.seam => SavedTreatment.seam,
-            _ => SavedTreatment.none,
-          },
-        ),
-        const SizedBox(height: 14),
-        MonthLegend(
-          received: receivedMinor,
-          kept: keptMinor,
-          spent: spentMinor,
-          savedMinor: savedMinor,
-          setsSavingAside: style.setsSavingAside,
-          namesTheSaving: style.namesTheSaving,
-        ),
-        if (style == HomeSavingsStyle.balance ||
-            style == HomeSavingsStyle.moved) ...[
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.only(top: 11),
-            decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: SpendWiseColors.line)),
-            ),
-            child: style == HomeSavingsStyle.balance
-                ? Eyebrow(
-                    'Savings',
-                    trailing: Text(
-                      formatMinor(heldMinor, cents: false),
-                      style: SpendWiseType.rowStrong.copyWith(fontSize: 14),
-                    ),
-                  )
-                : Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(
-                          text: formatMinor(savedMinor.abs(), cents: false),
-                          style: SpendWiseType.rowStrong.copyWith(fontSize: 15),
-                        ),
-                        TextSpan(
-                          text: savedMinor < 0
-                              ? ' taken back out of savings.'
-                              : ' put away this period.',
-                          style: SpendWiseType.body.copyWith(fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  ),
+  Widget build(BuildContext context) {
+    final aside = style.setsSavingAside && savedMinor > 0 ? savedMinor : 0;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
+      decoration: BoxDecoration(
+        border: Border.all(color: SpendWiseColors.edge),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Eyebrow('On Home  ${formatMinor(receivedMinor, cents: false)} in'),
+          const SizedBox(height: 10),
+          FlowShape(
+            height: 150,
+            animate: false,
+            receivedMinor: receivedMinor,
+            keptMinor: style == HomeSavingsStyle.available
+                ? keptMinor - aside
+                : keptMinor,
+            spentMinor: spentMinor,
+            savedMinor: savedMinor,
+            saved: switch (style) {
+              HomeSavingsStyle.siblings => SavedTreatment.branch,
+              HomeSavingsStyle.divided => SavedTreatment.inset,
+              HomeSavingsStyle.seam => SavedTreatment.seam,
+              _ => SavedTreatment.none,
+            },
           ),
+          const SizedBox(height: 14),
+          MonthLegend(
+            received: receivedMinor,
+            kept: keptMinor,
+            spent: spentMinor,
+            savedMinor: savedMinor,
+            setsSavingAside: style.setsSavingAside,
+            namesTheSaving: style.namesTheSaving,
+          ),
+          if (style == HomeSavingsStyle.balance ||
+              style == HomeSavingsStyle.moved) ...[
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.only(top: 11),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: SpendWiseColors.line)),
+              ),
+              child: style == HomeSavingsStyle.balance
+                  ? Eyebrow(
+                      'Savings',
+                      trailing: Text(
+                        formatMinor(heldMinor, cents: false),
+                        style: SpendWiseType.rowStrong.copyWith(fontSize: 14),
+                      ),
+                    )
+                  : Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: formatMinor(savedMinor.abs(), cents: false),
+                            style: SpendWiseType.rowStrong.copyWith(
+                              fontSize: 15,
+                            ),
+                          ),
+                          TextSpan(
+                            text: savedMinor < 0
+                                ? ' taken back out of savings.'
+                                : ' put away this period.',
+                            style: SpendWiseType.body.copyWith(fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+            ),
+          ],
         ],
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }

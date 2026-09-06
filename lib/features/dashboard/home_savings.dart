@@ -35,9 +35,9 @@ enum HomeSavingsStyle {
         'under the shape.',
   ),
 
-  /// Saving is taken out of the headline and not named. The shape still
-  /// accounts for it, because a picture that does not add up is worse than
-  /// one that mentions something you would rather not see.
+  /// Saving is taken out of the headline and out of the picture: two
+  /// branches, available against gone. Choosing not to see savings should
+  /// mean not seeing them.
   available(
     id: 'available',
     title: 'Only what I can spend',
@@ -83,7 +83,7 @@ enum HomeSavingsStyle {
 
   /// Whether the shape itself has to draw the saved portion.
   bool get changesTheShape =>
-      this == available || this == siblings || this == divided || this == seam;
+      this == siblings || this == divided || this == seam;
 
   /// Whether saving is counted out of the headline figure, which is what
   /// turns "still yours" into "available".

@@ -197,7 +197,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               ListTile(
                 leading: const Icon(Icons.date_range_outlined),
-                title: const Text('What Home covers'),
+                title: const Text('How much time Home shows'),
                 subtitle: Text(viewModel.uiHomePeriod.title),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () async {
@@ -216,7 +216,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // and what you hold. So it opens a choice that names them.
               ListTile(
                 leading: const Icon(Icons.savings_outlined),
-                title: const Text('Savings on Home'),
+                title: const Text('How Home counts savings'),
                 subtitle: Text(
                   HomeSavingsStyle.fromId(
                     viewModel.uiViewPreference('home_savings'),

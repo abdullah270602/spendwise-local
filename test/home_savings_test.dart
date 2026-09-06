@@ -207,9 +207,10 @@ void main() {
       );
     });
 
-    test('four of them touch the shape itself', () {
+    test('three of them draw the saved slice', () {
+      // "Only what I can spend" is not among them: it removes saving from the
+      // ribbon as well as from the figure.
       expect(HomeSavingsStyle.values.where((s) => s.changesTheShape), [
-        HomeSavingsStyle.available,
         HomeSavingsStyle.siblings,
         HomeSavingsStyle.divided,
         HomeSavingsStyle.seam,
@@ -235,7 +236,11 @@ void main() {
       // still yours.
       for (final style in HomeSavingsStyle.values) {
         if (!style.setsSavingAside) continue;
-        expect(style.changesTheShape, isTrue, reason: style.id);
+        expect(
+          style.title.toLowerCase(),
+          isNot(contains('still yours')),
+          reason: style.id,
+        );
       }
     });
 

@@ -48,7 +48,7 @@ class _HomePeriodScreenState extends State<HomePeriodScreen> {
     ];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('What Home covers')),
+      appBar: AppBar(title: const Text('How much time Home shows')),
       body: ListView(
         padding: EdgeInsets.fromLTRB(
           SpendWiseTheme.gutter,
