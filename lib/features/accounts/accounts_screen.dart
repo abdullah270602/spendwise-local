@@ -93,7 +93,12 @@ class _AccountsScreenState extends State<AccountsScreen> {
                 children: [
                   Row(
                     children: [
-                      const Spacer(),
+                      // Named, the way Insights is. The grand total that used
+                      // to sit here answered a question this screen is not
+                      // asking; the screen still deserves a name.
+                      Expanded(
+                        child: Text('Accounts', style: SpendWiseType.title),
+                      ),
                       ViewToggle(
                         options: const ['Map', 'Plain'],
                         selected: asMap ? 0 : 1,

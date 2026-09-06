@@ -298,9 +298,10 @@ void main() {
       ),
     );
 
-    // No grand total or headline here any more: it answered a question this
-    // screen is not asking, and invited a comparison with Home that it
-    // always lost. The zones say what they are on their own.
+    // No grand total here any more: it answered a question this screen is
+    // not asking, and invited a comparison with Home that it always lost.
+    // The screen keeps its name, the way Insights does.
+    expect(find.text('Accounts'), findsOneWidget);
     expect(find.text('125,000'), findsNothing);
     expect(find.text('AVAILABLE TO SPEND'), findsOneWidget);
     expect(find.text('SAVINGS'), findsOneWidget);
