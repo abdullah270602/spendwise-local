@@ -22,10 +22,20 @@ class LedgerScreen extends StatefulWidget {
 
 class _LedgerScreenState extends State<LedgerScreen> {
   static const _preferenceKey = 'ledger_chart';
+  static const _spanKey = 'ledger_span';
 
   final searchController = TextEditingController();
   late DateTime month;
   late bool showChart;
+
+  /// Whether the register shows the whole ledger rather than one month.
+  ///
+  /// One month is the default because that is the question people ask most,
+  /// and it keeps the balance chart meaningful. But everything older stayed
+  /// reachable only by stepping back a month at a time, which is no way to
+  /// find a payment from two years ago -- and "All months" appeared only as a
+  /// side effect of searching, so there was no way to simply ask for it.
+  late bool allMonths;
   bool searching = false;
   String query = '';
   TransactionKind? kind;
@@ -38,6 +48,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
     final now = DateTime.now();
     month = DateTime(now.year, now.month);
     showChart = widget.viewModel.uiViewPreference(_preferenceKey) != 'plain';
+    allMonths = widget.viewModel.uiViewPreference(_spanKey) == 'all';
   }
 
   @override
@@ -49,7 +60,24 @@ class _LedgerScreenState extends State<LedgerScreen> {
   /// A search or a filter is a question about the whole ledger, not about one
   /// month, so it drops the month scope rather than quietly hiding matches.
   bool get scoped =>
-      query.isEmpty && kind == null && accountId == null && category == null;
+      !allMonths &&
+      query.isEmpty &&
+      kind == null &&
+      accountId == null &&
+      category == null;
+
+  void _setAllMonths(bool value) {
+    setState(() {
+      allMonths = value;
+      // Coming back to a single month lands on this one, not on wherever the
+      // stepper happened to be left months ago.
+      if (!value) {
+        final now = DateTime.now();
+        month = DateTime(now.year, now.month);
+      }
+    });
+    widget.viewModel.uiSetViewPreference(_spanKey, value ? 'all' : 'month');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -141,12 +169,16 @@ class _LedgerScreenState extends State<LedgerScreen> {
                     ? 'Nothing recorded yet.'
                     : scoped
                     ? 'Nothing in ${DateFormat('MMMM').format(month)}.'
+                    : allMonths
+                    ? 'Nothing recorded yet.'
                     : 'No transaction matches that.',
                 detail: all.isEmpty
                     ? 'Bank alerts land here automatically once notification '
                           'access is on. You can also add one by hand.'
                     : scoped
-                    ? 'Step back a month, or search the whole ledger.'
+                    ? 'Step back a month, or show every month.'
+                    : allMonths
+                    ? 'This is the whole ledger.'
                     : 'Try fewer words, or clear the filters.',
                 action: scoped && all.isNotEmpty
                     ? OutlinedButton(
@@ -219,9 +251,16 @@ class _LedgerScreenState extends State<LedgerScreen> {
                 onPressed: () => _stepMonth(-1),
               ),
               const SizedBox(width: 2),
-              Text(
-                DateFormat(_sameYear ? 'MMMM' : 'MMMM yyyy').format(month),
-                style: SpendWiseType.title,
+              // Flexible so a long month name yields to the controls rather
+              // than pushing them off the edge -- "September 2024" plus four
+              // icons does not fit a narrow phone otherwise.
+              Flexible(
+                child: Text(
+                  DateFormat(_sameYear ? 'MMMM' : 'MMMM yyyy').format(month),
+                  style: SpendWiseType.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               const SizedBox(width: 2),
               _Step(
@@ -230,8 +269,33 @@ class _LedgerScreenState extends State<LedgerScreen> {
                 onPressed: _atCurrentMonth ? null : () => _stepMonth(1),
               ),
             ] else
-              Text('All months', style: SpendWiseType.title),
+              Flexible(
+                child: Text(
+                  allMonths ? 'All months' : 'Every match',
+                  style: SpendWiseType.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             const Spacer(),
+            // Only offered when a month is actually being enforced. While a
+            // search or filter is running the register is already showing the
+            // whole ledger, so the control would claim to change something it
+            // does not.
+            if (query.isEmpty &&
+                kind == null &&
+                accountId == null &&
+                category == null)
+              _Step(
+                icon: allMonths
+                    ? Icons.calendar_month_rounded
+                    : Icons.all_inclusive_rounded,
+                tooltip: allMonths
+                    ? 'Show one month at a time'
+                    : 'Show every month',
+                onPressed: () => _setAllMonths(!allMonths),
+                active: allMonths,
+              ),
             _Step(
               icon: Icons.search_rounded,
               tooltip: 'Search the ledger',
@@ -257,16 +321,26 @@ class _LedgerScreenState extends State<LedgerScreen> {
                 onSelected: _setChart,
               ),
             const Spacer(),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Eyebrow('Balance now · $_currency'),
-                const SizedBox(height: 3),
-                Text(
-                  formatMinor(_currentBalance),
-                  style: SpendWiseType.rowStrong.copyWith(fontSize: 19),
-                ),
-              ],
+            // A large balance and the toggle together are wider than a 360dp
+            // phone. Neither is worth clipping, so the number wraps its label
+            // and shrinks rather than running off the edge.
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Eyebrow('Balance now · $_currency'),
+                  const SizedBox(height: 3),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      formatMinor(_currentBalance),
+                      style: SpendWiseType.rowStrong.copyWith(fontSize: 19),
+                      maxLines: 1,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
