@@ -84,6 +84,14 @@ void main() {
 
     expect(debtOutflow, 20800000, reason: '40,000 lent + 168,000 handed back');
     expect(saved, 4000000);
+    // Nothing debt-linked *arrived* in September -- the family money landed on
+    // 31 August, inside the opening balance. That accident is the only reason
+    // this month reconciled while the inflow half was still missing.
+    expect(
+      debtInflowInWindow(transactions: ledger, from: from, to: to),
+      0,
+      reason: 'the arriving leg fell outside the window',
+    );
 
     // What Home shows once saving is set aside.
     final available = received - spent - debtOutflow - saved;
@@ -164,9 +172,11 @@ void main() {
     );
   });
 
-  test('money coming back from a loan is not an outflow', () {
+  test('money coming back from a loan is an inflow, not an outflow', () {
     // Repayment arrives as income carrying the debt. Counting it as an
-    // outflow would double-punish the month it returns in.
+    // outflow would double-punish the month it returns in -- but counting it
+    // nowhere at all was the other half of the same mistake. The balance rose
+    // by 40,000 and the headline did not move.
     final ledger = [
       at(
         9,
@@ -177,6 +187,72 @@ void main() {
       ),
     ];
     expect(debtOutflowInWindow(transactions: ledger, from: from, to: to), 0);
+    expect(
+      debtInflowInWindow(transactions: ledger, from: from, to: to),
+      4000000,
+    );
+
+    final received = debtInflowInWindow(
+      transactions: ledger,
+      from: from,
+      to: to,
+    );
+    final available =
+        received -
+        0 -
+        debtOutflowInWindow(transactions: ledger, from: from, to: to);
+    expect(available, 4000000, reason: '40,000 landed, so Home must say so');
+  });
+
+  test('money held for someone and passed straight on changes nothing', () {
+    // The courier case. Someone hands you money to give to someone else: it
+    // arrives, it leaves, and the account ends exactly where it started.
+    // Counting only the leg that leaves reported a loss of the whole amount.
+    final ledger = [
+      at(
+        2,
+        kind: TransactionKind.income,
+        minor: 16800000,
+        account: 'meezan',
+        debtId: 'family',
+      ),
+      at(
+        7,
+        kind: TransactionKind.expense,
+        minor: 16800000,
+        account: 'meezan',
+        debtId: 'family',
+      ),
+    ];
+    final received = debtInflowInWindow(
+      transactions: ledger,
+      from: from,
+      to: to,
+    );
+    final available =
+        received -
+        0 -
+        debtOutflowInWindow(transactions: ledger, from: from, to: to);
+    expect(available, 0, reason: 'in and straight back out is not a loss');
+  });
+
+  test('direction survives: lending out is not being repaid', () {
+    // The same debt id appears on the way out and on the way back, so the two
+    // helpers must not both claim it.
+    final ledger = [
+      at(
+        4,
+        kind: TransactionKind.expense,
+        minor: 4000000,
+        account: 'meezan',
+        debtId: 'kashif',
+      ),
+    ];
+    expect(debtInflowInWindow(transactions: ledger, from: from, to: to), 0);
+    expect(
+      debtOutflowInWindow(transactions: ledger, from: from, to: to),
+      4000000,
+    );
   });
 
   test('another period is another period', () {

@@ -55,9 +55,22 @@ class _HomeSavingsScreenState extends State<HomeSavingsScreen> {
       (sum, account) => sum + account.balance.minorUnits,
     );
     final dashboard = viewModel.dashboard;
-    final received = dashboard.incomeThisMonth.minorUnits;
+    // Home's arithmetic, not an approximation of it. The whole reason this
+    // preview draws the real widgets is that a preview which can disagree
+    // with the screen it previews is worse than showing nothing.
+    final dueIn = debtInflowInWindow(
+      transactions: viewModel.transactions,
+      from: from,
+      to: to,
+    );
+    final dueOut = debtOutflowInWindow(
+      transactions: viewModel.transactions,
+      from: from,
+      to: to,
+    );
+    final received = dashboard.incomeThisMonth.minorUnits + dueIn;
     final spent = dashboard.spendingThisMonth.minorUnits;
-    final kept = received - spent;
+    final kept = received - spent - dueOut;
 
     return Scaffold(
       appBar: AppBar(title: const Text('How Home counts savings')),

@@ -165,3 +165,34 @@ int debtOutflowInWindow({
   }
   return total;
 }
+
+/// Money that arrived in the spendable accounts over [from]..[to] for reasons
+/// that are not income: a loan being repaid to you, and money handed to you to
+/// pass on.
+///
+/// The mirror of [debtOutflowInWindow], and the half that was missing. Home
+/// excludes debt-linked movement from income so a repayment is not mistaken
+/// for earnings -- correct, but it was then counted nowhere at all, while the
+/// matching outflow *was* counted. Money leaving moved the headline and the
+/// same money arriving did not, so the two sides no longer met: a repayment
+/// left the headline flat while the balance rose, and money passed straight
+/// through showed as a loss the accounts never took.
+///
+/// It belongs in "what came in" rather than beside it. The figure it feeds is
+/// the change in the spendable balance, and this money genuinely arrived; what
+/// it is not is *earnings*, which is a different question that income answers.
+int debtInflowInWindow({
+  required Iterable<TransactionViewData> transactions,
+  required DateTime from,
+  required DateTime to,
+}) {
+  var total = 0;
+  for (final item in transactions) {
+    if (item.debtId == null) continue;
+    if (item.kind != TransactionKind.income) continue;
+    final local = item.occurredAt.toLocal();
+    if (local.isBefore(from) || !local.isBefore(to)) continue;
+    total += item.amount.minorUnits.abs();
+  }
+  return total;
+}

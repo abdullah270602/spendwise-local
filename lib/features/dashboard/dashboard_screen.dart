@@ -29,8 +29,31 @@ class DashboardScreen extends StatelessWidget {
     final period = viewModel.uiHomePeriod;
     final month = period.label(now);
 
-    final received = data.incomeThisMonth.minorUnits;
+    final (windowFrom, windowTo) = period.resolve(now);
+    // Everything that moved, not only what was earned and spent. Lending
+    // money out, handing back something borrowed, being repaid, holding money
+    // that is about to be passed on -- each of these moves the balance
+    // without being income or spending, and every one left out makes the
+    // headline drift from the accounts by exactly the amount ignored.
+    final debtOutflow = debtOutflowInWindow(
+      transactions: viewModel.transactions,
+      from: windowFrom,
+      to: windowTo,
+    );
+    final debtInflow = debtInflowInWindow(
+      transactions: viewModel.transactions,
+      from: windowFrom,
+      to: windowTo,
+    );
+
+    // Debt money that arrived is part of what came in. It is not *earnings*,
+    // which is why income excludes it, but it landed in the account and the
+    // figure below it is the change in the balance -- so the ribbon it feeds
+    // has to be the whole of what arrived, or kept and gone divide a total
+    // that money already left.
+    final received = data.incomeThisMonth.minorUnits + debtInflow;
     final spent = data.spendingThisMonth.minorUnits;
+    final kept = received - spent - debtOutflow;
     final anything = received != 0 || spent != 0;
     // A share of nothing is not a share. Before any income lands in the
     // window the ribbon would split |kept| against |spent| and draw a
@@ -43,18 +66,6 @@ class DashboardScreen extends StatelessWidget {
       0,
       (sum, item) => sum + item.amount.minorUnits,
     );
-
-    final (windowFrom, windowTo) = period.resolve(now);
-    // Everything that left, not just what was spent. Lending money out and
-    // handing back something borrowed both empty the account without being
-    // spending, and leaving them out made the headline drift from the
-    // balances by exactly the amount ignored.
-    final debtOutflow = debtOutflowInWindow(
-      transactions: viewModel.transactions,
-      from: windowFrom,
-      to: windowTo,
-    );
-    final kept = received - spent - debtOutflow;
     final savingsStyle = HomeSavingsStyle.fromId(
       viewModel.uiViewPreference('home_savings'),
       legacyOn: viewModel.uiShowSavingsOnHome,
