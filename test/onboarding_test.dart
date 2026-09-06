@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spendwise/app/theme.dart';
+import 'package:spendwise/features/onboarding/onboarding_figures.dart';
 import 'package:spendwise/features/onboarding/onboarding_screen.dart';
 import 'package:spendwise/features/shell/spendwise_view_model.dart';
 
@@ -57,7 +58,7 @@ void main() {
     expect(find.text('Which apps talk about money?'), findsOneWidget);
 
     await tapOn(tester, 'Next');
-    expect(find.text('That is everything.'), findsOneWidget);
+    expect(find.text('Add as many as you like.'), findsOneWidget);
 
     // Four cards and then out: nothing further to page to.
     expect(find.text('Next'), findsNothing);
@@ -110,6 +111,50 @@ void main() {
     expect(find.textContaining('your bank writes it'), findsNothing);
   });
 
+  testWidgets('an account can be attached to the app that speaks for it', (
+    tester,
+  ) async {
+    // The half of setup that decides whether an alert ever finds its way
+    // home. It used to be three screens deep in Settings.
+    await pump(tester, model: _Recorder(accounts: const []));
+    for (final label in ['Set it up', 'Next', 'Next']) {
+      await tapOn(tester, label);
+    }
+    expect(find.text('Which app tells you about it?'), findsOneWidget);
+    expect(find.text('Meezan Bank'), findsOneWidget);
+    // And what the money is worth today, which no alert can tell you.
+    expect(find.widgetWithText(TextField, 'Balance now'), findsOneWidget);
+  });
+
+  testWidgets('you can keep adding accounts, not just the one', (
+    tester,
+  ) async {
+    await pump(tester);
+    for (final label in ['Set it up', 'Next', 'Next']) {
+      await tapOn(tester, label);
+    }
+    // One already exists, so the form is folded away behind an offer.
+    expect(find.text('Add another account'), findsOneWidget);
+    expect(find.text('Which app tells you about it?'), findsNothing);
+
+    await tapOn(tester, 'Add another account');
+    expect(find.text('Which app tells you about it?'), findsOneWidget);
+    expect(find.text('Add it'), findsOneWidget);
+
+    await tapOn(tester, 'Cancel');
+    expect(find.text('Add another account'), findsOneWidget);
+  });
+
+  testWidgets('an account with nothing watching it says so', (tester) async {
+    await pump(tester);
+    for (final label in ['Set it up', 'Next', 'Next']) {
+      await tapOn(tester, label);
+    }
+    // Silently listing an account that can never receive an alert is how
+    // somebody finishes setup with an app that does nothing.
+    expect(find.text('No app attached yet'), findsOneWidget);
+  });
+
   testWidgets('every card lays out on a small screen', (tester) async {
     await pump(tester, size: const Size(320, 560));
     for (final label in ['Set it up', 'Next', 'Next']) {
@@ -117,6 +162,67 @@ void main() {
       await tapOn(tester, label);
     }
     expect(tester.takeException(), isNull);
+  });
+
+  group('attaching an app to an account', () {
+    const apps = [
+      SourceViewData(
+        packageName: 'com.meezan.app',
+        label: 'Meezan Bank',
+        enabled: true,
+      ),
+      SourceViewData(
+        packageName: 'com.google.android.apps.messaging',
+        label: 'Messages',
+        enabled: true,
+      ),
+    ];
+
+    Future<Set<String>> pumpChips(WidgetTester tester) async {
+      final picked = <String>{};
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SpendWiseTheme.dark,
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) => SourceChips(
+                sources: apps,
+                selected: picked,
+                isShared: (package) => package.contains('messaging'),
+                onToggle: (package) => setState(() {
+                  picked.contains(package)
+                      ? picked.remove(package)
+                      : picked.add(package);
+                }),
+              ),
+            ),
+          ),
+        ),
+      );
+      return picked;
+    }
+
+    testWidgets('a bank app can be attached', (tester) async {
+      final picked = await pumpChips(tester);
+      await tester.tap(find.text('Meezan Bank'));
+      await tester.pumpAndSettle();
+      expect(picked, {'com.meezan.app'});
+    });
+
+    testWidgets('an app that carries every bank cannot be', (tester) async {
+      // The router deliberately ignores such a binding, because it is how
+      // every bank's SMS once ended up filed under one account. A control
+      // that quietly does nothing is worse than one that says why.
+      final picked = await pumpChips(tester);
+      await tester.tap(find.text('Messages'));
+      await tester.pumpAndSettle();
+      expect(picked, isEmpty);
+      expect(
+        find.textContaining('carry every bank'),
+        findsOneWidget,
+        reason: 'the rule has to be stated where it applies',
+      );
+    });
   });
 
   test('the whole flow stays inside its word budget', () {
@@ -151,15 +257,32 @@ const _onboardingCopy = [
   'Everything else on your phone stays invisible.',
   'Where should it all land?',
   'The last digits are how an alert finds the right account.',
-  'That is everything.',
+  'Which app tells you about it?',
+  'Greyed apps carry every bank, so their alerts route by what they say.',
+  'No app attached yet',
+  'Add as many as you like.',
   'Nothing waiting yet. The next alert lands on its own.',
 ];
 
 class _Recorder extends ChangeNotifier implements SpendWiseViewModel {
-  _Recorder({this.access = true});
+  _Recorder({this.access = true, List<AccountViewData>? accounts})
+    : accounts = accounts ?? _oneAccount;
+
+  static const _oneAccount = [
+    AccountViewData(
+      id: 'bank',
+      name: 'Everyday',
+      type: 'Bank',
+      balance: MoneyViewData(0),
+      suffix: '4821',
+    ),
+  ];
 
   final bool access;
   bool completed = false;
+
+  @override
+  final List<AccountViewData> accounts;
 
   @override
   Future<void> completeOnboarding() async {
@@ -172,17 +295,13 @@ class _Recorder extends ChangeNotifier implements SpendWiseViewModel {
   @override
   bool get notificationAccessGranted => access;
   @override
-  List<AccountViewData> get accounts => const [
-    AccountViewData(
-      id: 'bank',
-      name: 'Everyday',
-      type: 'Bank',
-      balance: MoneyViewData(0),
-      suffix: '4821',
+  List<SourceViewData> get sources => const [
+    SourceViewData(
+      packageName: 'com.meezan.app',
+      label: 'Meezan Bank',
+      enabled: true,
     ),
   ];
-  @override
-  List<SourceViewData> get sources => const [];
   @override
   List<TransactionViewData> get transactions => const [];
   @override

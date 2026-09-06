@@ -382,3 +382,134 @@ class RoutingFigure extends StatelessWidget {
     );
   }
 }
+
+/// Choosing which app speaks for an account.
+///
+/// This is the half of setup that decides whether an alert ever finds its
+/// way home, so it belongs in first run rather than three screens deep in
+/// Settings. Apps that carry more than one institution are shown but cannot
+/// be attached: the router deliberately ignores such a binding, and a
+/// control that quietly does nothing is worse than one that says why.
+class SourceChips extends StatelessWidget {
+  const SourceChips({
+    super.key,
+    required this.sources,
+    required this.selected,
+    required this.isShared,
+    required this.onToggle,
+  });
+
+  final List<SourceViewData> sources;
+  final Set<String> selected;
+  final bool Function(String packageName) isShared;
+  final void Function(String packageName) onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    if (sources.isEmpty) {
+      return Text(
+        'No apps chosen yet. Go back a step to pick some.',
+        style: SpendWiseType.body.copyWith(fontSize: 12.5),
+      );
+    }
+    final anyShared = sources.any((item) => isShared(item.packageName));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final source in sources)
+              _Chip(
+                source: source,
+                on: selected.contains(source.packageName),
+                shared: isShared(source.packageName),
+                onTap: () => onToggle(source.packageName),
+              ),
+          ],
+        ),
+        if (anyShared) ...[
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 7),
+                width: 12,
+                height: 2,
+                color: SpendWiseColors.dim,
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  'Greyed apps carry every bank, so their alerts route by '
+                  'what they say.',
+                  style: SpendWiseType.body.copyWith(fontSize: 11.5),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _Chip extends StatelessWidget {
+  const _Chip({
+    required this.source,
+    required this.on,
+    required this.shared,
+    required this.onTap,
+  });
+
+  final SourceViewData source;
+  final bool on;
+  final bool shared;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = source.iconPng;
+    return Opacity(
+      opacity: shared ? .45 : 1,
+      child: InkWell(
+        onTap: shared ? null : onTap,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(9, 7, 12, 7),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: on ? SpendWiseColors.fg : SpendWiseColors.edge,
+              width: on ? 1.4 : 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: icon == null
+                    ? const Icon(
+                        Icons.apps_rounded,
+                        size: 14,
+                        color: SpendWiseColors.dim,
+                      )
+                    : Image.memory(icon, filterQuality: FilterQuality.medium),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                source.label,
+                style: SpendWiseType.body.copyWith(
+                  fontSize: 12.5,
+                  color: on ? SpendWiseColors.fg : SpendWiseColors.dim,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

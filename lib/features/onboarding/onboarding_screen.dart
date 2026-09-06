@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
+import '../../core/money.dart';
 import '../../widgets/shape_kit.dart';
 import '../../widgets/spendwise_components.dart';
 import '../settings/source_selection_screen.dart';
@@ -362,10 +363,16 @@ class _Landing extends StatefulWidget {
 class _LandingState extends State<_Landing> {
   final name = TextEditingController(text: 'Everyday');
   final suffix = TextEditingController();
+  final balance = TextEditingController();
   final formKey = GlobalKey<FormState>();
+  final attached = <String>{};
   String type = 'Bank';
   bool saving = false;
   bool scanning = false;
+
+  /// Whether the form is open. It starts open when there is nothing yet and
+  /// folds away after each save, so what you see is what exists.
+  bool adding = false;
   int? found;
 
   static const types = ['Bank', 'Wallet', 'Cash', 'Credit card', 'Savings'];
@@ -376,22 +383,34 @@ class _LandingState extends State<_Landing> {
   void dispose() {
     name.dispose();
     suffix.dispose();
+    balance.dispose();
     super.dispose();
   }
 
   Future<void> _add() async {
     if (!formKey.currentState!.validate()) return;
+    final opening = Money.tryParsePkr('PKR ${balance.text.trim()}');
     setState(() => saving = true);
     try {
       await viewModel.uiAddDetailedAccount(
         AccountCreationDraft(
           name: name.text.trim(),
           type: type,
-          openingBalance: const MoneyViewData(0),
+          openingBalance: MoneyViewData(opening?.minorUnits ?? 0),
           suffix: suffix.text.trim(),
+          sourcePackages: {...attached},
         ),
       );
-      if (mounted) FocusScope.of(context).unfocus();
+      if (!mounted) return;
+      FocusScope.of(context).unfocus();
+      setState(() {
+        adding = false;
+        name.text = '';
+        suffix.clear();
+        balance.clear();
+        attached.clear();
+        type = 'Bank';
+      });
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -419,7 +438,9 @@ class _LandingState extends State<_Landing> {
   @override
   Widget build(BuildContext context) {
     final accounts = viewModel.accounts;
+    final enabled = viewModel.sources.where((item) => item.enabled).toList();
     final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+    final open = adding || accounts.isEmpty;
 
     return Form(
       key: formKey,
@@ -428,7 +449,7 @@ class _LandingState extends State<_Landing> {
           _Say(
             accounts.isEmpty
                 ? 'Where should it all land?'
-                : 'That is everything.',
+                : 'Add as many as you like.',
             detail: accounts.isEmpty
                 ? 'The last digits are how an alert finds the right account.'
                 : null,
@@ -436,6 +457,10 @@ class _LandingState extends State<_Landing> {
           if (accounts.isEmpty) ...[
             RoutingFigure(suffix: suffix.text.trim()),
             const SizedBox(height: 22),
+          ],
+          for (final account in accounts) _AccountLine(account: account),
+          if (accounts.isNotEmpty) const SizedBox(height: 16),
+          if (open) ...[
             TextFormField(
               controller: name,
               textCapitalization: TextCapitalization.words,
@@ -449,6 +474,9 @@ class _LandingState extends State<_Landing> {
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     initialValue: type,
+                    // Without this the button takes the width of its widest
+                    // entry, which is wider than half a narrow phone.
+                    isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Type'),
                     items: [
                       for (final option in types)
@@ -463,7 +491,7 @@ class _LandingState extends State<_Landing> {
                     controller: suffix,
                     keyboardType: TextInputType.number,
                     // The figure above quotes whatever is typed here, so the
-                    // example is about this person's account within a keypress.
+                    // example is about this account within a keypress.
                     onChanged: (_) => setState(() {}),
                     decoration: const InputDecoration(
                       labelText: 'Last digits',
@@ -480,18 +508,72 @@ class _LandingState extends State<_Landing> {
                 ),
               ],
             ),
-            const SizedBox(height: 18),
-            OutlinedButton(
-              onPressed: saving ? null : _add,
-              child: Text(saving ? 'Adding…' : 'Add it'),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: balance,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                labelText: 'Balance now',
+                prefixText: 'PKR ',
+              ),
+              validator: (value) {
+                final text = (value ?? '').trim();
+                if (text.isEmpty) return null;
+                return Money.tryParsePkr('PKR $text') == null
+                    ? 'Not an amount'
+                    : null;
+              },
+            ),
+            const SizedBox(height: 20),
+            // The half of setup that decides whether an alert ever finds its
+            // way home. Leaving it for later is how an account ends up
+            // watching nothing at all.
+            Text(
+              'Which app tells you about it?',
+              style: SpendWiseType.row.copyWith(fontSize: 14),
+            ),
+            const SizedBox(height: 10),
+            SourceChips(
+              sources: enabled,
+              selected: attached,
+              isShared: viewModel.uiIsSharedSource,
+              onToggle: (package) => setState(() {
+                if (attached.contains(package)) {
+                  attached.remove(package);
+                } else {
+                  attached.add(package);
+                }
+              }),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                OutlinedButton(
+                  onPressed: saving ? null : _add,
+                  child: Text(saving ? 'Adding…' : 'Add it'),
+                ),
+                if (accounts.isNotEmpty) ...[
+                  const SizedBox(width: 10),
+                  TextButton(
+                    onPressed: () => setState(() => adding = false),
+                    style: TextButton.styleFrom(
+                      foregroundColor: SpendWiseColors.dim,
+                    ),
+                    child: const Text('Cancel'),
+                  ),
+                ],
+              ],
             ),
           ] else
-            for (final account in accounts)
-              _Done(
-                account.suffix.isEmpty
-                    ? account.name
-                    : '${account.name} · ${account.suffix}',
-              ),
+            OutlinedButton(
+              onPressed: () => setState(() {
+                adding = true;
+                name.text = '';
+              }),
+              child: const Text('Add another account'),
+            ),
           const SizedBox(height: 26),
           if (found case final count?)
             Padding(
@@ -512,6 +594,60 @@ class _LandingState extends State<_Landing> {
             onPressed: _scanThenFinish,
           ),
           SizedBox(height: keyboard > 0 ? keyboard + 12 : 0),
+        ],
+      ),
+    );
+  }
+}
+
+/// One account already added, with the apps that speak for it.
+class _AccountLine extends StatelessWidget {
+  const _AccountLine({required this.account});
+
+  final AccountViewData account;
+
+  @override
+  Widget build(BuildContext context) {
+    final watching = account.sources.map((item) => item.label).toList();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              '✓',
+              style: TextStyle(color: SpendWiseColors.keep, fontSize: 14),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  account.suffix.isEmpty
+                      ? account.name
+                      : '${account.name} · ${account.suffix}',
+                  style: SpendWiseType.row,
+                ),
+                if (watching.isNotEmpty)
+                  Text(
+                    watching.join(', '),
+                    style: SpendWiseType.body.copyWith(fontSize: 11.5),
+                  )
+                else
+                  Text(
+                    'No app attached yet',
+                    style: SpendWiseType.body.copyWith(
+                      fontSize: 11.5,
+                      color: SpendWiseColors.spend,
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ],
       ),
     );
