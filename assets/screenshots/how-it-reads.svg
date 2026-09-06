@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 240" width="760" height="240"
+     role="img" aria-labelledby="reads-title reads-desc">
+  <title id="reads-title">How SpendWise reads a bank alert</title>
+  <desc id="reads-desc">A bank alert on the left, the four things SpendWise takes from it in the middle — the amount, the counterparty, the account digits, and the available balance which is deliberately ignored — and on the right the single ledger line it becomes.</desc>
+
+  <defs>
+    <marker id="reads-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#767C80"/>
+    </marker>
+  </defs>
+
+  <rect width="760" height="240" fill="#0F1113"/>
+
+  <!-- Connectors first, so the boxes sit over them. Both endpoints share the
+       centreline y=128, so straight segments are correct here; no elbows. -->
+  <line x1="260" y1="128" x2="300" y2="128" stroke="#767C80" stroke-width="1" marker-end="url(#reads-arrow)"/>
+  <rect x="264" y="104" width="32" height="12" fill="#0F1113"/>
+  <text x="280" y="112" fill="#767C80" font-size="8" font-family="ui-monospace, 'JetBrains Mono', SFMono-Regular, Menlo, monospace" text-anchor="middle" letter-spacing="0.10em">READS</text>
+
+  <line x1="488" y1="128" x2="528" y2="128" stroke="#767C80" stroke-width="1" marker-end="url(#reads-arrow)"/>
+  <rect x="484" y="104" width="48" height="12" fill="#0F1113"/>
+  <text x="508" y="112" fill="#767C80" font-size="8" font-family="ui-monospace, 'JetBrains Mono', SFMono-Regular, Menlo, monospace" text-anchor="middle" letter-spacing="0.10em">BECOMES</text>
+
+  <!-- ── The alert, as it arrives ────────────────────────────────────────── -->
+  <rect x="24" y="40" width="236" height="176" fill="#0F1113" stroke="#282D31" stroke-width="1"/>
+  <rect x="40" y="60" width="5" height="5" fill="#767C80"/>
+  <text x="52" y="64" fill="#767C80" font-size="8" font-family="ui-monospace, 'JetBrains Mono', SFMono-Regular, Menlo, monospace" letter-spacing="0.14em">BANK ALERT</text>
+
+  <text x="40" y="112" font-size="12" font-family="ui-monospace, 'JetBrains Mono', SFMono-Regular, Menlo, monospace" fill="#767C80">
+    <tspan fill="#C97A5A" text-decoration="underline">Rs 2,450.00</tspan><tspan> debited from</tspan>
+  </text>
+  <text x="40" y="132" font-size="12" font-family="ui-monospace, 'JetBrains Mono', SFMono-Regular, Menlo, monospace" fill="#767C80">
+    <tspan>A/C </tspan><tspan fill="#7C93A8" text-decoration="underline">****4821</tspan><tspan> at</tspan>
+  </text>
+  <text x="40" y="152" font-size="12" font-family="ui-monospace, 'JetBrains Mono', SFMono-Regular, Menlo, monospace" fill="#767C80">
+    <tspan fill="#E9E7E2" text-decoration="underline">VALLEY MART</tspan><tspan> on 06-SEP.</tspan>
+  </text>
+  <text x="40" y="184" font-size="12" font-family="ui-monospace, 'JetBrains Mono', SFMono-Regular, Menlo, monospace" fill="#3F464B">Avl Bal Rs 61,300.00</text>
+
+  <!-- ── What it takes, and what it deliberately leaves ──────────────────── -->
+  <rect x="308" y="40" width="180" height="176" fill="#0F1113" stroke="#282D31" stroke-width="1"/>
+  <text x="324" y="64" fill="#767C80" font-size="8" font-family="ui-monospace, 'JetBrains Mono', SFMono-Regular, Menlo, monospace" letter-spacing="0.14em">WHAT IT TAKES</text>
+
+  <rect x="324" y="100" width="12" height="2" fill="#C97A5A"/>
+  <text x="344" y="104" fill="#E9E7E2" font-size="12" font-family="ui-sans-serif, Archivo, system-ui, sans-serif">the amount</text>
+
+  <rect x="324" y="128" width="12" height="2" fill="#E9E7E2"/>
+  <text x="344" y="132" fill="#E9E7E2" font-size="12" font-family="ui-sans-serif, Archivo, system-ui, sans-serif">who it went to</text>
+
+  <rect x="324" y="156" width="12" height="2" fill="#7C93A8"/>
+  <text x="344" y="160" fill="#E9E7E2" font-size="12" font-family="ui-sans-serif, Archivo, system-ui, sans-serif">which account</text>
+
+  <line x1="324" y1="180" x2="472" y2="180" stroke="#1C2023" stroke-width="1"/>
+  <rect x="324" y="200" width="12" height="2" fill="#3F464B"/>
+  <text x="344" y="204" fill="#767C80" font-size="12" font-family="ui-sans-serif, Archivo, system-ui, sans-serif">not the balance</text>
+
+  <!-- ── The line it becomes ────────────────────────────────────────────── -->
+  <rect x="536" y="80" width="200" height="96" fill="#0F1113" stroke="#282D31" stroke-width="1"/>
+  <rect x="536" y="80" width="2" height="96" fill="#C97A5A"/>
+  <text x="556" y="104" fill="#767C80" font-size="8" font-family="ui-monospace, 'JetBrains Mono', SFMono-Regular, Menlo, monospace" letter-spacing="0.14em">IN YOUR LEDGER</text>
+  <text x="556" y="136" fill="#E9E7E2" font-size="12" font-family="ui-sans-serif, Archivo, system-ui, sans-serif">Valley Mart</text>
+  <text x="716" y="136" fill="#C97A5A" font-size="12" font-family="ui-sans-serif, Archivo, system-ui, sans-serif" text-anchor="end">&#8722;2,450.00</text>
+  <text x="556" y="160" fill="#767C80" font-size="8" font-family="ui-monospace, 'JetBrains Mono', SFMono-Regular, Menlo, monospace" letter-spacing="0.10em">GROCERIES &#183; EVERYDAY</text>
+</svg>

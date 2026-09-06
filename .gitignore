@@ -52,8 +52,14 @@ app.*.map.json
 # Widget Preview related
 .widget_preview/
 
-# Local only, never published: design explorations, the running notebook, and
-# anything under local/ (patches, scratch, throwaway builds).
+# Local only, never published: working notes, design explorations, agent
+# scratch, and anything under local/ (patches, throwaway builds). The public
+# story lives in the root README and the files beside it.
+docs/
 design/
-.remember/
 local/
+.remember/
+.impeccable/
+.codex/
+.codex-remote-attachments/
+.cursor/

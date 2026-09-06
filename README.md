@@ -1,98 +1,182 @@
+<div align="center">
+
+<img src="assets/spendwise-icon-512.png" width="96" alt="SpendWise">
+
 # SpendWise
 
-**Private. Local. Yours.**
+### Your bank already tells you everything.
+
+SpendWise turns the alerts you already get into a ledger you never had to type.<br>
+It runs entirely on your phone and has no internet permission at all.
 
 [![Flutter CI](https://github.com/abdullah270602/spendwise-local/actions/workflows/flutter.yml/badge.svg)](https://github.com/abdullah270602/spendwise-local/actions/workflows/flutter.yml)
 [![Latest release](https://img.shields.io/github/v/release/abdullah270602/spendwise-local?display_name=tag)](https://github.com/abdullah270602/spendwise-local/releases/latest)
-[![License: MIT](https://img.shields.io/badge/license-MIT-60D394.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-9FB2AC.svg)](LICENSE)
 
-[**Download the latest Android APK**](https://github.com/abdullah270602/spendwise-local/releases/latest/download/spendwise-local.apk)
+**[Download for Android →](https://github.com/abdullah270602/spendwise-local/releases/latest)**
 
-SpendWise is an Android-first, privacy-first personal finance ledger built with Flutter. It turns financial notification evidence, CSV/Excel statement rows, and manual entries into canonical local transactions.
+</div>
 
-> Raw event ≠ financial transaction.
+<br>
 
-A bank-app debit, an SMS alert for the same debit, and a wallet credit can describe one transfer. SpendWise retains the observations as evidence, then uses deterministic, explainable rules to produce one ledger entry.
+<div align="center">
+<img src="assets/screenshots/home.png" width="30%" alt="Home">
+&nbsp;
+<img src="assets/screenshots/ledger.png" width="30%" alt="Ledger">
+&nbsp;
+<img src="assets/screenshots/accounts.png" width="30%" alt="Accounts">
+</div>
 
-## V1 capabilities
+<br>
 
-- Encrypted, local-only SQLCipher ledger with its key protected by Android Keystore
-- Android `NotificationListenerService` with a separate Keystore-encrypted durable queue
-- Explicit notification-source allowlist; unconfigured apps are never captured
-- At-least-once native-to-Flutter handoff (`peek` → ledger commit → `ack`)
-- Strict PKR/Rs amount and direction parsing without floating-point money
-- Duplicate evidence collapse and debit/credit transfer reconciliation
-- Review inbox for ambiguous or unsupported observations
-- Everyday and savings accounts with separate available/saved totals
-- Manual income/expense/transfer entry, ledger search, and filters
-- Conservative CSV, XLSX, and XLS statement import with local CSV export
-- Smart bank-table detection skips statement titles, account metadata, and blank rows before the real transaction header
-- Editable column mappings, remembered statement formats, duplicate previews, and import batches
-- Evidence timelines, source health, category analytics, filtered CSV/JSON export, and removable demo data
-- One-action local data erasure
+## Why this exists
 
-There is no backend, account system, telemetry, analytics, advertising, crash reporter, AI integration, or `INTERNET` permission.
+I kept losing track of my own money.
 
-## Install on Android
+Not for lack of apps. I tried plenty. Every one of them wanted me to connect
+something that does not connect here, or to sit down at the end of the week and
+type in what I had already done. The banks were not integrated. The wallets
+were not integrated. So the work fell back to me, by hand — and the moment I
+stopped doing it, the picture went stale and the app became a lie.
 
-1. Download [`spendwise-local.apk`](https://github.com/abdullah270602/spendwise-local/releases/latest/download/spendwise-local.apk).
-2. Open the downloaded file on Android 7.0 or newer.
-3. If Android asks, allow your browser or file manager to install this one unknown app.
-4. Install SpendWise, then revoke that installer permission if you no longer need it.
+Meanwhile my phone was already being told everything. Every payment, every
+transfer, every salary: an alert arrives within seconds of the money moving.
+The information was never missing. It was just never collected.
 
-The GitHub APK is an early community build signed with the project's development key. Android may show an unfamiliar-app warning because it is distributed outside Google Play. Verify the SHA-256 checksum published in the matching [GitHub Release](https://github.com/abdullah270602/spendwise-local/releases/latest) before installing.
+So I built the thing that collects it.
+
+<br>
+
+## How it reads an alert
+
+<div align="center">
+<img src="assets/screenshots/how-it-reads.svg" width="88%" alt="A bank alert on the left, what SpendWise takes from it in the middle, and the single ledger line it becomes on the right">
+</div>
+
+SpendWise reads the sentence, not just the numbers in it: which way the money
+went, who was on the other end, and which of your accounts it touched.
+
+That last part matters more than it sounds. The amount you spent usually sits
+right next to the available balance, which is a much larger number meaning
+something else entirely — and the direction comes from the verb, because most
+alerts carry no plus or minus at all.
+
+When it is unsure, it says so rather than guessing. Ten alerts uncertain for
+the same reason become **one** question in Review, not ten.
+
+<br>
+
+## What it does
+
+**Reads your alerts.** Banks, wallets, and your messages app — but only the
+ones you pick. Everything else on your phone stays invisible to it.
+
+**Keeps one ledger.** A bank alert and its SMS twin describe one payment, not
+two. Duplicates collapse, and money moved between your own accounts counts as
+neither income nor spending.
+
+**Answers one question on Home.** Of everything that arrived, how much is still
+yours — drawn to true proportion, over whatever stretch of time matches your
+pay cycle.
+
+**Separates savings from spendable.** Savings stay visible and stay out of
+*available to spend*.
+
+**Knows lending from spending.** Money you lent is coming back, so it stops
+counting against your month.
+
+**Gives it all back.** A PDF report, or the whole ledger as CSV or JSON.
+Nothing here is locked in.
+
+**Locks, if you want.** A PIN of any length, with a fingerprint as the fast
+path.
+
+<div align="center">
+<br>
+<img src="assets/screenshots/accounts.png" width="30%" alt="Savings held back from available to spend">
+&nbsp;
+<img src="assets/screenshots/loan.png" width="30%" alt="Marking a payment as a loan">
+&nbsp;
+<img src="assets/screenshots/insights.png" width="30%" alt="Insights">
+</div>
+
+<br>
+
+## Privacy, checked rather than claimed
+
+**There is no internet permission.** Not disabled, not opted out of — never
+requested. Android will not grant SpendWise network access, so there is no
+server to send anything to and none to be breached. The app shows you its own
+permission list, read from the installed package, under *Settings → How
+SpendWise works → Privacy*.
+
+**The ledger is encrypted on the phone.** SQLCipher, with the key held by the
+Android keystore. Notification text is encrypted before it is even handed to
+the app.
+
+**Nothing syncs or backs up.** Android backup and device-transfer extraction
+are switched off. Data leaves only when you export it yourself, to a file you
+choose.
+
+There is no account, no cloud, no telemetry, no analytics, no advertising, no
+crash reporter, and no AI service.
+
+What this cannot do is protect an already-unlocked, compromised device. See
+[SECURITY.md](SECURITY.md) for the exact trust boundary.
+
+<br>
+
+## Install
+
+Download the APK from the [latest release](https://github.com/abdullah270602/spendwise-local/releases/latest).
+Most phones want **arm64-v8a**; take the **universal** build if you are unsure.
+
+Android 7.0 or newer. Because it is installed outside Google Play, Android will
+warn you about an unknown app, and on Android 13+ the notification-access
+toggle stays greyed out until you allow it:
+
+> App info → ⋮ → **Allow restricted settings**
+
+The app says so at the moment it matters. Notification access is an Android
+Settings grant, not a normal runtime permission — SpendWise cannot turn it on
+for you.
+
+> **Note on signing.** Release APKs here are signed with the Android debug key,
+> which every developer machine holds. Fine for trying it; not proof of origin.
+
+<br>
 
 ## Build from source
 
-Requirements: Flutter 3.47+, Dart 3.13+, Android SDK 37, JDK 17 or newer.
+Flutter 3.47+, Dart 3.13+, Android SDK 37, JDK 17+.
 
-```powershell
+```bash
 flutter pub get
 flutter analyze
 flutter test
-flutter build apk --debug
+flutter build apk --release
 ```
 
-The debug APK is written to `build/app/outputs/flutter-apk/app-debug.apk`.
+## Layout
 
-## First run
+| | |
+|---|---|
+| `lib/domain` | money, evidence, parsing, reconciliation — pure Dart |
+| `lib/data` | the SQLCipher ledger |
+| `lib/platform` | the notification bridge |
+| `lib/features` | the screens |
+| `android/…/com/spendwise/app` | encrypted notification capture and queue |
 
-1. Add the bank, wallet, cash, card, or savings accounts you want to track. Savings remain in **Accounts** and the combined **Insights** total, stay excluded from **Available to spend**, and can optionally be shown on Home.
-2. Open Settings → Notification access and grant Android notification-listener access.
-3. Enable only the financial source apps you want SpendWise to observe.
-4. Use the ledger normally; uncertain evidence appears in Review.
+[ARCHITECTURE.md](ARCHITECTURE.md) has the invariants and the data flow.
 
-Notification access is an Android Settings grant, not a normal runtime permission. SpendWise cannot grant it automatically.
+## Contributing
 
-## Privacy model
+Start with [CONTRIBUTING.md](CONTRIBUTING.md). Use sanitized fixtures only —
+never commit real notifications, statements, account numbers, or names.
 
-The ledger database, WAL, and journals are SQLCipher-encrypted. The native queue encrypts notification fields with AES-GCM under a non-exportable Android Keystore key before writing them. Android backup and device-transfer extraction are disabled. See [docs/PRIVACY.md](docs/PRIVACY.md).
-
-SpendWise protects data at rest in the app sandbox; it cannot protect an already-unlocked, compromised device.
-
-## Current limitations
-
-- Android only; iOS, web, and desktop are out of scope for V1.
-- Parsers are conservative and currently focus on explicit PKR/Rs Pakistani finance formats. Unsupported or ambiguous events remain reviewable evidence.
-- Notification availability varies by the source app and Android version.
-- Exports are plaintext after a clear warning; there is no automatic backup or sync.
-- Optional BYOK AI is not shipped in V1. The deterministic ledger has no AI or network dependency.
-
-## Architecture
-
-- `lib/domain`: pure Dart money, evidence, parsing, and reconciliation
-- `lib/data`: SQLCipher ledger and CSV ingestion
-- `lib/platform`: Flutter/native notification bridge
-- `lib/features`: Android-first Material UI
-- `android/.../com/spendwise/app`: encrypted notification capture and queue
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for invariants and data flow. The exact trust boundary is documented in [SECURITY.md](SECURITY.md).
-
-## Contributing and security
-
-Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), and use sanitized fixtures only—never commit real financial notifications, statements, account numbers, or secrets.
-
-Please report vulnerabilities through a [private GitHub security advisory](https://github.com/abdullah270602/spendwise-local/security/advisories/new), not a public issue. See [SECURITY.md](SECURITY.md) for the threat model and reporting guidance.
+Report vulnerabilities through a
+[private advisory](https://github.com/abdullah270602/spendwise-local/security/advisories/new),
+not a public issue.
 
 ## License
 
