@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../app/theme.dart';
 import '../../core/money.dart';
+import '../../widgets/controller_scope.dart';
 import '../../widgets/shape_kit.dart';
 import '../debts/debt_sheets.dart' as debt_sheets;
 import '../../widgets/spendwise_components.dart';
@@ -459,10 +460,11 @@ class _AccountsScreenState extends State<AccountsScreen> {
       );
       final adjustmentKey = GlobalKey<FormState>();
       var adjusting = false;
-      try {
-        await showDialog<void>(
-          context: sheetContext,
-          builder: (dialogContext) => StatefulBuilder(
+      await showDialog<void>(
+        context: sheetContext,
+        builder: (dialogContext) => ControllerScope(
+          controllers: [balance],
+          child: StatefulBuilder(
             builder: (context, setDialogState) => AlertDialog(
               title: const Text('Adjust account balance'),
               content: Form(
@@ -550,10 +552,8 @@ class _AccountsScreenState extends State<AccountsScreen> {
               ],
             ),
           ),
-        );
-      } finally {
-        balance.dispose();
-      }
+        ),
+      );
     }
 
     Future<void> deleteAccount(
@@ -619,7 +619,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
       isScrollControlled: true,
       showDragHandle: true,
       useSafeArea: true,
-      builder: (sheetContext) => _ControllerDisposalScope(
+      builder: (sheetContext) => ControllerScope(
         controllers: [name, institution, suffix],
         child: StatefulBuilder(
           builder: (context, setState) => SafeArea(
@@ -842,7 +842,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
       isScrollControlled: true,
       showDragHandle: true,
       useSafeArea: true,
-      builder: (sheetContext) => _ControllerDisposalScope(
+      builder: (sheetContext) => ControllerScope(
         controllers: [name, balance, institution, suffix, smsSender],
         child: StatefulBuilder(
           builder: (context, setState) => SafeArea(
@@ -1199,34 +1199,6 @@ class _SavingsExplanation extends StatelessWidget {
 }
 
 enum _AccountAction { delete }
-
-final class _ControllerDisposalScope extends StatefulWidget {
-  const _ControllerDisposalScope({
-    required this.controllers,
-    required this.child,
-  });
-
-  final List<TextEditingController> controllers;
-  final Widget child;
-
-  @override
-  State<_ControllerDisposalScope> createState() =>
-      _ControllerDisposalScopeState();
-}
-
-final class _ControllerDisposalScopeState
-    extends State<_ControllerDisposalScope> {
-  @override
-  Widget build(BuildContext context) => widget.child;
-
-  @override
-  void dispose() {
-    for (final controller in widget.controllers) {
-      controller.dispose();
-    }
-    super.dispose();
-  }
-}
 
 final class _ThousandsSeparatedAmountFormatter extends TextInputFormatter {
   const _ThousandsSeparatedAmountFormatter();

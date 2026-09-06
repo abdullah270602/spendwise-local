@@ -7,6 +7,7 @@ import '../../security/app_lock.dart';
 import '../help/help_screen.dart';
 import '../../app/theme.dart';
 import '../../main.dart';
+import '../../widgets/controller_scope.dart';
 import '../../widgets/spendwise_components.dart';
 import '../shell/spendwise_view_model.dart';
 import 'app_lock_screen.dart';
@@ -366,48 +367,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final controller = TextEditingController(
       text: viewModel.uiOwnNames.join(', '),
     );
-    final saved = await showDialog<bool>(
+    final entered = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Your name(s)'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'As they appear in bank or wallet SMS/notifications, e.g. '
-              '"YOUR FULL NAME". Used only to recognize transfers between '
-              'your own accounts — separate multiple names with commas.',
-              style: Theme.of(dialogContext).textTheme.bodySmall,
+      builder: (dialogContext) => ControllerScope(
+        controllers: [controller],
+        child: AlertDialog(
+          title: const Text('Your name(s)'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'As they appear in bank or wallet SMS/notifications, e.g. '
+                '"YOUR FULL NAME". Used only to recognize transfers between '
+                'your own accounts — separate multiple names with commas.',
+                style: Theme.of(dialogContext).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Your Name, Y. Name',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
             ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              decoration: const InputDecoration(hintText: 'Your Name, Y. Name'),
+            FilledButton(
+              // The text goes out with the pop. Reading it off the controller
+              // after the await would mean reaching into a route that is on its
+              // way out, which is the whole mistake this scope exists to stop.
+              onPressed: () => Navigator.pop(dialogContext, controller.text),
+              child: const Text('Save'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
     // The dialog is an async gap: by the time it closes this screen may be
     // gone, and the context that was good enough to open it is not
     // automatically good enough to use again.
-    if (saved == true && mounted) {
-      final names = controller.text
-          .split(',')
-          .map((name) => name.trim())
-          .toList();
+    if (entered != null && mounted) {
+      final names = entered.split(',').map((name) => name.trim()).toList();
       // Defer past the dialog's own pop transition -- calling a mutation
       // that notifies listeners in the same frame the dialog route is still
       // unwinding is what produced the Dismissible zombie-widget bug earlier
@@ -427,7 +433,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }
       });
     }
-    controller.dispose();
   }
 
   Future<void> _confirmErase(BuildContext context) async {
