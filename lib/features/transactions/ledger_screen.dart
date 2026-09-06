@@ -419,10 +419,6 @@ class _LedgerScreenState extends State<LedgerScreen> {
     return month.year == now.year && month.month == now.month;
   }
 
-  String get _currency => widget.viewModel.accounts.isEmpty
-      ? 'PKR'
-      : widget.viewModel.accounts.first.currency;
-
   int get _currentBalance {
     final dashboard = widget.viewModel.dashboard;
     return (dashboard.spendableBalance ?? dashboard.netWorth).minorUnits;

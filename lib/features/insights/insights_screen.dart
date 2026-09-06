@@ -421,28 +421,6 @@ class _Tick extends StatelessWidget {
   );
 }
 
-class _BalancePart extends StatelessWidget {
-  const _BalancePart({required this.label, required this.value});
-
-  final String label;
-  final MoneyViewData value;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(label, style: Theme.of(context).textTheme.bodySmall),
-      const SizedBox(height: 3),
-      Text(
-        formatMoney(value),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.titleMedium,
-      ),
-    ],
-  );
-}
-
 class _SummaryBand extends StatelessWidget {
   const _SummaryBand(this.analytics);
 
