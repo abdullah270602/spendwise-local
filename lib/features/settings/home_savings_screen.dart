@@ -58,15 +58,21 @@ class _HomeSavingsScreenState extends State<HomeSavingsScreen> {
     // Home's arithmetic, not an approximation of it. The whole reason this
     // preview draws the real widgets is that a preview which can disagree
     // with the screen it previews is worse than showing nothing.
+    final heldDebtIds = {
+      for (final debt in viewModel.uiDebts)
+        if (debt.isHeld) debt.id,
+    };
     final dueIn = debtInflowInWindow(
       transactions: viewModel.transactions,
       from: from,
       to: to,
+      heldDebtIds: heldDebtIds,
     );
     final dueOut = debtOutflowInWindow(
       transactions: viewModel.transactions,
       from: from,
       to: to,
+      heldDebtIds: heldDebtIds,
     );
     final received = dashboard.incomeThisMonth.minorUnits + dueIn;
     final spent = dashboard.spendingThisMonth.minorUnits;

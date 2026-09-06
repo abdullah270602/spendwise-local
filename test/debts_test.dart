@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:spendwise/core/debt_kind.dart';
 import 'package:spendwise/data/local_ledger.dart';
 import 'package:spendwise/domain/domain.dart';
 
@@ -45,7 +46,11 @@ void main() {
       reason: 'before marking, it is ordinary spending',
     );
 
-    ledger.openDebt(transactionId: id, lent: true, counterparty: 'A friend');
+    ledger.openDebt(
+      transactionId: id,
+      kind: DebtKind.lent,
+      counterparty: 'A friend',
+    );
 
     expect(
       ledger.spendingByCategory(month: DateTime.utc(2026, 9)),
@@ -61,7 +66,7 @@ void main() {
 
     final debt = ledger.openDebt(
       transactionId: id,
-      lent: true,
+      kind: DebtKind.lent,
       counterparty: 'A friend',
       note: 'For the deposit',
     );
@@ -81,7 +86,7 @@ void main() {
     addTearDown(ledger.close);
     final debt = ledger.openDebt(
       transactionId: spend(ledger, 2000000),
-      lent: true,
+      kind: DebtKind.lent,
       counterparty: 'A friend',
     );
 
@@ -98,7 +103,7 @@ void main() {
     addTearDown(ledger.close);
     final debt = ledger.openDebt(
       transactionId: spend(ledger, 2000000),
-      lent: true,
+      kind: DebtKind.lent,
       counterparty: 'A friend',
     );
 
@@ -117,7 +122,7 @@ void main() {
     addTearDown(ledger.close);
     final debt = ledger.openDebt(
       transactionId: spend(ledger, 2000000),
-      lent: true,
+      kind: DebtKind.lent,
       counterparty: 'A friend',
     );
     final repayment = receive(ledger, 2000000);
@@ -143,7 +148,7 @@ void main() {
     addTearDown(ledger.close);
     final debt = ledger.openDebt(
       transactionId: receive(ledger, 500000),
-      lent: false,
+      kind: DebtKind.borrowed,
       counterparty: 'A cousin',
     );
 
@@ -158,7 +163,7 @@ void main() {
     final id = spend(ledger, 2000000);
     final debt = ledger.openDebt(
       transactionId: id,
-      lent: true,
+      kind: DebtKind.lent,
       counterparty: 'A friend',
     );
 
@@ -183,7 +188,7 @@ void main() {
     expect(
       () => ledger.openDebt(
         transactionId: spend(ledger, 100000),
-        lent: true,
+        kind: DebtKind.lent,
         counterparty: '   ',
       ),
       throwsArgumentError,

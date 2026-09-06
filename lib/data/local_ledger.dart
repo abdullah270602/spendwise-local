@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:uuid/uuid.dart';
 
+import '../core/debt_kind.dart';
 import '../core/notification_noise.dart';
 import '../core/perf.dart';
 import '../domain/domain.dart';
@@ -122,7 +123,7 @@ final class UnparsedSourceSummary {
 final class StoredDebt {
   const StoredDebt({
     required this.id,
-    required this.lent,
+    required this.kind,
     required this.counterparty,
     required this.principalMinor,
     required this.settledMinor,
@@ -135,8 +136,17 @@ final class StoredDebt {
 
   final String id;
 
-  /// True when the user lent the money out; false when they borrowed it.
-  final bool lent;
+  /// Whose money it was and which way it moved. Replaced a bool that could
+  /// only say "lent or borrowed", which had no room for money the user is
+  /// merely holding for somebody else.
+  final DebtKind kind;
+
+  /// True when the user lent the money out. Kept because most of the app only
+  /// ever asked this one question of a debt.
+  bool get lent => kind.owedToUser;
+
+  /// True when the money is in the account but is not the user's to spend.
+  bool get isHeld => kind == DebtKind.holding;
   final String counterparty;
   final int principalMinor;
 
@@ -667,6 +677,13 @@ final class LocalLedger {
       'debt_id',
       'TEXT REFERENCES debts(id) ON DELETE SET NULL',
     );
+    // Whether the money was ever the user's. A column rather than a third
+    // `direction` value because widening that CHECK means rebuilding the
+    // debts table, and transactions.debt_id cascades on delete -- a botched
+    // rebuild would take real financial history with it. It is also the
+    // truer shape: direction is which way the money went, this is whose it
+    // was, and the two vary independently.
+    _addColumn('debts', 'held', 'INTEGER NOT NULL DEFAULT 0');
 
     _db.execute('''
       INSERT OR IGNORE INTO categories(id,name,icon_key,color_value,kind,is_system) VALUES
@@ -683,6 +700,7 @@ final class LocalLedger {
         ('personal-care','Self care','self_care',4294198070,'expense',1),
         ('lent','Lent out','call_made',4283215696,'both',1),
         ('borrowed','Borrowed','call_received',4294940672,'both',1),
+        ('holding','Held for someone','swap_horiz',4286141768,'both',1),
         ('home','Home','home',4288585374,'expense',1),
         ('insurance','Insurance','verified_user',4280391411,'expense',1),
         ('gifts-charity','Gifts & charity','volunteer_activism',4286208615,'expense',1),
@@ -1289,7 +1307,7 @@ final class LocalLedger {
   /// evidence -- only its meaning changes.
   StoredDebt openDebt({
     required String transactionId,
-    required bool lent,
+    required DebtKind kind,
     required String counterparty,
     String? note,
   }) {
@@ -1313,11 +1331,13 @@ final class LocalLedger {
 
     final id = _ids.v4();
     _db.execute(
-      'INSERT INTO debts(id,direction,counterparty,principal_minor,currency,'
-      'opened_at,opening_transaction_id,note) VALUES (?,?,?,?,?,?,?,?)',
+      'INSERT INTO debts(id,direction,held,counterparty,principal_minor,'
+      'currency,opened_at,opening_transaction_id,note) '
+      'VALUES (?,?,?,?,?,?,?,?,?)',
       [
         id,
-        lent ? 'lent' : 'borrowed',
+        kind.storedDirection,
+        kind.storedHeld ? 1 : 0,
         name,
         (row['amount_minor'] as int).abs(),
         row['currency'] as String,
@@ -1329,12 +1349,7 @@ final class LocalLedger {
     _db.execute(
       'UPDATE transactions SET debt_id = ?, category_id = ?, category = ?, '
       'needs_review = 0, locked = 1 WHERE id = ?',
-      [
-        id,
-        lent ? 'lent' : 'borrowed',
-        lent ? 'Lent out' : 'Borrowed',
-        transactionId,
-      ],
+      [id, kind.categoryId, kind.categoryName, transactionId],
     );
     return debt(id)!;
   }
@@ -1373,8 +1388,8 @@ final class LocalLedger {
         'needs_review = 0, locked = 1 WHERE id = ?',
         [
           debtId,
-          existing.lent ? 'lent' : 'borrowed',
-          existing.lent ? 'Lent out' : 'Borrowed',
+          existing.kind.categoryId,
+          existing.kind.categoryName,
           transactionId,
         ],
       );
@@ -1403,6 +1418,42 @@ final class LocalLedger {
     _db.execute('DELETE FROM debts WHERE id = ?', [id]);
   }
 
+  /// Re-files an existing debt as a different story.
+  ///
+  /// The amount, date, counterparty and the entry it came from are all still
+  /// true -- only what the money *was* changes. This exists because the third
+  /// story arrived after people had already been recording these, and telling
+  /// someone their history is now mis-filed but unfixable would be worse than
+  /// not having the story at all.
+  StoredDebt changeDebtKind(String id, DebtKind kind) {
+    final existing = debt(id);
+    if (existing == null) {
+      throw ArgumentError.value(id, 'id', 'No such debt');
+    }
+    _db.execute('UPDATE debts SET direction = ?, held = ? WHERE id = ?', [
+      kind.storedDirection,
+      kind.storedHeld ? 1 : 0,
+      id,
+    ]);
+    // Every entry pinned to this debt carries its label, including any
+    // repayments, so they all move together or the ledger contradicts itself.
+    _db.execute(
+      'UPDATE transactions SET category_id = ?, category = ? WHERE debt_id = ?',
+      [kind.categoryId, kind.categoryName, id],
+    );
+    return debt(id)!;
+  }
+
+  /// How much of the money sitting in the accounts belongs to somebody else.
+  ///
+  /// Subtracted from what the user can spend. A balance is not a permission:
+  /// money you are holding for your brother shows in the bank the same as your
+  /// own, and the only thing that knows the difference is this.
+  int heldOutstandingMinor() =>
+      debts(includeSettled: false)
+          .where((item) => item.isHeld)
+          .fold<int>(0, (sum, item) => sum + item.outstandingMinor);
+
   StoredDebt? debt(String id) {
     final rows = _debtQuery('WHERE d.id = ?', [id]);
     return rows.isEmpty ? null : rows.first;
@@ -1425,7 +1476,10 @@ final class LocalLedger {
       for (final row in rows)
         StoredDebt(
           id: row['id'] as String,
-          lent: row['direction'] == 'lent',
+          kind: DebtKind.fromStorage(
+            direction: row['direction'] as String,
+            held: (row['held'] as int? ?? 0) == 1,
+          ),
           counterparty: row['counterparty'] as String,
           principalMinor: row['principal_minor'] as int,
           settledMinor: (row['settled'] as num).toInt(),

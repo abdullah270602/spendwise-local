@@ -143,6 +143,12 @@ int savedInWindow({
 /// Money that left the spendable accounts over [from]..[to] for reasons that
 /// are not spending: lending it out, and handing back something borrowed.
 ///
+/// [heldDebtIds] names debts that were never the user's money. Both legs of
+/// those are skipped here and in [debtInflowInWindow], because money that only
+/// passed through never belonged to the picture Home draws. Counting it would
+/// show a windfall in the period it arrived and a loss in the period it left,
+/// and neither ever happened to the user.
+///
 /// Home's headline used to be `received - spent`, which quietly assumes
 /// spending is the only way money leaves. It is not, and when it is not the
 /// figure drifts from reality by exactly the amount ignored — far enough that
@@ -154,10 +160,12 @@ int debtOutflowInWindow({
   required Iterable<TransactionViewData> transactions,
   required DateTime from,
   required DateTime to,
+  Set<String> heldDebtIds = const {},
 }) {
   var total = 0;
   for (final item in transactions) {
     if (item.debtId == null) continue;
+    if (heldDebtIds.contains(item.debtId)) continue;
     if (item.kind != TransactionKind.expense) continue;
     final local = item.occurredAt.toLocal();
     if (local.isBefore(from) || !local.isBefore(to)) continue;
@@ -185,10 +193,12 @@ int debtInflowInWindow({
   required Iterable<TransactionViewData> transactions,
   required DateTime from,
   required DateTime to,
+  Set<String> heldDebtIds = const {},
 }) {
   var total = 0;
   for (final item in transactions) {
     if (item.debtId == null) continue;
+    if (heldDebtIds.contains(item.debtId)) continue;
     if (item.kind != TransactionKind.income) continue;
     final local = item.occurredAt.toLocal();
     if (local.isBefore(from) || !local.isBefore(to)) continue;

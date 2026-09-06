@@ -499,9 +499,15 @@ class _BatchImportViewModel extends _FakeViewModel
   @override
   Future<void> openDebt({
     required String transactionId,
-    required bool lent,
+    required DebtKind kind,
     required String counterparty,
     String? note,
+  }) async {}
+
+  @override
+  Future<void> changeDebtKind({
+    required String debtId,
+    required DebtKind kind,
   }) async {}
 
   @override

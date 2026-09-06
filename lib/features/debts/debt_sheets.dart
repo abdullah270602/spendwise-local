@@ -5,11 +5,17 @@ import '../../app/theme.dart';
 import '../../widgets/shape_kit.dart';
 import '../shell/spendwise_view_model.dart';
 
-/// Marking a movement as a loan.
+Color _toneFor(DebtKind kind) => switch (kind) {
+  DebtKind.lent => SpendWiseColors.keep,
+  DebtKind.borrowed => SpendWiseColors.spend,
+  DebtKind.holding => SpendWiseColors.dim,
+};
+
+/// Marking a movement as somebody else's business.
 ///
 /// A bank alert cannot tell lending from spending — "PKR 20,000 sent" reads
 /// the same either way. Only the person knows, so this is the one thing the
-/// app asks them to say out loud, and it asks for exactly one fact: who.
+/// app asks them to say out loud, and it asks for two facts: whose, and who.
 Future<bool> markAsLoan(
   BuildContext context, {
   required SpendWiseViewModel viewModel,
@@ -24,7 +30,7 @@ Future<bool> markAsLoan(
     builder: (sheetContext) => _MarkLoanSheet(
       viewModel: viewModel,
       transaction: transaction,
-      lent: outgoing,
+      kind: outgoing ? DebtKind.lent : DebtKind.borrowed,
     ),
   );
   return result ?? false;
@@ -34,19 +40,19 @@ class _MarkLoanSheet extends StatefulWidget {
   const _MarkLoanSheet({
     required this.viewModel,
     required this.transaction,
-    required this.lent,
+    required this.kind,
   });
 
   final SpendWiseViewModel viewModel;
   final TransactionViewData transaction;
-  final bool lent;
+  final DebtKind kind;
 
   @override
   State<_MarkLoanSheet> createState() => _MarkLoanSheetState();
 }
 
 class _MarkLoanSheetState extends State<_MarkLoanSheet> {
-  late bool lent = widget.lent;
+  late DebtKind kind = widget.kind;
   final who = TextEditingController();
   final note = TextEditingController();
   bool saving = false;
@@ -83,41 +89,30 @@ class _MarkLoanSheetState extends State<_MarkLoanSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('This was a loan', style: SpendWiseType.title),
+          Text('This was not spending', style: SpendWiseType.title),
           const SizedBox(height: 6),
           Text(
-            'It stops counting as ${widget.lent ? 'spending' : 'income'}, '
-            'because it is coming back.',
+            kind == DebtKind.holding
+                ? 'It is not yours, so it stays out of what you can spend.'
+                : 'It stops counting as '
+                      '${kind == DebtKind.lent ? 'spending' : 'income'}, '
+                      'because it is coming back.',
             style: SpendWiseType.body.copyWith(fontSize: 13),
           ),
           const SizedBox(height: 22),
-          const Eyebrow('Which way'),
+          const Eyebrow('Whose money was it'),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _Direction(
-                  title: 'I lent it out',
-                  detail: 'They owe you',
-                  selected: lent,
-                  tone: SpendWiseColors.keep,
-                  onTap: () => setState(() => lent = true),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _Direction(
-                  title: 'I borrowed it',
-                  detail: 'You owe them',
-                  selected: !lent,
-                  tone: SpendWiseColors.spend,
-                  onTap: () => setState(() => lent = false),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 22),
-          Eyebrow(lent ? 'Who owes you' : 'Who you owe'),
+          // Three stacked rather than side by side: a third option does not
+          // fit across a 360dp phone without the labels turning to stumps,
+          // and the difference between them lives in the detail line.
+          for (final option in DebtKind.values)
+            _KindRow(
+              kind: option,
+              selected: option == kind,
+              onTap: () => setState(() => kind = option),
+            ),
+          const SizedBox(height: 14),
+          Eyebrow(kind.partyLabel),
           const SizedBox(height: 8),
           TextField(
             controller: who,
@@ -159,18 +154,14 @@ class _MarkLoanSheetState extends State<_MarkLoanSheet> {
                 Text(
                   formatAmount(widget.transaction.amount),
                   style: SpendWiseType.rowStrong.copyWith(
-                    color: lent ? SpendWiseColors.keep : SpendWiseColors.spend,
+                    color: _toneFor(kind),
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
-          PrimaryAction(
-            label: lent ? 'Record what they owe' : 'Record what you owe',
-            busy: saving,
-            onPressed: _save,
-          ),
+          PrimaryAction(label: kind.openLabel, busy: saving, onPressed: _save),
         ],
       ),
     ),
@@ -188,7 +179,7 @@ class _MarkLoanSheetState extends State<_MarkLoanSheet> {
     try {
       await widget.viewModel.uiOpenDebt(
         transactionId: widget.transaction.id,
-        lent: lent,
+        kind: kind,
         counterparty: name,
         note: note.text,
       );
@@ -203,48 +194,73 @@ class _MarkLoanSheetState extends State<_MarkLoanSheet> {
   }
 }
 
-class _Direction extends StatelessWidget {
-  const _Direction({
-    required this.title,
-    required this.detail,
+class _KindRow extends StatelessWidget {
+  const _KindRow({
+    required this.kind,
     required this.selected,
-    required this.tone,
     required this.onTap,
   });
 
-  final String title;
-  final String detail;
+  final DebtKind kind;
   final bool selected;
-  final Color tone;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    child: Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: selected ? tone : SpendWiseColors.edge,
-          width: selected ? 1.6 : 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: SpendWiseType.rowStrong.copyWith(
-              fontSize: 14,
-              color: selected ? tone : SpendWiseColors.fg,
+  Widget build(BuildContext context) {
+    final tone = _toneFor(kind);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: selected ? tone : SpendWiseColors.edge,
+              width: selected ? 1.6 : 1,
             ),
           ),
-          const SizedBox(height: 2),
-          Text(detail, style: SpendWiseType.body.copyWith(fontSize: 12)),
-        ],
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 14,
+                height: 14,
+                margin: const EdgeInsets.only(top: 3, right: 12),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: selected ? tone : SpendWiseColors.edge,
+                    width: 1.5,
+                  ),
+                  color: selected ? tone : Colors.transparent,
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      kind.title,
+                      style: SpendWiseType.rowStrong.copyWith(
+                        fontSize: 14,
+                        color: selected ? tone : SpendWiseColors.fg,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      kind.detail,
+                      style: SpendWiseType.body.copyWith(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 /// One loan, with what is left on it and the two ways it can end: money comes
@@ -312,7 +328,11 @@ class _DebtSheetState extends State<_DebtSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Eyebrow(current.lent ? 'Owed to you by' : 'You owe'),
+            Eyebrow(switch (current.kind) {
+              DebtKind.lent => 'Owed to you by',
+              DebtKind.borrowed => 'You owe',
+              DebtKind.holding => 'Holding for',
+            }),
             const SizedBox(height: 5),
             Text(current.counterparty, style: SpendWiseType.title),
             const SizedBox(height: 16),
@@ -428,6 +448,21 @@ class _DebtSheetState extends State<_DebtSheet> {
               ),
               const SizedBox(height: 18),
             ],
+            const Eyebrow('Whose money was it'),
+            const SizedBox(height: 8),
+            // Re-filing, not re-entering. Anything recorded before the third
+            // story existed is sitting under the nearest wrong answer, and
+            // "your history is mis-filed but you cannot fix it" would be a
+            // worse answer than never having offered the story.
+            for (final option in DebtKind.values)
+              _KindRow(
+                kind: option,
+                selected: option == current.kind,
+                onTap: working || option == current.kind
+                    ? () {}
+                    : () => _refile(option),
+              ),
+            const SizedBox(height: 14),
             Row(
               children: [
                 if (!current.isSettled)
@@ -458,6 +493,23 @@ class _DebtSheetState extends State<_DebtSheet> {
         ),
       ),
     );
+  }
+
+  Future<void> _refile(DebtKind kind) async {
+    setState(() => working = true);
+    try {
+      await widget.viewModel.uiChangeDebtKind(
+        debtId: widget.debt.id,
+        kind: kind,
+      );
+      if (mounted) Navigator.pop(context);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => working = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not re-file that: $error')));
+    }
   }
 
   Future<void> _settle() async {

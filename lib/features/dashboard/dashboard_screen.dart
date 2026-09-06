@@ -35,15 +35,23 @@ class DashboardScreen extends StatelessWidget {
     // that is about to be passed on -- each of these moves the balance
     // without being income or spending, and every one left out makes the
     // headline drift from the accounts by exactly the amount ignored.
+    // Money being held for someone else is nobody's flow but theirs. Both
+    // legs drop out, so it never shows as arriving and never as leaving.
+    final heldDebtIds = {
+      for (final debt in viewModel.uiDebts)
+        if (debt.isHeld) debt.id,
+    };
     final debtOutflow = debtOutflowInWindow(
       transactions: viewModel.transactions,
       from: windowFrom,
       to: windowTo,
+      heldDebtIds: heldDebtIds,
     );
     final debtInflow = debtInflowInWindow(
       transactions: viewModel.transactions,
       from: windowFrom,
       to: windowTo,
+      heldDebtIds: heldDebtIds,
     );
 
     // Debt money that arrived is part of what came in. It is not *earnings*,

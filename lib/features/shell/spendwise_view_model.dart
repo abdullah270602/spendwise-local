@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 
 import '../../app/home_period.dart';
+import '../../core/debt_kind.dart';
 export '../../app/home_period.dart';
+export '../../core/debt_kind.dart';
 
 enum TransactionKind { expense, income, transfer }
 
@@ -257,7 +259,7 @@ class ReviewDecision {
 class DebtViewData {
   const DebtViewData({
     required this.id,
-    required this.lent,
+    required this.kind,
     required this.counterparty,
     required this.principal,
     required this.settled,
@@ -270,8 +272,14 @@ class DebtViewData {
 
   final String id;
 
-  /// True when the user lent it out; false when they borrowed it.
-  final bool lent;
+  /// Whose money it was and which way it moved.
+  final DebtKind kind;
+
+  /// True when the user lent it out.
+  bool get lent => kind.owedToUser;
+
+  /// True when the money is in an account but is not theirs to spend.
+  bool get isHeld => kind == DebtKind.holding;
   final String counterparty;
   final MoneyViewData principal;
   final MoneyViewData settled;
@@ -515,10 +523,14 @@ abstract class SpendWiseAdvancedViewModel implements SpendWiseViewModel {
   /// Marks an existing entry as a loan and opens the debt behind it.
   Future<void> openDebt({
     required String transactionId,
-    required bool lent,
+    required DebtKind kind,
     required String counterparty,
     String? note,
   });
+
+  /// Re-files an existing debt as a different story, for history recorded
+  /// before the story it needed existed.
+  Future<void> changeDebtKind({required String debtId, required DebtKind kind});
 
   /// Records money coming back. Pass [transactionId] when a real entry in the
   /// ledger is the repayment; omit it for cash that never touched an account.
@@ -651,16 +663,22 @@ extension SpendWiseAdvancedAccess on SpendWiseViewModel {
   List<DebtViewData> get uiDebts => _advanced?.debts ?? const [];
   Future<void> uiOpenDebt({
     required String transactionId,
-    required bool lent,
+    required DebtKind kind,
     required String counterparty,
     String? note,
   }) =>
       _advanced?.openDebt(
         transactionId: transactionId,
-        lent: lent,
+        kind: kind,
         counterparty: counterparty,
         note: note,
       ) ??
+      Future.error(UnsupportedError('Loans are not available'));
+  Future<void> uiChangeDebtKind({
+    required String debtId,
+    required DebtKind kind,
+  }) =>
+      _advanced?.changeDebtKind(debtId: debtId, kind: kind) ??
       Future.error(UnsupportedError('Loans are not available'));
   Future<void> uiSettleDebt({
     required String debtId,

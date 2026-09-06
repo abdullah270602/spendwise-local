@@ -54,7 +54,13 @@ class _AccountsScreenState extends State<AccountsScreen> {
     final savings = viewModel.accounts
         .where((account) => !account.isIncluded)
         .toList(growable: false);
-    final everydayTotal = _sum(everyday);
+    // Money you are holding for somebody else sits in the bank looking
+    // exactly like your own. It is the one thing a balance cannot tell you,
+    // so it comes off the top -- a balance is not a permission to spend.
+    final heldTotal = viewModel.uiDebts
+        .where((item) => item.isHeld && !item.isSettled)
+        .fold<int>(0, (sum, item) => sum + item.outstanding.minorUnits);
+    final everydayTotal = _sum(everyday) - heldTotal;
     final savingsTotal = _sum(savings);
     final unconfigured = viewModel.accounts
         .where((account) => account.suffix.trim().isEmpty)
@@ -165,6 +171,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
               children: [
                 if (everyday.isNotEmpty) ...[
                   _zone('Available to spend', everydayTotal),
+                  if (heldTotal != 0) _heldNote(heldTotal),
                   ..._blocks(everyday),
                 ],
                 if (savings.isNotEmpty) ...[
@@ -181,13 +188,28 @@ class _AccountsScreenState extends State<AccountsScreen> {
     );
   }
 
-  /// Lent money is still yours; borrowed money is not. Neither sits in an
-  /// account, so the map has to say so out loud or the total lies.
+  /// A note under the spendable total explaining why it is lower than the
+  /// balances beneath it add up to. Without this the screen looks broken.
+  Widget _heldNote(int heldMinor) => Padding(
+    padding: const EdgeInsets.only(left: 13, bottom: 8),
+    child: Text(
+      '${formatMinor(heldMinor, cents: false)} of what is in these accounts '
+      'is being held for someone else, so it is not counted here.',
+      style: SpendWiseType.metaTight,
+    ),
+  );
+
+  /// Lent money is still yours; borrowed money is not; held money never was.
+  /// None of the three sits in an account of its own, so the map has to say so
+  /// out loud or the total lies.
   List<Widget> _loans() {
     final open = viewModel.uiDebts.where((item) => !item.isSettled).toList();
     if (open.isEmpty) return const [];
-    final owedToYou = open.where((item) => item.lent).toList();
-    final youOwe = open.where((item) => !item.lent).toList();
+    final owedToYou = open.where((item) => item.kind == DebtKind.lent).toList();
+    final youOwe = open
+        .where((item) => item.kind == DebtKind.borrowed)
+        .toList();
+    final holding = open.where((item) => item.isHeld).toList();
     int total(List<DebtViewData> items) =>
         items.fold<int>(0, (sum, item) => sum + item.outstanding.minorUnits);
 
@@ -200,11 +222,19 @@ class _AccountsScreenState extends State<AccountsScreen> {
         _zone('You owe', total(youOwe)),
         for (final item in youOwe) _loanRow(item),
       ],
+      if (holding.isNotEmpty) ...[
+        _zone('Holding for someone', total(holding)),
+        for (final item in holding) _loanRow(item),
+      ],
     ];
   }
 
   Widget _loanRow(DebtViewData debt) {
-    final tone = debt.lent ? SpendWiseColors.keep : SpendWiseColors.spend;
+    final tone = switch (debt.kind) {
+      DebtKind.lent => SpendWiseColors.keep,
+      DebtKind.borrowed => SpendWiseColors.spend,
+      DebtKind.holding => SpendWiseColors.dim,
+    };
     return Padding(
       padding: const EdgeInsets.only(bottom: 5),
       child: InkWell(

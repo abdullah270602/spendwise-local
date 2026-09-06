@@ -916,7 +916,7 @@ final class SpendWiseController extends ChangeNotifier
       .map(
         (item) => DebtViewData(
           id: item.id,
-          lent: item.lent,
+          kind: item.kind,
           counterparty: item.counterparty,
           principal: MoneyViewData(
             item.principalMinor,
@@ -938,17 +938,23 @@ final class SpendWiseController extends ChangeNotifier
   @override
   Future<void> openDebt({
     required String transactionId,
-    required bool lent,
+    required DebtKind kind,
     required String counterparty,
     String? note,
   }) => _runBusy(() async {
     _ledger.openDebt(
       transactionId: transactionId,
-      lent: lent,
+      kind: kind,
       counterparty: counterparty,
       note: note,
     );
   });
+
+  @override
+  Future<void> changeDebtKind({
+    required String debtId,
+    required DebtKind kind,
+  }) => _runBusy(() async => _ledger.changeDebtKind(debtId, kind));
 
   @override
   Future<void> settleDebt({
