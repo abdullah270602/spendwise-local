@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../app/palette.dart';
 import '../../security/app_lock.dart';
 import '../help/help_screen.dart';
 import '../../app/theme.dart';
-import '../../main.dart';
 import '../../widgets/controller_scope.dart';
 import '../../widgets/spendwise_components.dart';
 import '../shell/spendwise_view_model.dart';
@@ -16,6 +14,7 @@ import '../reports/report_screen.dart';
 import '../dashboard/home_savings.dart';
 import 'home_period_screen.dart';
 import 'home_savings_screen.dart';
+import 'palette_screen.dart';
 import 'export_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -34,6 +33,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late final Future<PackageInfo> packageInfo = PackageInfo.fromPlatform();
 
   SpendWiseViewModel get viewModel => widget.viewModel;
+
+  /// Both halves of the savings choice in one line, because the row has one
+  /// line and hiding half the answer is how a setting becomes a surprise.
+  static String _savingsSummary(SpendWiseViewModel viewModel) {
+    final style = HomeSavingsStyle.fromId(
+      viewModel.uiViewPreference('home_savings'),
+    );
+    final extra = HomeSavingsExtra.resolve(
+      viewModel.uiViewPreference('home_savings_extra'),
+      viewModel.uiViewPreference('home_savings'),
+      legacyOn: viewModel.uiShowSavingsOnHome,
+    );
+    if (extra == HomeSavingsExtra.none) return style.title;
+    return '${style.title}  ·  ${extra.title}';
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -211,18 +225,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 },
               ),
               const Divider(height: 1, indent: 56),
-              // A switch could only ever ask "on or off", and there are two
-              // different questions here -- what you put away over the period,
-              // and what you hold. So it opens a choice that names them.
+              // Two questions, not a switch: whether saving comes out of
+              // the figure, and whether a line appears beneath the shape.
               ListTile(
                 leading: const Icon(Icons.savings_outlined),
-                title: const Text('How Home counts savings'),
-                subtitle: Text(
-                  HomeSavingsStyle.fromId(
-                    viewModel.uiViewPreference('home_savings'),
-                    legacyOn: viewModel.uiShowSavingsOnHome,
-                  ).title,
-                ),
+                title: const Text('Savings on Home'),
+                subtitle: Text(_savingsSummary(viewModel)),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () async {
                   await Navigator.push(
@@ -234,13 +242,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   if (mounted) setState(() {});
                 },
               ),
+              const Divider(height: 1, indent: 56),
+              ListTile(
+                leading: const Icon(Icons.palette_outlined),
+                title: const Text('Colour'),
+                subtitle: Text(SpendWiseColors.palette.name),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => PaletteScreen(viewModel: viewModel),
+                    ),
+                  );
+                  if (mounted) setState(() {});
+                },
+              ),
             ],
           ),
         ),
-        const SizedBox(height: 22),
-        const SectionHeading('Colour'),
-        const SizedBox(height: 8),
-        _PalettePicker(viewModel: viewModel),
         const SizedBox(height: 22),
         const SectionHeading('Sample data'),
         const SizedBox(height: 8),
@@ -479,97 +499,4 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
-}
-
-/// Five palettes, not a colour wheel. The ground, the type and the layout are
-/// the app's identity; what a person gets to choose is the temperament of the
-/// three colours that carry meaning. Every option is checked against the same
-/// dark ground, so none of them can make the app look worse than the default.
-class _PalettePicker extends StatefulWidget {
-  const _PalettePicker({required this.viewModel});
-
-  final SpendWiseViewModel viewModel;
-
-  @override
-  State<_PalettePicker> createState() => _PalettePickerState();
-}
-
-class _PalettePickerState extends State<_PalettePicker> {
-  @override
-  Widget build(BuildContext context) => Card(
-    child: Column(
-      children: [
-        for (final palette in SpendWisePalette.all) ...[
-          if (palette != SpendWisePalette.all.first)
-            const Divider(height: 1, indent: 16),
-          InkWell(
-            onTap: () => _choose(palette),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
-              child: Row(
-                children: [
-                  _Swatch(palette: palette),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(palette.name, style: SpendWiseType.row),
-                        const SizedBox(height: 2),
-                        Text(
-                          palette.blurb,
-                          style: SpendWiseType.body.copyWith(fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (palette.id == SpendWiseColors.palette.id)
-                    Text(
-                      '✓',
-                      style: TextStyle(
-                        color: SpendWiseColors.keep,
-                        fontSize: 16,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ],
-    ),
-  );
-
-  void _choose(SpendWisePalette palette) {
-    if (palette.id == SpendWiseColors.palette.id) return;
-    SpendWiseColors.apply(palette);
-    widget.viewModel.uiSetViewPreference('palette', palette.id);
-    // Repaint from the root: ThemeData itself carries these colours.
-    paletteRevision.value++;
-    setState(() {});
-  }
-}
-
-/// The three tones that carry meaning, in the order the app uses them:
-/// kept, moved between your own accounts, gone.
-class _Swatch extends StatelessWidget {
-  const _Swatch({required this.palette});
-
-  final SpendWisePalette palette;
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 46,
-    height: 26,
-    // Stretch, or a childless ColoredBox inside Expanded gets a tight width
-    // and zero height, and the swatch renders as nothing at all.
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(flex: 5, child: ColoredBox(color: palette.keep)),
-        Expanded(flex: 2, child: ColoredBox(color: palette.mine)),
-        Expanded(flex: 3, child: ColoredBox(color: palette.spend)),
-      ],
-    ),
-  );
 }

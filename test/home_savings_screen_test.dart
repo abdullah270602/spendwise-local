@@ -5,10 +5,12 @@ import 'package:spendwise/features/dashboard/dashboard_screen.dart';
 import 'package:spendwise/features/dashboard/home_savings.dart';
 import 'package:spendwise/features/settings/home_savings_screen.dart';
 import 'package:spendwise/features/shell/spendwise_view_model.dart';
+import 'package:spendwise/widgets/chooser_kit.dart';
 import 'package:spendwise/widgets/shape_kit.dart';
 
-/// Saving is now a choice of which question Home answers, so the tests are
-/// about which question got answered — not about pixels.
+/// Saving is two choices now -- whether it comes out of the figure, and what
+/// line sits underneath -- so the tests are about which question got answered
+/// and whether the two stay independent. Never about pixels.
 void main() {
   Future<void> pump(WidgetTester tester, Widget child) async {
     tester.view.physicalSize = const Size(1080, 2400);
@@ -23,12 +25,25 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> choose(WidgetTester tester, String label) async {
+    final option = find.text(label);
+    // scrollUntilVisible stops as soon as the finder matches, and a lazy list
+    // builds a little beyond the viewport -- so the row can be "found" while
+    // still sitting below the fold, and the tap lands on nothing. ensureVisible
+    // is the one that actually brings it into view.
+    await tester.scrollUntilVisible(option, 120);
+    await tester.ensureVisible(option);
+    await tester.pumpAndSettle();
+    await tester.tap(option);
+    await tester.pumpAndSettle();
+  }
+
   group('on Home', () {
     testWidgets('off draws nothing about savings', (tester) async {
       await pump(
         tester,
         DashboardScreen(
-          viewModel: _Fake('off'),
+          viewModel: _Fake(style: 'off'),
           onSeeLedger: () {},
           onOpenAccounts: () {},
         ),
@@ -41,13 +56,13 @@ void main() {
       );
     });
 
-    testWidgets('the balance shows a band and leaves the shape alone', (
+    testWidgets('a balance is a band and never enters the shape', (
       tester,
     ) async {
       await pump(
         tester,
         DashboardScreen(
-          viewModel: _Fake('balance'),
+          viewModel: _Fake(style: 'off', extra: 'balance'),
           onSeeLedger: () {},
           onOpenAccounts: () {},
         ),
@@ -56,7 +71,7 @@ void main() {
       expect(
         tester.widget<FlowShape>(find.byType(FlowShape)).saved,
         SavedTreatment.none,
-        reason: 'a balance must never enter the flow',
+        reason: 'a balance must never enter a picture of flow',
       );
     });
 
@@ -66,7 +81,7 @@ void main() {
       await pump(
         tester,
         DashboardScreen(
-          viewModel: _Fake('moved'),
+          viewModel: _Fake(style: 'off', extra: 'moved'),
           onSeeLedger: () {},
           onOpenAccounts: () {},
         ),
@@ -87,7 +102,7 @@ void main() {
         await pump(
           tester,
           DashboardScreen(
-            viewModel: _Fake(id),
+            viewModel: _Fake(style: id),
             onSeeLedger: () {},
             onOpenAccounts: () {},
           ),
@@ -95,9 +110,21 @@ void main() {
         final shape = tester.widget<FlowShape>(find.byType(FlowShape));
         expect(shape.saved, expected, reason: id);
         expect(shape.savedMinor, 4000000, reason: id);
-        // The drawing is always accompanied by the figure it draws.
-        expect(find.textContaining('put away'), findsOneWidget, reason: id);
       }
+    });
+
+    testWidgets('the two choices compose', (tester) async {
+      // The whole reason for the split: this combination was unreachable.
+      await pump(
+        tester,
+        DashboardScreen(
+          viewModel: _Fake(style: 'available', extra: 'moved'),
+          onSeeLedger: () {},
+          onOpenAccounts: () {},
+        ),
+      );
+      expect(find.text('AVAILABLE'), findsOneWidget);
+      expect(find.textContaining('put away this period'), findsOneWidget);
     });
 
     testWidgets('only what I can spend hides the saved figure entirely', (
@@ -108,7 +135,7 @@ void main() {
       await pump(
         tester,
         DashboardScreen(
-          viewModel: _Fake('available'),
+          viewModel: _Fake(style: 'available'),
           onSeeLedger: () {},
           onOpenAccounts: () {},
         ),
@@ -116,115 +143,137 @@ void main() {
       expect(find.text('AVAILABLE'), findsOneWidget);
       expect(find.text('SAVED'), findsNothing);
       expect(find.textContaining('put away'), findsNothing);
-      // And the shape stays two branches. Choosing not to see savings means
-      // not seeing them; the ribbon divides available against gone.
       final shape = tester.widget<FlowShape>(find.byType(FlowShape));
       expect(shape.saved, SavedTreatment.none);
       expect(shape.keptMinor, (18000000 - 3500000) - 4000000);
+    });
+
+    testWidgets('"nothing underneath" means nothing', (tester) async {
+      // Even where the shape draws the saved slice. If you want the figure as
+      // well, you ask for it -- otherwise the group label is a lie.
+      await pump(
+        tester,
+        DashboardScreen(
+          viewModel: _Fake(style: 'seam'),
+          onSeeLedger: () {},
+          onOpenAccounts: () {},
+        ),
+      );
+      expect(find.textContaining('put away'), findsNothing);
+      expect(find.text('SAVINGS'), findsNothing);
     });
 
     testWidgets('money taken back out is a different sentence', (tester) async {
       await pump(
         tester,
         DashboardScreen(
-          viewModel: _Fake('moved', out: true),
+          viewModel: _Fake(style: 'off', extra: 'moved', out: true),
           onSeeLedger: () {},
           onOpenAccounts: () {},
         ),
       );
       expect(find.textContaining('taken back out of savings'), findsOneWidget);
-      expect(find.textContaining('put away'), findsNothing);
-    });
-
-    testWidgets('a period with no movement says nothing at all', (
-      tester,
-    ) async {
-      await pump(
-        tester,
-        DashboardScreen(
-          viewModel: _Fake('divided', none: true),
-          onSeeLedger: () {},
-          onOpenAccounts: () {},
-        ),
-      );
-      expect(find.textContaining('put away'), findsNothing);
-      expect(tester.widget<FlowShape>(find.byType(FlowShape)).savedMinor, 0);
+      expect(find.textContaining('put away this'), findsNothing);
     });
   });
 
   group('choosing it', () {
-    testWidgets('every option is offered, named by its question', (
-      tester,
-    ) async {
-      await pump(tester, HomeSavingsScreen(viewModel: _Fake('off')));
+    testWidgets('both questions are asked, and named apart', (tester) async {
+      await pump(tester, HomeSavingsScreen(viewModel: _Fake(style: 'off')));
+      expect(find.text('IN THE FIGURE'), findsOneWidget);
       for (final style in HomeSavingsStyle.values) {
         await tester.scrollUntilVisible(find.text(style.title), 120);
         expect(find.text(style.title), findsOneWidget, reason: style.id);
       }
+      await tester.scrollUntilVisible(find.text('UNDERNEATH'), 120);
+      expect(find.text('UNDERNEATH'), findsOneWidget);
+      for (final extra in HomeSavingsExtra.values) {
+        await tester.scrollUntilVisible(find.text(extra.title), 120);
+        expect(find.text(extra.title), findsOneWidget, reason: extra.id);
+      }
     });
 
-    testWidgets('picking one stores it', (tester) async {
-      final viewModel = _Fake('off');
+    testWidgets('picking a treatment stores it', (tester) async {
+      final viewModel = _Fake(style: 'off');
       await pump(tester, HomeSavingsScreen(viewModel: viewModel));
-      await tester.scrollUntilVisible(
-        find.text(HomeSavingsStyle.divided.title),
-        120,
-      );
-      await tester.tap(find.text(HomeSavingsStyle.divided.title));
-      await tester.pumpAndSettle();
+      await choose(tester, HomeSavingsStyle.divided.title);
       expect(viewModel.preferences['home_savings'], 'divided');
     });
 
-    testWidgets('each option shows what it will actually look like', (
+    testWidgets('picking a line underneath stores it separately', (
       tester,
     ) async {
-      // One preview, at Home's size, not a thumbnail per row.
-      await pump(tester, HomeSavingsScreen(viewModel: _Fake('off')));
-      expect(find.byType(FlowShape), findsOneWidget);
-      expect(find.textContaining('ON HOME'), findsOneWidget);
+      final viewModel = _Fake(style: 'off');
+      await pump(tester, HomeSavingsScreen(viewModel: viewModel));
+      await choose(tester, HomeSavingsExtra.moved.title);
+      expect(viewModel.preferences['home_savings_extra'], 'moved');
+      expect(
+        viewModel.preferences['home_savings'],
+        'off',
+        reason: 'the figure treatment is a different question',
+      );
     });
 
-    testWidgets('the preview relabels when saving is counted out', (
+    testWidgets('choosing a treatment does not silently drop the line', (
       tester,
     ) async {
-      // The preview follows the selection, and the headline is relabelled
-      // only where saving is actually counted out of it.
-      final viewModel = _Fake('divided');
+      // The failure the split exists to prevent: picking one and losing the
+      // other without being told.
+      final viewModel = _Fake(style: 'off', extra: 'moved');
+      await pump(tester, HomeSavingsScreen(viewModel: viewModel));
+      await choose(tester, HomeSavingsStyle.seam.title);
+      expect(viewModel.preferences['home_savings'], 'seam');
+      expect(viewModel.preferences['home_savings_extra'], 'moved');
+    });
+
+    testWidgets('one preview, at Home size, not a thumbnail per row', (
+      tester,
+    ) async {
+      await pump(tester, HomeSavingsScreen(viewModel: _Fake(style: 'off')));
+      expect(find.byType(FlowShape), findsOneWidget);
+      expect(find.byType(ChooserScreen), findsOneWidget);
+    });
+
+    testWidgets('the preview stays put while you scroll the options', (
+      tester,
+    ) async {
+      // It used to sit at the top of the same list, so reaching an option
+      // scrolled the answer off screen and the choice became a guess.
+      await pump(tester, HomeSavingsScreen(viewModel: _Fake(style: 'off')));
+      await tester.scrollUntilVisible(
+        find.text(HomeSavingsExtra.moved.title),
+        120,
+      );
+      expect(find.byType(FlowShape), findsOneWidget);
+    });
+
+    testWidgets('the preview follows the selection', (tester) async {
+      final viewModel = _Fake(style: 'off');
       await pump(tester, HomeSavingsScreen(viewModel: viewModel));
       expect(find.text('STILL YOURS'), findsOneWidget);
       expect(find.text('AVAILABLE'), findsNothing);
 
-      await tester.scrollUntilVisible(
-        find.text(HomeSavingsStyle.siblings.title),
-        120,
-      );
-      await tester.tap(find.text(HomeSavingsStyle.siblings.title));
-      await tester.pumpAndSettle();
+      await choose(tester, HomeSavingsStyle.available.title);
 
-      // The preview sits at the top; scrolling down to the option left it
-      // off-screen, and a lazy list does not build what is off-screen.
-      await tester.scrollUntilVisible(find.textContaining('ON HOME'), -120);
       expect(find.text('AVAILABLE'), findsOneWidget);
-      expect(find.text('SAVED'), findsOneWidget);
       expect(find.text('STILL YOURS'), findsNothing);
     });
 
     testWidgets('and it shows the real figures, not an abstraction', (
       tester,
     ) async {
-      await pump(tester, HomeSavingsScreen(viewModel: _Fake('off')));
-      expect(find.textContaining('40,000'), findsWidgets);
+      await pump(tester, HomeSavingsScreen(viewModel: _Fake(style: 'off')));
+      expect(find.textContaining('180,000'), findsWidgets);
     });
   });
 }
 
 class _Fake extends ChangeNotifier implements SpendWiseAdvancedViewModel {
-  _Fake(String style, {this.out = false, this.none = false})
-    : preferences = {'home_savings': style};
+  _Fake({required String style, String extra = 'none', this.out = false})
+    : preferences = {'home_savings': style, 'home_savings_extra': extra};
 
   final Map<String, String> preferences;
   final bool out;
-  final bool none;
 
   @override
   List<AccountViewData> get accounts => const [
@@ -243,20 +292,42 @@ class _Fake extends ChangeNotifier implements SpendWiseAdvancedViewModel {
     ),
   ];
 
+  /// Real entries, because the figures are derived from them now rather than
+  /// handed over ready-made. A fake that reports totals its own ledger does
+  /// not support cannot catch a sum going wrong.
   @override
   List<TransactionViewData> get transactions => [
-    if (!none)
-      TransactionViewData(
-        id: 't',
-        title: 'To savings',
-        subtitle: '',
-        amount: const MoneyViewData(4000000),
-        kind: TransactionKind.transfer,
-        occurredAt: DateTime.now().subtract(const Duration(days: 1)),
-        category: 'Between your accounts',
-        accountId: out ? 'pot' : 'current',
-        toAccountId: out ? 'current' : 'pot',
-      ),
+    TransactionViewData(
+      id: 'in',
+      title: 'Salary',
+      subtitle: '',
+      amount: const MoneyViewData(18000000),
+      kind: TransactionKind.income,
+      occurredAt: DateTime.now().subtract(const Duration(days: 3)),
+      category: 'Income',
+      accountId: 'current',
+    ),
+    TransactionViewData(
+      id: 'out',
+      title: 'Groceries',
+      subtitle: '',
+      amount: const MoneyViewData(3500000),
+      kind: TransactionKind.expense,
+      occurredAt: DateTime.now().subtract(const Duration(days: 2)),
+      category: 'Groceries',
+      accountId: 'current',
+    ),
+    TransactionViewData(
+      id: 't',
+      title: 'To savings',
+      subtitle: '',
+      amount: const MoneyViewData(4000000),
+      kind: TransactionKind.transfer,
+      occurredAt: DateTime.now().subtract(const Duration(days: 1)),
+      category: 'Between your accounts',
+      accountId: out ? 'pot' : 'current',
+      toAccountId: out ? 'current' : 'pot',
+    ),
   ];
 
   @override

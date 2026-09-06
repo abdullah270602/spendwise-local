@@ -187,23 +187,25 @@ void main() {
     );
   });
 
-  group('choosing how it shows', () {
-    test('an unset choice keeps whatever the old switch did', () {
-      expect(
-        HomeSavingsStyle.fromId(null, legacyOn: true),
-        HomeSavingsStyle.balance,
-        reason: 'the switch drew a balance, so that is what they keep seeing',
-      );
-      expect(
-        HomeSavingsStyle.fromId(null, legacyOn: false),
-        HomeSavingsStyle.off,
-      );
+  group('the figure', () {
+    test('an unset choice shows only what you can spend', () {
+      // Home's one job is to say what is left, and money deliberately put
+      // away is not left. Chosen deliberately as the default, not inherited.
+      expect(HomeSavingsStyle.fromId(null), HomeSavingsStyle.available);
     });
 
-    test('a stored choice wins over the old switch', () {
+    test('a stored choice wins', () {
+      expect(HomeSavingsStyle.fromId('divided'), HomeSavingsStyle.divided);
+    });
+
+    test('the two that never touched the figure no longer sit here', () {
+      // They were values in this enum before the split. Anything stored under
+      // those names must not resolve to a figure treatment.
+      expect(HomeSavingsStyle.fromId('balance'), HomeSavingsStyle.off);
+      expect(HomeSavingsStyle.fromId('moved'), HomeSavingsStyle.off);
       expect(
-        HomeSavingsStyle.fromId('divided', legacyOn: false),
-        HomeSavingsStyle.divided,
+        HomeSavingsStyle.values.map((s) => s.id),
+        isNot(anyElement(anyOf('balance', 'moved'))),
       );
     });
 
@@ -218,9 +220,6 @@ void main() {
     });
 
     test('two take saving out of the headline, only one names it', () {
-      // "Only what I can spend" is the whole point of the unnamed one: the
-      // money is yours, it is simply not available to you, and you would
-      // rather not be shown a figure for it.
       expect(HomeSavingsStyle.values.where((s) => s.setsSavingAside), [
         HomeSavingsStyle.available,
         HomeSavingsStyle.siblings,
@@ -243,12 +242,86 @@ void main() {
         );
       }
     });
+  });
 
+  group('the line underneath', () {
+    test('nothing, unless asked for', () {
+      expect(
+        HomeSavingsExtra.resolve('none', 'available', legacyOn: false),
+        HomeSavingsExtra.none,
+      );
+    });
+
+    test('it inherits from the setting it was split out of', () {
+      // Someone who had picked "what I put away" keeps seeing it, even though
+      // that value now lives in a different enum entirely.
+      expect(
+        HomeSavingsExtra.resolve(null, 'moved', legacyOn: false),
+        HomeSavingsExtra.moved,
+      );
+      expect(
+        HomeSavingsExtra.resolve(null, 'balance', legacyOn: false),
+        HomeSavingsExtra.balance,
+      );
+    });
+
+    test('and from the switch before that', () {
+      expect(
+        HomeSavingsExtra.resolve(null, null, legacyOn: true),
+        HomeSavingsExtra.balance,
+        reason: 'the old switch drew a balance',
+      );
+      expect(
+        HomeSavingsExtra.resolve(null, null, legacyOn: false),
+        HomeSavingsExtra.none,
+      );
+    });
+
+    test('an explicit choice is never overridden by inheritance', () {
+      // The bug this guards: picking "nothing" while an old value is still
+      // stored, and having the old value quietly win.
+      expect(
+        HomeSavingsExtra.resolve('none', 'moved', legacyOn: true),
+        HomeSavingsExtra.none,
+      );
+    });
+
+    test('they compose with any figure treatment', () {
+      // The point of the split. Every combination has to be reachable --
+      // previously choosing one silently gave up the other.
+      for (final style in HomeSavingsStyle.values) {
+        for (final extra in HomeSavingsExtra.values) {
+          expect(HomeSavingsStyle.fromId(style.id), style);
+          expect(
+            HomeSavingsExtra.resolve(extra.id, style.id, legacyOn: false),
+            extra,
+            reason: '${style.id} + ${extra.id}',
+          );
+        }
+      }
+    });
+  });
+
+  group('naming', () {
     test('every option is named after a question, not a drawing', () {
-      // The trap this is guarding: naming them "bar", "seam", "three-way".
       for (final style in HomeSavingsStyle.values) {
         expect(style.title, isNotEmpty);
         expect(style.detail, isNotEmpty, reason: style.id);
+      }
+      for (final extra in HomeSavingsExtra.values) {
+        expect(extra.title, isNotEmpty);
+        expect(extra.detail, isNotEmpty, reason: extra.id);
+      }
+    });
+
+    test('a detail line stays a line', () {
+      // The clutter this screen was rebuilt to remove: rows whose explanation
+      // ran longer than the preview that explains it better.
+      for (final style in HomeSavingsStyle.values) {
+        expect(style.detail.length, lessThan(80), reason: style.id);
+      }
+      for (final extra in HomeSavingsExtra.values) {
+        expect(extra.detail.length, lessThan(80), reason: extra.id);
       }
     });
   });

@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
+import '../../widgets/chooser_kit.dart';
 import '../../widgets/shape_kit.dart';
+import '../dashboard/home_preview.dart';
+import '../dashboard/home_savings.dart';
 import '../shell/spendwise_view_model.dart';
 
-/// Choosing what Home is a picture of.
+/// Choosing what stretch of time Home is a picture of.
 ///
-/// Every option shows the figures it would actually produce from the ledger,
-/// because the choice is only meaningful in terms of its denominator: "the
-/// 1st to today" and "last 30 days" are abstractions until you can see that
-/// one of them says you received nothing.
+/// Every option used to carry its own miniature set of figures, which made a
+/// wall of numbers to read before you could choose anything. One preview
+/// answers the question better: pick a window and watch Home become that
+/// window, including the case that matters most -- the one where the window
+/// you picked contains no income and the proportion means nothing.
 class HomePeriodScreen extends StatefulWidget {
   const HomePeriodScreen({super.key, required this.viewModel});
 
@@ -31,10 +35,17 @@ class _HomePeriodScreenState extends State<HomePeriodScreen> {
     endDay = current.kind == HomePeriodKind.dayRange ? current.endDay : 0;
   }
 
+  void _choose(HomePeriod period) {
+    widget.viewModel.uiSetHomePeriod(period);
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final current = widget.viewModel.uiHomePeriod;
+    final viewModel = widget.viewModel;
+    final current = viewModel.uiHomePeriod;
+    final figures = homeFigures(viewModel, now: now);
     final options = <HomePeriod>[
       HomePeriod.calendarMonth,
       HomePeriod.lastThirtyDays,
@@ -47,246 +58,77 @@ class _HomePeriodScreenState extends State<HomePeriodScreen> {
       ),
     ];
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('How much time Home shows')),
-      body: ListView(
-        padding: EdgeInsets.fromLTRB(
-          SpendWiseTheme.gutter,
-          8,
-          SpendWiseTheme.gutter,
-          48 + MediaQuery.viewPaddingOf(context).bottom,
-        ),
+    return ChooserScreen(
+      title: 'How much time Home shows',
+      preview: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Home answers one question: of everything that arrived, how much '
-            'is still yours. That needs a stretch of time with money in it — '
-            'so pick the one that matches when you get paid.',
-            style: SpendWiseType.body.copyWith(fontSize: 13.5),
-          ),
-          const SizedBox(height: 24),
-          for (final option in options) ...[
-            _PeriodTile(
-              period: option,
-              now: now,
-              selected: option == current,
-              totals: _totalsFor(option, now),
-              onTap: () => _choose(option),
+          HomePreview(
+            figures: figures,
+            style: HomeSavingsStyle.fromId(
+              viewModel.uiViewPreference('home_savings'),
             ),
-            if (option.kind == HomePeriodKind.dayRange)
-              _DayRangeEditor(
-                startDay: startDay,
-                endDay: endDay,
-                onChanged: (start, end) {
-                  setState(() {
-                    startDay = start;
-                    endDay = end;
-                  });
-                  if (current.kind == HomePeriodKind.dayRange) {
-                    _choose(
-                      HomePeriod(
-                        kind: HomePeriodKind.dayRange,
-                        startDay: start,
-                        endDay: end,
-                      ),
-                    );
-                  }
-                },
+            extra: HomeSavingsExtra.resolve(
+              viewModel.uiViewPreference('home_savings_extra'),
+              viewModel.uiViewPreference('home_savings'),
+              legacyOn: viewModel.uiShowSavingsOnHome,
+            ),
+            label: current.label(now),
+          ),
+          if (figures.received == 0) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Nothing arrived in this window, so there is no proportion to '
+              'show. Pick one that contains a payday.',
+              style: SpendWiseType.body.copyWith(
+                fontSize: 12.5,
+                color: SpendWiseColors.spend,
               ),
+            ),
           ],
         ],
       ),
-    );
-  }
-
-  void _choose(HomePeriod period) {
-    widget.viewModel.uiSetHomePeriod(period);
-    setState(() {});
-  }
-
-  /// The same arithmetic Home does, run over a candidate window so the choice
-  /// can be judged on its own numbers rather than its name.
-  ({int received, int spent, int entries}) _totalsFor(
-    HomePeriod period,
-    DateTime now,
-  ) {
-    final (from, to) = period.resolve(now);
-    var received = 0, spent = 0, entries = 0;
-    for (final item in widget.viewModel.transactions) {
-      final at = item.occurredAt.toLocal();
-      if (at.isBefore(from) || !at.isBefore(to)) continue;
-      if (item.isLoanMovement) continue;
-      entries++;
-      if (item.kind == TransactionKind.income) {
-        received += item.amount.minorUnits.abs();
-      } else if (item.kind == TransactionKind.expense) {
-        spent += item.amount.minorUnits.abs();
-      }
-    }
-    return (received: received, spent: spent, entries: entries);
-  }
-}
-
-class _PeriodTile extends StatelessWidget {
-  const _PeriodTile({
-    required this.period,
-    required this.now,
-    required this.selected,
-    required this.totals,
-    required this.onTap,
-  });
-
-  final HomePeriod period;
-  final DateTime now;
-  final bool selected;
-  final ({int received, int spent, int entries}) totals;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final kept = totals.received - totals.spent;
-    final hasIncome = totals.received > 0;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: selected ? SpendWiseColors.fg : SpendWiseColors.edge,
-              width: selected ? 1.4 : 1,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(period.title, style: SpendWiseType.rowStrong),
-                  ),
-                  if (selected)
-                    Text(
-                      '✓',
-                      style: TextStyle(
-                        color: SpendWiseColors.keep,
-                        fontSize: 16,
-                      ),
-                    ),
-                ],
+      children: [
+        ChoiceGroup(
+          label: 'The window',
+          caption: 'Match it to when you get paid.',
+          first: true,
+          children: [
+            for (final option in options) ...[
+              ChoiceRow(
+                title: option.title,
+                detail: option.blurb,
+                selected: option == current,
+                onTap: () => _choose(option),
               ),
-              const SizedBox(height: 3),
-              Text(
-                period.blurb,
-                style: SpendWiseType.body.copyWith(fontSize: 12.5),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.only(top: 11),
-                decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: SpendWiseColors.line)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Eyebrow(
-                      period.label(now),
-                      trailing: Text(
-                        '${totals.entries} '
-                        '${totals.entries == 1 ? 'entry' : 'entries'}',
-                        style: SpendWiseType.eyebrow,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    if (!hasIncome)
-                      // The whole reason this setting exists.
-                      Text(
-                        totals.spent == 0
-                            ? 'Nothing at all in this window.'
-                            : 'Nothing received in this window, so Home cannot '
-                                  'show a share — only '
-                                  '${formatMinor(totals.spent, cents: false)} '
-                                  'spent.',
-                        style: SpendWiseType.body.copyWith(
-                          fontSize: 12.5,
-                          color: SpendWiseColors.spend,
+              if (option.kind == HomePeriodKind.dayRange)
+                _DayRangeEditor(
+                  startDay: startDay,
+                  endDay: endDay,
+                  onChanged: (start, end) {
+                    setState(() {
+                      startDay = start;
+                      endDay = end;
+                    });
+                    if (current.kind == HomePeriodKind.dayRange) {
+                      _choose(
+                        HomePeriod(
+                          kind: HomePeriodKind.dayRange,
+                          startDay: start,
+                          endDay: end,
                         ),
-                      )
-                    else ...[
-                      SegmentBar(
-                        weights: [
-                          kept < 0 ? 0.0 : kept / totals.received,
-                          (kept < 0 ? 1.0 : totals.spent / totals.received)
-                              .clamp(0.0, 1.0),
-                        ],
-                        colors: [SpendWiseColors.keep, SpendWiseColors.spend],
-                        height: 8,
-                        gap: 2,
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _Figure(
-                              label: 'Received',
-                              value: formatMinor(totals.received, cents: false),
-                              tone: SpendWiseColors.fg,
-                            ),
-                          ),
-                          Expanded(
-                            child: _Figure(
-                              label: kept < 0 ? 'Overspent' : 'Still yours',
-                              value: formatMinor(kept, cents: false),
-                              tone: kept < 0
-                                  ? SpendWiseColors.spend
-                                  : SpendWiseColors.keep,
-                            ),
-                          ),
-                          Expanded(
-                            child: _Figure(
-                              label: 'Gone',
-                              value: formatMinor(totals.spent, cents: false),
-                              tone: SpendWiseColors.spend,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
+                      );
+                    }
+                  },
                 ),
-              ),
             ],
-          ),
+          ],
         ),
-      ),
+      ],
     );
   }
 }
 
-class _Figure extends StatelessWidget {
-  const _Figure({required this.label, required this.value, required this.tone});
-
-  final String label;
-  final String value;
-  final Color tone;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Eyebrow(label),
-      const SizedBox(height: 2),
-      Text(
-        value,
-        style: SpendWiseType.rowStrong.copyWith(fontSize: 14, color: tone),
-      ),
-    ],
-  );
-}
-
-/// Two dials for the pay-cycle window. The end day is optional, because the
-/// common case is "my month starts when I get paid" rather than a window that
-/// deliberately ignores the last few days.
 class _DayRangeEditor extends StatelessWidget {
   const _DayRangeEditor({
     required this.startDay,

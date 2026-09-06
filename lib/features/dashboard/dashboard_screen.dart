@@ -29,39 +29,16 @@ class DashboardScreen extends StatelessWidget {
     final period = viewModel.uiHomePeriod;
     final month = period.label(now);
 
-    final (windowFrom, windowTo) = period.resolve(now);
-    // Everything that moved, not only what was earned and spent. Lending
-    // money out, handing back something borrowed, being repaid, holding money
-    // that is about to be passed on -- each of these moves the balance
-    // without being income or spending, and every one left out makes the
-    // headline drift from the accounts by exactly the amount ignored.
-    // Money being held for someone else is nobody's flow but theirs. Both
-    // legs drop out, so it never shows as arriving and never as leaving.
-    final heldDebtIds = {
-      for (final debt in viewModel.uiDebts)
-        if (debt.isHeld) debt.id,
-    };
-    final debtOutflow = debtOutflowInWindow(
-      transactions: viewModel.transactions,
-      from: windowFrom,
-      to: windowTo,
-      heldDebtIds: heldDebtIds,
-    );
-    final debtInflow = debtInflowInWindow(
-      transactions: viewModel.transactions,
-      from: windowFrom,
-      to: windowTo,
-      heldDebtIds: heldDebtIds,
-    );
-
-    // Debt money that arrived is part of what came in. It is not *earnings*,
-    // which is why income excludes it, but it landed in the account and the
-    // figure below it is the change in the balance -- so the ribbon it feeds
-    // has to be the whole of what arrived, or kept and gone divide a total
-    // that money already left.
-    final received = data.incomeThisMonth.minorUnits + debtInflow;
-    final spent = data.spendingThisMonth.minorUnits;
-    final kept = received - spent - debtOutflow;
+    // Every figure on Home comes from one place, and the settings previews
+    // read the same one. Three separate assemblies of the same sum was three
+    // chances for the preview to disagree with the screen it previews.
+    final figures = homeFigures(viewModel, now: now);
+    final windowFrom = figures.from;
+    final windowTo = figures.to;
+    final received = figures.received;
+    final spent = figures.spent;
+    final kept = figures.kept;
+    final savedMinor = figures.saved;
     final anything = received != 0 || spent != 0;
     // A share of nothing is not a share. Before any income lands in the
     // window the ribbon would split |kept| against |spent| and draw a
@@ -76,18 +53,14 @@ class DashboardScreen extends StatelessWidget {
     );
     final savingsStyle = HomeSavingsStyle.fromId(
       viewModel.uiViewPreference('home_savings'),
-      legacyOn: viewModel.uiShowSavingsOnHome,
     );
-    // Read over the same window as everything else on Home, so a fortnight
-    // view reports what was put away in that fortnight.
-    final savedMinor = savedInWindow(
-      transactions: viewModel.transactions,
-      savingsAccountIds: {
-        for (final account in viewModel.accounts)
-          if (!account.isIncluded) account.id,
-      },
-      from: windowFrom,
-      to: windowTo,
+    // The line beneath the shape is its own choice now. It changes no figure
+    // above it, so it was the wrong thing to have been picked *instead of*
+    // the five that do.
+    final savingsExtra = HomeSavingsExtra.resolve(
+      viewModel.uiViewPreference('home_savings_extra'),
+      viewModel.uiViewPreference('home_savings'),
+      legacyOn: viewModel.uiShowSavingsOnHome,
     );
     final ownMoves = viewModel.transactions.where((item) {
       final local = item.occurredAt.toLocal();
@@ -135,7 +108,7 @@ class DashboardScreen extends StatelessWidget {
           if (viewModel.uiViewPreference('tour_seen') != 'true' &&
               viewModel.accounts.isNotEmpty)
             SliverToBoxAdapter(child: _TourOffer(viewModel: viewModel)),
-          if (!anything && savingsStyle == HomeSavingsStyle.balance)
+          if (!anything && savingsExtra == HomeSavingsExtra.balance)
             SliverToBoxAdapter(
               child: _SavingsStrip(
                 accounts: viewModel.accounts,
@@ -267,19 +240,17 @@ class DashboardScreen extends StatelessWidget {
                 ),
               ),
             ),
-            if (savingsStyle == HomeSavingsStyle.balance)
+            if (savingsExtra == HomeSavingsExtra.balance)
               SliverToBoxAdapter(
                 child: _SavingsStrip(
                   accounts: viewModel.accounts,
                   onTap: onOpenAccounts,
                 ),
               ),
-            // The shape treatments need a figure to go with the drawing, and
-            // "what I put away" needs a line of its own since it changes
-            // nothing about the shape.
-            if (savingsStyle != HomeSavingsStyle.off &&
-                savingsStyle != HomeSavingsStyle.balance &&
-                savingsStyle != HomeSavingsStyle.available)
+            // Whatever is underneath is asked for underneath. "Nothing" means
+            // nothing, including for the treatments that draw the saved slice
+            // in the shape -- if you want the figure as well, ask for it.
+            if (savingsExtra == HomeSavingsExtra.moved)
               SliverToBoxAdapter(
                 child: _PutAwayNote(
                   savedMinor: savedMinor,
