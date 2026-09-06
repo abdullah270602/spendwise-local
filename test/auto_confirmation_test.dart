@@ -41,7 +41,7 @@ void main() {
     expect(
       ingest(
         ledger,
-        'Your account was debited PKR 1,500 at IMTIAZ SUPERMARKET',
+        'Your account was debited PKR 1,500 at SAMPLE SUPERMARKET',
       ),
       isTrue,
     );
@@ -115,7 +115,7 @@ void main() {
       'captures out of review', () {
     final ledger = ledgerWithBankAccount();
     addTearDown(ledger.close);
-    ingest(ledger, 'Your account was debited PKR 1,500 at IMTIAZ SUPERMARKET');
+    ingest(ledger, 'Your account was debited PKR 1,500 at SAMPLE SUPERMARKET');
     ingest(ledger, 'PKR 9,000 credited to your account', key: 'bank:2');
 
     final before = ledger.snapshot().transactions;
@@ -172,7 +172,7 @@ void main() {
     expect(ledger.snapshot().unparsedCount, 1);
   });
 
-  test('marketing copy that reads like a transaction still asks first', () {
+  test('marketing copy never reaches the ledger at all', () {
     final ledger = ledgerWithBankAccount();
     addTearDown(ledger.close);
 
@@ -182,13 +182,19 @@ void main() {
         'Congratulations! PKR 5,000 cashback will be credited on your next spend. T&C apply',
       ),
       isTrue,
+      reason: 'the alert is still captured, so it stays auditable',
     );
 
-    final transaction = ledger.snapshot().transactions.single;
     expect(
-      transaction.needsReview,
-      isTrue,
-      reason: 'promotional copy must never post to the ledger unreviewed',
+      ledger.snapshot().transactions,
+      isEmpty,
+      reason: 'an advert is not a transaction, and not a decision either',
     );
+    expect(
+      ledger.unparsedBySource(),
+      isEmpty,
+      reason: 'it must not surface as pending work in Review',
+    );
+    expect(ledger.alerts(onlyUnresolved: false).single.status, 'ignored');
   });
 }

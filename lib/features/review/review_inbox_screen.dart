@@ -1,374 +1,734 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
-import '../../widgets/spendwise_components.dart';
-import '../shell/spendwise_view_model.dart';
+import '../../widgets/category_picker.dart';
+import '../../widgets/shape_kit.dart';
 import '../settings/source_selection_screen.dart';
+import '../shell/spendwise_view_model.dart';
 import '../transactions/transaction_details_screen.dart';
+import 'review_rules.dart';
 
-class ReviewInboxScreen extends StatelessWidget {
+/// Review asks questions, not permissions. Fourteen uncertain alerts are not
+/// fourteen decisions — they are usually two, and answering one settles the
+/// whole group. One-by-one is still there for anyone who wants it.
+class ReviewInboxScreen extends StatefulWidget {
   const ReviewInboxScreen({super.key, required this.viewModel});
-  final SpendWiseViewModel viewModel;
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text('Review inbox'),
-      actions: [
-        _ScanTrayAction(viewModel: viewModel),
-        const SizedBox(width: 4),
-      ],
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(32),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-            child: Text(
-              'Only uncertain matches need your attention',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
-        ),
-      ),
-    ),
-    body: ListView(
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 100),
-      children: [
-        if (viewModel.reviews.isEmpty)
-          const EmptyState(
-            icon: Icons.verified_outlined,
-            title: 'You’re all caught up',
-            message:
-                'New uncertain matches and unparsed events will appear here.',
-          )
-        else
-          for (final item in viewModel.reviews)
-            _ReviewCard(item: item, viewModel: viewModel),
-      ],
-    ),
-  );
-}
-
-class _ScanTrayAction extends StatefulWidget {
-  const _ScanTrayAction({required this.viewModel});
 
   final SpendWiseViewModel viewModel;
 
   @override
-  State<_ScanTrayAction> createState() => _ScanTrayActionState();
+  State<ReviewInboxScreen> createState() => _ReviewInboxScreenState();
 }
 
-class _ScanTrayActionState extends State<_ScanTrayAction> {
-  bool _scanning = false;
+class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
+  String? applying;
 
-  @override
-  Widget build(BuildContext context) => IconButton(
-    onPressed: _scanning ? null : _scan,
-    tooltip: 'Scan notification tray for missed transactions',
-    icon: _scanning
-        ? const SizedBox.square(
-            dimension: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          )
-        : const Icon(Icons.refresh_rounded),
-  );
-
-  Future<void> _scan() async {
-    setState(() => _scanning = true);
-    try {
-      final result = await widget.viewModel.uiScanNotificationTray();
-      if (!mounted) return;
-      final messenger = ScaffoldMessenger.of(context);
-      switch (result.status) {
-        case NotificationTrayScanViewStatus.accessRequired:
-          messenger.showSnackBar(
-            SnackBar(
-              content: const Text(
-                'Notification access is required before SpendWise can scan the tray.',
-              ),
-              action: SnackBarAction(
-                label: 'Open settings',
-                onPressed: widget.viewModel.requestNotificationAccess,
-              ),
-            ),
-          );
-        case NotificationTrayScanViewStatus.listenerUnavailable:
-          messenger.showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Android is reconnecting SpendWise. Wait a moment, then scan again.',
-              ),
-            ),
-          );
-        case NotificationTrayScanViewStatus.completed:
-          messenger.showSnackBar(
-            SnackBar(content: Text(_completedMessage(result))),
-          );
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'The tray could not be scanned. Check notification access and try again.',
-            ),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _scanning = false);
-    }
-  }
-
-  String _completedMessage(NotificationTrayScanViewData result) {
-    if (result.failedCount > 0) {
-      return 'Recovered ${result.queuedCount} new ${_plural(result.queuedCount, 'notification')}; ${result.failedCount} could not be read.';
-    }
-    if (result.queuedCount > 0) {
-      return 'Recovered ${result.queuedCount} new ${_plural(result.queuedCount, 'notification')} from the tray.';
-    }
-    if (result.eligibleCount > 0) {
-      return 'Checked ${result.eligibleCount} ${_plural(result.eligibleCount, 'notification')}. Everything visible was already captured.';
-    }
-    return 'No enabled-source notifications are currently visible in the tray.';
-  }
-
-  String _plural(int count, String singular) =>
-      count == 1 ? singular : '${singular}s';
-}
-
-class _ReviewCard extends StatelessWidget {
-  const _ReviewCard({required this.item, required this.viewModel});
-  final ReviewViewData item;
-  final SpendWiseViewModel viewModel;
   @override
   Widget build(BuildContext context) {
-    final icon = switch (item.reason) {
-      ReviewReason.possibleDuplicate => Icons.content_copy_rounded,
-      ReviewReason.possibleTransfer => Icons.swap_horiz_rounded,
-      ReviewReason.needsCategory => Icons.category_outlined,
-      ReviewReason.lowConfidence => Icons.help_outline_rounded,
-      ReviewReason.parseFailed => Icons.text_snippet_outlined,
-    };
-    final card = Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: SpendWiseColors.warning.withValues(alpha: .12),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(icon, color: SpendWiseColors.warning, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      item.title,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                ],
+    final rules = buildReviewRules(
+      transactions: widget.viewModel.transactions,
+      reviews: widget.viewModel.reviews,
+      accounts: widget.viewModel.accounts,
+      unroutedAlerts: widget.viewModel.uiUnroutedAlerts,
+    );
+    final alerts = rules.fold<int>(0, (sum, rule) => sum + rule.count);
+
+    return SafeArea(
+      bottom: false,
+      child: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                SpendWiseTheme.gutter,
+                18,
+                SpendWiseTheme.gutter,
+                0,
               ),
-              const SizedBox(height: 10),
-              Text(
-                item.description,
-                style: Theme.of(context).textTheme.bodySmall,
+              child: rules.isEmpty
+                  ? null
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$alerts ${alerts == 1 ? 'alert' : 'alerts'}, '
+                          '${rules.length} ${rules.length == 1 ? 'decision' : 'decisions'}.',
+                          style: SpendWiseType.statement,
+                        ),
+                        const SizedBox(height: 7),
+                        Text(
+                          'Answer once and SpendWise applies it to the rest.',
+                          style: SpendWiseType.body.copyWith(fontSize: 13.5),
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+          if (rules.isEmpty)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: RestState(
+                headline: 'Nothing needs you.',
+                detail:
+                    'Every alert SpendWise captured was clear enough to '
+                    'file on its own. Anything it cannot read will show up '
+                    'here as a question, not a pile.',
               ),
-              if (item.transactions.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Container(
-                  decoration: BoxDecoration(
-                    color: SpendWiseColors.background,
-                    borderRadius: BorderRadius.circular(12),
+            )
+          else ...[
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: SpendWiseTheme.gutter,
+              ),
+              sliver: SliverList.builder(
+                itemCount: rules.length,
+                itemBuilder: (context, index) => _RuleBlock(
+                  rule: rules[index],
+                  busy: applying == rules[index].id,
+                  locked: applying != null,
+                  onApply: () => _apply(rules[index]),
+                  onAlternative: () => _alternative(rules[index]),
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  SpendWiseTheme.gutter,
+                  22,
+                  SpendWiseTheme.gutter,
+                  96 + MediaQuery.viewPaddingOf(context).bottom,
+                ),
+                child: Container(
+                  padding: const EdgeInsets.only(top: 13),
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      top: BorderSide(color: SpendWiseColors.line),
+                    ),
                   ),
-                  child: Column(
-                    children: [
-                      for (final tx in item.transactions) TransactionTile(tx),
-                    ],
+                  child: Text(
+                    rules.length == 1
+                        ? 'Answering it clears the inbox.'
+                        : 'Answering all ${rules.length} clears the inbox.',
+                    style: SpendWiseType.body.copyWith(fontSize: 12.5),
                   ),
                 ),
-              ],
-              const SizedBox(height: 14),
-              if (item.transactions.isEmpty)
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                SourceSelectionScreen(viewModel: viewModel),
-                          ),
-                        ),
-                        child: const Text('Configure sources'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: () => _confirmDismiss(context),
-                        child: const Text('Dismiss all'),
-                      ),
-                    ),
-                  ],
-                )
-              else
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => TransactionDetailsScreen(
-                              viewModel: viewModel,
-                              transaction: item.transactions.first,
-                            ),
-                          ),
-                        ),
-                        child: const Text('Inspect details'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: () =>
-                            viewModel.resolveReview(item.id, merge: false),
-                        child: const Text('Confirm as shown'),
-                      ),
-                    ),
-                  ],
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (item.transactions.isEmpty) return card;
-    final transactionId = item.transactions.first.id;
-    return Dismissible(
-      key: ValueKey('review-${item.id}'),
-      direction: DismissDirection.horizontal,
-      background: const _SwipeBackground(
-        color: SpendWiseColors.income,
-        icon: Icons.check_circle_rounded,
-        label: 'Confirm',
-        alignment: Alignment.centerLeft,
-      ),
-      secondaryBackground: const _SwipeBackground(
-        color: SpendWiseColors.expense,
-        icon: Icons.delete_rounded,
-        label: 'Delete',
-        alignment: Alignment.centerRight,
-      ),
-      onDismissed: (direction) {
-        // Dismissible's own dismiss handling is asynchronous internally, so
-        // mutating state synchronously from here can race the frame that's
-        // still finishing the resize-collapse animation. A post-frame
-        // callback guarantees the rebuild that removes this widget happens
-        // cleanly after Dismissible is done with it.
-        final messenger = ScaffoldMessenger.of(context);
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (direction == DismissDirection.startToEnd) {
-            viewModel.resolveReview(item.id, merge: false);
-          } else {
-            _deleteWithUndo(messenger, transactionId);
-          }
-        });
-      },
-      child: card,
-    );
-  }
-
-  void _deleteWithUndo(ScaffoldMessengerState messenger, String transactionId) {
-    viewModel.deleteTransaction(transactionId);
-    messenger.showSnackBar(
-      SnackBar(
-        content: const Text('Transaction deleted'),
-        action: SnackBarAction(
-          label: 'Undo',
-          onPressed: () => viewModel.restoreTransaction(transactionId),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _confirmDismiss(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Dismiss unsupported evidence?'),
-        content: Text(
-          '${item.title}\n\nThese observations stay stored locally, but will no longer appear in Review.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Dismiss all'),
-          ),
+              ),
+            ),
+          ],
         ],
       ),
     );
-    if (confirmed == true) {
-      await viewModel.resolveReview(item.id, merge: false);
+  }
+
+  Future<void> _apply(ReviewRule rule) async {
+    var decision = rule.decision;
+
+    if (rule.needsAccount) {
+      final accountId = await _pickAccount();
+      if (accountId == null) return;
+      decision = ReviewDecision(
+        kind: decision.kind,
+        transactionIds: decision.transactionIds,
+        alertIds: decision.alertIds,
+        accountId: accountId,
+      );
+    } else if (rule.needsCategory) {
+      final category = await _pickCategory();
+      if (category == null) return;
+      decision = ReviewDecision(
+        kind: ReviewDecisionKind.categorize,
+        transactionIds: decision.transactionIds,
+        category: category,
+      );
+    }
+
+    setState(() => applying = rule.id);
+    try {
+      await widget.viewModel.uiApplyReviewDecision(decision);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            rule.count == 1
+                ? 'Done — 1 alert settled.'
+                : 'Done — ${rule.count} alerts settled in one go.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not apply that: $error')));
+    } finally {
+      if (mounted) setState(() => applying = null);
     }
   }
+
+  /// The escape hatch. A rule about raw alerts opens the alerts themselves;
+  /// a rule about parsed transactions opens them one at a time.
+  void _alternative(ReviewRule rule) {
+    if (rule.opensAlertReader) {
+      _showAlerts(rule);
+      return;
+    }
+    final ids = rule.decision.transactionIds.toSet();
+    final items = widget.viewModel.transactions
+        .where((item) => ids.contains(item.id))
+        .toList();
+    if (items.isEmpty) return;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (sheetContext) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: .7,
+        maxChildSize: .92,
+        builder: (context, controller) => ListView.builder(
+          controller: controller,
+          padding: const EdgeInsets.fromLTRB(
+            SpendWiseTheme.gutter,
+            0,
+            SpendWiseTheme.gutter,
+            24,
+          ),
+          itemCount: items.length + 1,
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      items.length == 1
+                          ? 'One alert, up close'
+                          : '${items.length} alerts, one at a time',
+                      style: SpendWiseType.title,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Swipe right to confirm, left to delete. Tap to open '
+                      'the alert it came from.',
+                      style: SpendWiseType.body.copyWith(fontSize: 13),
+                    ),
+                  ],
+                ),
+              );
+            }
+            final item = items[index - 1];
+            return _Swipeable(
+              id: item.id,
+              onConfirm: () => _confirmOne(item),
+              onDelete: () => _deleteOne(item, sheetContext),
+              child: RegisterRow(
+                name: item.title,
+                meta: [
+                  item.category,
+                  if (item.accountName.isNotEmpty) item.accountName,
+                ].join(' · '),
+                amount: formatAmount(item.amount),
+                amountColor: switch (item.kind) {
+                  TransactionKind.income => SpendWiseColors.keep,
+                  TransactionKind.transfer => SpendWiseColors.mine,
+                  TransactionKind.expense => SpendWiseColors.spend,
+                },
+                ownTransfer: item.kind == TransactionKind.transfer,
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => TransactionDetailsScreen(
+                        viewModel: widget.viewModel,
+                        transaction: item,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmOne(TransactionViewData item) async {
+    try {
+      await widget.viewModel.uiApplyReviewDecision(
+        ReviewDecision(
+          kind: ReviewDecisionKind.confirm,
+          transactionIds: [item.id],
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Could not confirm: $error')));
+    }
+  }
+
+  /// Closes the sheet before deleting. A snackbar raised from inside a modal
+  /// sheet renders behind it, so the Undo would be visible but untappable --
+  /// an undo you cannot reach is worse than no undo at all.
+  Future<void> _deleteOne(
+    TransactionViewData item,
+    BuildContext sheetContext,
+  ) async {
+    if (Navigator.canPop(sheetContext)) Navigator.pop(sheetContext);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await widget.viewModel.deleteTransaction(item.id);
+      messenger.showSnackBar(
+        SnackBar(
+          content: const Text('Transaction deleted'),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () => widget.viewModel.restoreTransaction(item.id),
+          ),
+        ),
+      );
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not delete: $error')),
+      );
+    }
+  }
+
+  /// The raw alerts, verbatim. Every rule above is a claim about these; this
+  /// is where the user checks the claim rather than taking it on trust.
+  void _showAlerts(ReviewRule rule) {
+    final alerts = widget.viewModel.uiAlerts(
+      packageName: rule.alertPackage,
+      onlyUnresolved: true,
+    );
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (sheetContext) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: .78,
+        maxChildSize: .94,
+        builder: (context, controller) => Column(
+          children: [
+            Expanded(
+              child: ListView.builder(
+                controller: controller,
+                padding: const EdgeInsets.fromLTRB(
+                  SpendWiseTheme.gutter,
+                  0,
+                  SpendWiseTheme.gutter,
+                  12,
+                ),
+                itemCount: alerts.length + 1,
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            alerts.length == 1
+                                ? 'The alert, verbatim'
+                                : '${alerts.length} alerts, verbatim',
+                            style: SpendWiseType.title,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Exactly what arrived, and what SpendWise made of it.',
+                            style: SpendWiseType.body.copyWith(fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return _AlertCard(alert: alerts[index - 1]);
+                },
+              ),
+            ),
+            // Pinned: on a pile of twenty alerts this was previously the last
+            // row of the list, which is to say invisible.
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  SpendWiseTheme.gutter,
+                  8,
+                  SpendWiseTheme.gutter,
+                  12,
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.pop(sheetContext);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => SourceSelectionScreen(
+                            viewModel: widget.viewModel,
+                          ),
+                        ),
+                      );
+                    },
+                    child: const Text('Manage notification sources'),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<String?> _pickAccount() {
+    final accounts = widget.viewModel.accounts;
+    if (accounts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Add an account first — there is nowhere to file these.',
+          ),
+        ),
+      );
+      return Future.value();
+    }
+    return showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                SpendWiseTheme.gutter,
+                0,
+                SpendWiseTheme.gutter,
+                14,
+              ),
+              child: Text('Which account?', style: SpendWiseType.title),
+            ),
+            for (final account in accounts)
+              ListTile(
+                title: Text(account.name, style: SpendWiseType.row),
+                subtitle: Text(
+                  [
+                    if (account.institution.isNotEmpty) account.institution,
+                    if (account.suffix.isNotEmpty) '••${account.suffix}',
+                  ].join(' · '),
+                  style: SpendWiseType.metaTight,
+                ),
+                onTap: () => Navigator.pop(sheetContext, account.id),
+              ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<String?> _pickCategory() =>
+      pickCategory(context, viewModel: widget.viewModel);
 }
 
-class _SwipeBackground extends StatelessWidget {
-  const _SwipeBackground({
-    required this.color,
-    required this.icon,
+class _Swipeable extends StatelessWidget {
+  const _Swipeable({
+    required this.id,
+    required this.child,
+    required this.onConfirm,
+    required this.onDelete,
+  });
+
+  final String id;
+  final Widget child;
+  final Future<void> Function() onConfirm;
+  final Future<void> Function() onDelete;
+
+  @override
+  Widget build(BuildContext context) => Dismissible(
+    key: ValueKey('review-$id'),
+    background: _SwipeHint(
+      label: 'CONFIRM',
+      tone: SpendWiseColors.keep,
+      alignment: Alignment.centerLeft,
+    ),
+    secondaryBackground: _SwipeHint(
+      label: 'DELETE',
+      tone: SpendWiseColors.spend,
+      alignment: Alignment.centerRight,
+    ),
+    onDismissed: (direction) {
+      if (direction == DismissDirection.startToEnd) {
+        onConfirm();
+      } else {
+        onDelete();
+      }
+    },
+    child: child,
+  );
+}
+
+class _SwipeHint extends StatelessWidget {
+  const _SwipeHint({
     required this.label,
+    required this.tone,
     required this.alignment,
   });
-  final Color color;
-  final IconData icon;
+
   final String label;
+  final Color tone;
   final Alignment alignment;
+
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: Container(
-      alignment: alignment,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: .16),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: alignment == Alignment.centerLeft
-            ? [
-                Icon(icon, color: color),
-                const SizedBox(width: 8),
-                Text(
-                  label,
-                  style: TextStyle(color: color, fontWeight: FontWeight.w700),
-                ),
-              ]
-            : [
-                Text(
-                  label,
-                  style: TextStyle(color: color, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(width: 8),
-                Icon(icon, color: color),
-              ],
+  Widget build(BuildContext context) => Container(
+    color: tone,
+    alignment: alignment,
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    child: Text(
+      label,
+      style: const TextStyle(
+        fontFamily: SpendWiseType.sans,
+        fontSize: 11,
+        letterSpacing: 1.6,
+        fontWeight: FontWeight.w700,
+        color: SpendWiseColors.bg,
       ),
     ),
   );
+}
+
+/// One captured alert: when it arrived, what it said, and where it ended up.
+class _AlertCard extends StatelessWidget {
+  const _AlertCard({required this.alert});
+
+  final AlertViewData alert;
+
+  @override
+  Widget build(BuildContext context) {
+    final stamp = alert.observedAt;
+    final when =
+        '${stamp.day.toString().padLeft(2, '0')} '
+        '${_months[stamp.month - 1]} '
+        '${stamp.hour.toString().padLeft(2, '0')}:'
+        '${stamp.minute.toString().padLeft(2, '0')}';
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.only(top: 12),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: SpendWiseColors.line)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '$when · ${alert.sourceLabel}'.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: SpendWiseType.metaTight,
+                ),
+              ),
+              Text(
+                _statusLabel(alert),
+                style: SpendWiseType.metaTight.copyWith(
+                  color: _statusColor(alert),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          if (alert.title.isNotEmpty) ...[
+            Text(alert.title, style: SpendWiseType.rowStrong),
+            const SizedBox(height: 3),
+          ],
+          Text(
+            alert.body,
+            style: SpendWiseType.meta.copyWith(
+              fontSize: 11.5,
+              color: SpendWiseColors.fg,
+              height: 1.5,
+            ),
+          ),
+          if (alert.reason case final reason? when reason.isNotEmpty) ...[
+            const SizedBox(height: 7),
+            Text(reason, style: SpendWiseType.body.copyWith(fontSize: 12)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static const _months = [
+    'JAN',
+    'FEB',
+    'MAR',
+    'APR',
+    'MAY',
+    'JUN',
+    'JUL',
+    'AUG',
+    'SEP',
+    'OCT',
+    'NOV',
+    'DEC',
+  ];
+
+  static String _statusLabel(AlertViewData alert) {
+    if (alert.reachedLedger) return alert.accountName ?? 'FILED';
+    if (alert.ignored) return 'IGNORED';
+    return alert.accountName == null ? 'NO ACCOUNT' : 'UNREAD';
+  }
+
+  static Color _statusColor(AlertViewData alert) => alert.reachedLedger
+      ? SpendWiseColors.keep
+      : alert.ignored
+      ? SpendWiseColors.dim
+      : SpendWiseColors.spend;
+}
+
+class _RuleBlock extends StatelessWidget {
+  const _RuleBlock({
+    required this.rule,
+    required this.busy,
+    required this.locked,
+    required this.onApply,
+    required this.onAlternative,
+  });
+
+  final ReviewRule rule;
+  final bool busy;
+  final bool locked;
+  final VoidCallback onApply;
+  final VoidCallback onAlternative;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(top: 20),
+    padding: const EdgeInsets.only(top: 17),
+    decoration: const BoxDecoration(
+      border: Border(top: BorderSide(color: SpendWiseColors.edge)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(
+              '${rule.count}',
+              style: SpendWiseType.figure.copyWith(
+                fontSize: 38,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -1.6,
+              ),
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                rule.unit,
+                style: SpendWiseType.body.copyWith(fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 9),
+        Text(rule.claim, style: SpendWiseType.lead),
+        if (rule.evidence case final evidence?) ...[
+          const SizedBox(height: 11),
+          Container(
+            padding: const EdgeInsets.only(left: 11),
+            decoration: const BoxDecoration(
+              border: Border(
+                left: BorderSide(color: SpendWiseColors.edge, width: 2),
+              ),
+            ),
+            child: _Evidence(text: evidence, highlights: rule.highlights),
+          ),
+        ],
+        const SizedBox(height: 13),
+        PrimaryAction(
+          label: rule.actionLabel,
+          busy: busy,
+          onPressed: locked && !busy ? null : onApply,
+        ),
+        if (rule.alternative case final alternative?) ...[
+          const SizedBox(height: 9),
+          InkWell(
+            onTap: locked ? null : onAlternative,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      alternative,
+                      style: SpendWiseType.body.copyWith(
+                        fontSize: 12.5,
+                        decoration: TextDecoration.underline,
+                        decorationColor: SpendWiseColors.edge,
+                      ),
+                    ),
+                  ),
+                  Text('${rule.count}', style: SpendWiseType.metaTight),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
+/// Quotes the alert verbatim and marks the phrases the decision turned on, so
+/// the user can see why SpendWise thinks what it thinks rather than trust it.
+class _Evidence extends StatelessWidget {
+  const _Evidence({required this.text, required this.highlights});
+
+  final String text;
+  final List<String> highlights;
+
+  @override
+  Widget build(BuildContext context) {
+    final base = SpendWiseType.meta.copyWith(fontSize: 11.5, height: 1.55);
+    if (highlights.isEmpty) {
+      return Text(text, style: base);
+    }
+    final pattern = RegExp(
+      highlights.map(RegExp.escape).join('|'),
+      caseSensitive: false,
+    );
+    final spans = <TextSpan>[];
+    var cursor = 0;
+    for (final match in pattern.allMatches(text)) {
+      if (match.start > cursor) {
+        spans.add(TextSpan(text: text.substring(cursor, match.start)));
+      }
+      spans.add(
+        TextSpan(
+          text: match.group(0),
+          style: TextStyle(color: SpendWiseColors.spend),
+        ),
+      );
+      cursor = match.end;
+    }
+    if (cursor < text.length) {
+      spans.add(TextSpan(text: text.substring(cursor)));
+    }
+    return Text.rich(TextSpan(style: base, children: spans));
+  }
 }

@@ -1,6 +1,33 @@
 import '../shell/spendwise_view_model.dart';
 
-enum AnalyticsResolution { days, months, years }
+/// How far back a reading looks, and how finely it is cut. The two day
+/// windows are the ones people actually ask about — "this week" and "this
+/// month so far" — which a single "days" bucket could not express.
+enum AnalyticsResolution { last7Days, last30Days, months, years }
+
+extension AnalyticsResolutionCopy on AnalyticsResolution {
+  String get shortLabel => switch (this) {
+    AnalyticsResolution.last7Days => '7 days',
+    AnalyticsResolution.last30Days => '30 days',
+    AnalyticsResolution.months => 'Months',
+    AnalyticsResolution.years => 'Years',
+  };
+
+  /// The unit one bar covers.
+  String get cadence => switch (this) {
+    AnalyticsResolution.last7Days || AnalyticsResolution.last30Days => 'day',
+    AnalyticsResolution.months => 'month',
+    AnalyticsResolution.years => 'year',
+  };
+
+  int get dayCount => switch (this) {
+    AnalyticsResolution.last7Days => 7,
+    AnalyticsResolution.last30Days => 30,
+    _ => 0,
+  };
+
+  bool get isDaily => dayCount > 0;
+}
 
 final class AnalyticsBucket {
   const AnalyticsBucket({
@@ -73,13 +100,16 @@ final class SpendingAnalytics {
     final starts = _bucketStarts(resolution, localNow, transactions);
     final start = starts.first;
     final endExclusive = localNow.add(const Duration(days: 1));
+    // The comparison period is always the window immediately before this one,
+    // so "spending rate" answers "against the last stretch of the same length".
     final previousStart = switch (resolution) {
-      AnalyticsResolution.days => start.subtract(const Duration(days: 7)),
+      AnalyticsResolution.last7Days || AnalyticsResolution.last30Days =>
+        start.subtract(Duration(days: resolution.dayCount)),
       AnalyticsResolution.months => DateTime(start.year - 1, start.month),
       AnalyticsResolution.years => start,
     };
     final previousEndExclusive = switch (resolution) {
-      AnalyticsResolution.days => start,
+      AnalyticsResolution.last7Days || AnalyticsResolution.last30Days => start,
       AnalyticsResolution.months => DateTime(
         endExclusive.year - 1,
         endExclusive.month,
@@ -95,6 +125,9 @@ final class SpendingAnalytics {
     var currency = transactions.firstOrNull?.amount.currency ?? 'PKR';
 
     for (final transaction in transactions) {
+      // Lending is not spending and borrowing is not income, on this screen
+      // for the same reason as on Home: the money is coming back.
+      if (transaction.isLoanMovement) continue;
       final occurred = transaction.occurredAt.toLocal();
       final amount = transaction.amount.minorUnits.abs();
       currency = transaction.amount.currency;
@@ -176,8 +209,8 @@ final class SpendingAnalytics {
     DateTime now,
     List<TransactionViewData> transactions,
   ) => switch (resolution) {
-    AnalyticsResolution.days => [
-      for (var offset = 6; offset >= 0; offset--)
+    AnalyticsResolution.last7Days || AnalyticsResolution.last30Days => [
+      for (var offset = resolution.dayCount - 1; offset >= 0; offset--)
         now.subtract(Duration(days: offset)),
     ],
     AnalyticsResolution.months => [
@@ -214,7 +247,9 @@ final class SpendingAnalytics {
 
   static String _label(DateTime value, AnalyticsResolution resolution) =>
       switch (resolution) {
-        AnalyticsResolution.days => const [
+        // A week reads by weekday; a month of days needs the date, or every
+        // label repeats four times over.
+        AnalyticsResolution.last7Days => const [
           'Mon',
           'Tue',
           'Wed',
@@ -223,6 +258,7 @@ final class SpendingAnalytics {
           'Sat',
           'Sun',
         ][value.weekday - 1],
+        AnalyticsResolution.last30Days => '${value.day}',
         AnalyticsResolution.months => const [
           'Jan',
           'Feb',

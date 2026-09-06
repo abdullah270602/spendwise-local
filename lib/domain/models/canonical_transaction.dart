@@ -42,6 +42,7 @@ final class CanonicalTransaction {
     this.origin = TransactionOrigin.automatic,
     this.reconciliationState,
     this.decisionIds = const {},
+    this.debtId,
   });
 
   final String id;
@@ -58,6 +59,11 @@ final class CanonicalTransaction {
   final bool locked;
   final TransactionOrigin origin;
   final ReconciliationState? reconciliationState;
+
+  /// Set when this movement is a loan being made or repaid, in which case
+  /// it is neither spending nor income -- the money is only in transit
+  /// between the user and somebody they trust.
+  final String? debtId;
   final Set<String> decisionIds;
 
   ReconciliationState get effectiveReconciliationState =>

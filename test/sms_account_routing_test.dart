@@ -50,7 +50,7 @@ void main() {
       'postedAt': at.millisecondsSinceEpoch,
       'title': sender ?? 'Messages',
       'text': text,
-      if (sender != null) 'sender': sender,
+      'sender': ?sender,
     });
   }
 

@@ -11,29 +11,31 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: SpendWiseTheme.dark,
-        home: InsightsScreen(viewModel: _InsightsModel()),
+        home: Scaffold(body: InsightsScreen(viewModel: _InsightsModel())),
       ),
     );
     await tester.pumpAndSettle();
 
     expect(find.text('Insights'), findsOneWidget);
+    // Detail is the default view now: thirty days of all spending is the
+    // question people arrive with.
     expect(find.text('Total tracked'), findsOneWidget);
-    expect(find.text('Money moving over time'), findsOneWidget);
+    expect(find.text('MONEY MOVING OVER TIME'), findsOneWidget);
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
     await tester.pumpAndSettle();
-    expect(find.text('Where your money went'), findsOneWidget);
+    expect(find.text('WHERE YOUR MONEY WENT'), findsOneWidget);
 
     await tester.drag(find.byType(CustomScrollView), const Offset(0, 1000));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Days'));
+    await tester.tap(find.text('7 DAYS'));
     await tester.pumpAndSettle();
     expect(find.text('Average per day'), findsOneWidget);
 
     await tester.tap(find.text('Entertainment'));
     await tester.pumpAndSettle();
-    expect(find.text('Entertainment spending over time'), findsOneWidget);
-    expect(find.text('Where your money went'), findsNothing);
+    expect(find.text('ENTERTAINMENT SPENDING OVER TIME'), findsOneWidget);
+    expect(find.text('WHERE YOUR MONEY WENT'), findsNothing);
   });
 }
 

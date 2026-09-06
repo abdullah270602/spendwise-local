@@ -38,6 +38,12 @@ final class SpendWiseController extends ChangeNotifier
   List<TransactionViewData>? _transactionsCache;
   DashboardViewData? _dashboardCache;
   List<ReviewViewData>? _reviewsCache;
+  // Read on every shell rebuild for the Review badge, so it is cached
+  // alongside the rest and invalidated by the same reload.
+  List<AlertViewData>? _unroutedAlertsCache;
+  List<CategoryViewData>? _categoriesCache;
+  List<DebtViewData>? _debtsCache;
+  HomePeriod? _homePeriodCache;
 
   static Future<SpendWiseController> create() async {
     final ledger = await timedAsync('ledgerOpen', LocalLedger.open);
@@ -131,6 +137,9 @@ final class SpendWiseController extends ChangeNotifier
     _transactionsCache = null;
     _dashboardCache = null;
     _reviewsCache = null;
+    _unroutedAlertsCache = null;
+    _categoriesCache = null;
+    _debtsCache = null;
     notifyListeners();
   }
 
@@ -286,6 +295,7 @@ final class SpendWiseController extends ChangeNotifier
                 })
                 .toList(growable: false),
             isReviewed: !item.needsReview,
+            debtId: item.debtId,
           );
         })
         .toList(growable: false);
@@ -296,10 +306,14 @@ final class SpendWiseController extends ChangeNotifier
     final cached = _dashboardCache;
     if (cached != null) return cached;
     final now = DateTime.now();
+    final (from, to) = homePeriod.resolve(now);
     var income = 0, spending = 0;
     for (final item in _snapshot.transactions) {
       final local = item.occurredAt.toLocal();
-      if (local.year != now.year || local.month != now.month) continue;
+      if (local.isBefore(from) || !local.isBefore(to)) continue;
+      // Money lent out is still yours and money borrowed is not: neither
+      // belongs in the month's income or spending. They get their own line.
+      if (item.debtId != null) continue;
       if (item.kind == domain.TransactionKind.income) {
         income += item.amount.minorUnits;
       }
@@ -310,7 +324,7 @@ final class SpendWiseController extends ChangeNotifier
     final change = income == 0
         ? (spending == 0 ? 0.0 : -100.0)
         : ((income - spending) / income) * 100;
-    final categoryTotals = _ledger.spendingByCategory(month: now);
+    final categoryTotals = _ledger.spendingByCategory(from: from, to: to);
     final maxCategory = categoryTotals.values.fold<int>(
       0,
       (a, b) => a > b ? a : b,
@@ -771,6 +785,190 @@ final class SpendWiseController extends ChangeNotifier
   Future<void> setOwnNames(List<String> names) => _runBusy(() async {
     _ledger.setOwnNames(names);
   });
+
+  /// One Review rule, applied to every alert it covers, with a single
+  /// reconciliation pass at the end. The old screen ran one round-trip per
+  /// item, which is why clearing an inbox of six felt like work.
+  @override
+  Future<void> applyReviewDecision(ReviewDecision decision) =>
+      _runBusy(() async {
+        switch (decision.kind) {
+          case ReviewDecisionKind.confirm:
+            _ledger.confirmTransactions(decision.transactionIds);
+          case ReviewDecisionKind.categorize:
+            _ledger.categorizeTransactions(
+              decision.transactionIds,
+              _categoryId(decision.category ?? ''),
+            );
+          case ReviewDecisionKind.route:
+            final accountId = decision.accountId;
+            if (accountId == null) {
+              throw ArgumentError('Routing needs an account');
+            }
+            _ledger.routeTransactions(decision.transactionIds, accountId);
+          case ReviewDecisionKind.redirect:
+            _ledger.redirectTransactions(
+              decision.transactionIds,
+              expense: decision.expense,
+            );
+          case ReviewDecisionKind.routeAlerts:
+            final target = decision.accountId;
+            if (target == null) {
+              throw ArgumentError('Routing needs an account');
+            }
+            _ledger.routeAlerts(decision.alertIds, target);
+          case ReviewDecisionKind.dismissSource:
+            final package = decision.packageName;
+            _ledger.dismissUnparsed(
+              packageName: package == null || package.isEmpty ? null : package,
+            );
+        }
+      });
+
+  @override
+  List<AlertViewData> alerts({
+    String? packageName,
+    bool onlyUnresolved = true,
+  }) => _ledger
+      .alerts(packageName: packageName, onlyUnresolved: onlyUnresolved)
+      .map(_alertView)
+      .toList(growable: false);
+
+  @override
+  List<AlertViewData> get unroutedAlerts => _unroutedAlertsCache ??= _ledger
+      .unroutedAlerts()
+      .map(_alertView)
+      .toList(growable: false);
+
+  @override
+  bool isSharedSource(String packageName) =>
+      _ledger.isSharedSource(packageName);
+
+  static AlertViewData _alertView(StoredAlert alert) => AlertViewData(
+    id: alert.id,
+    observedAt: alert.observedAt.toLocal(),
+    title: alert.title,
+    body: alert.body,
+    sourceLabel: alert.sourceLabel,
+    packageName: alert.packageName,
+    status: alert.status,
+    reason: alert.reason,
+    accountName: alert.accountName,
+  );
+
+  @override
+  List<DebtViewData> get debts => _debtsCache ??= _ledger
+      .debts()
+      .map(
+        (item) => DebtViewData(
+          id: item.id,
+          lent: item.lent,
+          counterparty: item.counterparty,
+          principal: MoneyViewData(
+            item.principalMinor,
+            currency: item.currency,
+          ),
+          settled: MoneyViewData(item.settledMinor, currency: item.currency),
+          outstanding: MoneyViewData(
+            item.outstandingMinor,
+            currency: item.currency,
+          ),
+          openedAt: item.openedAt.toLocal(),
+          isSettled: item.isSettled,
+          note: item.note,
+          closedAt: item.closedAt?.toLocal(),
+        ),
+      )
+      .toList(growable: false);
+
+  @override
+  Future<void> openDebt({
+    required String transactionId,
+    required bool lent,
+    required String counterparty,
+    String? note,
+  }) => _runBusy(() async {
+    _ledger.openDebt(
+      transactionId: transactionId,
+      lent: lent,
+      counterparty: counterparty,
+      note: note,
+    );
+  });
+
+  @override
+  Future<void> settleDebt({
+    required String debtId,
+    required MoneyViewData amount,
+    String? transactionId,
+  }) => _runBusy(() async {
+    _ledger.settleDebt(
+      debtId: debtId,
+      amountMinor: amount.minorUnits.abs(),
+      transactionId: transactionId,
+    );
+  });
+
+  @override
+  Future<void> closeDebt(String id) => _runBusy(() async {
+    _ledger.closeDebt(id);
+  });
+
+  @override
+  Future<void> removeDebt(String id) => _runBusy(() async {
+    _ledger.removeDebt(id);
+  });
+
+  @override
+  List<CategoryViewData> get categories => _categoriesCache ??= _ledger
+      .categories()
+      .map(
+        (item) => CategoryViewData(
+          id: item.id,
+          name: item.name,
+          kind: item.kind,
+          isSystem: !item.id.startsWith('custom:'),
+        ),
+      )
+      .toList(growable: false);
+
+  @override
+  Future<String> addCategory(String name, {String kind = 'expense'}) async {
+    final created = _ledger.addCategory(name, kind: kind);
+    _categoriesCache = null;
+    notifyListeners();
+    return created.name;
+  }
+
+  @override
+  Future<void> removeCategory(String id) async {
+    _ledger.removeCategory(id);
+    _categoriesCache = null;
+    _reload();
+  }
+
+  @override
+  HomePeriod get homePeriod => _homePeriodCache ??= HomePeriod.decode(
+    _ledger.viewPreference('home_period'),
+  );
+
+  @override
+  void setHomePeriod(HomePeriod period) {
+    _ledger.setViewPreference('home_period', period.encode());
+    _homePeriodCache = period;
+    _dashboardCache = null;
+    notifyListeners();
+  }
+
+  @override
+  Future<List<String>> declaredPermissions() => _bridge.declaredPermissions();
+
+  @override
+  String? viewPreference(String key) => _ledger.viewPreference(key);
+
+  @override
+  void setViewPreference(String key, String value) =>
+      _ledger.setViewPreference(key, value);
 
   @override
   Future<void> exportData() async {

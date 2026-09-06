@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
+import '../../widgets/category_picker.dart';
+import '../../widgets/shape_kit.dart';
+import '../debts/debt_sheets.dart' as debt_sheets;
 import '../../widgets/spendwise_components.dart';
 import '../shell/spendwise_view_model.dart';
 
@@ -41,7 +44,12 @@ class TransactionDetailsScreen extends StatelessWidget {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 10, 18, 32),
+        padding: const EdgeInsets.fromLTRB(
+          SpendWiseTheme.gutter,
+          10,
+          SpendWiseTheme.gutter,
+          48,
+        ),
         children: [
           Card(
             child: Padding(
@@ -110,6 +118,7 @@ class TransactionDetailsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
+          _LoanSection(viewModel: viewModel, transaction: transaction),
           const SectionHeading('Source evidence'),
           const SizedBox(height: 8),
           Card(
@@ -117,10 +126,7 @@ class TransactionDetailsScreen extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.layers_outlined,
-                    color: SpendWiseColors.accent,
-                  ),
+                  Icon(Icons.layers_outlined, color: SpendWiseColors.accent),
                   const SizedBox(width: 13),
                   Expanded(
                     child: Column(
@@ -205,6 +211,7 @@ class TransactionDetailsScreen extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
+      useSafeArea: true,
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setModalState) => SafeArea(
           top: false,
@@ -261,34 +268,35 @@ class TransactionDetailsScreen extends StatelessWidget {
                         }),
                 ),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: category,
-                  decoration: const InputDecoration(labelText: 'Category'),
-                  items:
-                      {
-                            'Food & dining',
-                            'Shopping',
-                            'Transport',
-                            'Bills & utilities',
-                            'Entertainment',
-                            'Subscriptions & digital services',
-                            'Cash withdrawal',
-                            'Fees',
-                            'Income',
-                            'Transfer',
-                            'Other',
-                            transaction.category,
-                          }
-                          .map(
-                            (value) => DropdownMenuItem(
-                              value: value,
-                              child: Text(value),
-                            ),
-                          )
-                          .toList(),
-                  onChanged: saving
+                InkWell(
+                  onTap: saving
                       ? null
-                      : (value) => category = value ?? category,
+                      : () async {
+                          final picked = await pickCategory(
+                            context,
+                            viewModel: viewModel,
+                            kind: kind,
+                            current: category,
+                          );
+                          if (picked != null) {
+                            setModalState(() => category = picked);
+                          }
+                        },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(labelText: 'Category'),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(category, style: SpendWiseType.row),
+                        ),
+                        const Icon(
+                          Icons.expand_more_rounded,
+                          size: 18,
+                          color: SpendWiseColors.dim,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
@@ -438,7 +446,7 @@ class _EvidenceCard extends StatelessWidget {
             Container(
               width: 12,
               height: 12,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: SpendWiseColors.accent,
                 shape: BoxShape.circle,
               ),
@@ -579,4 +587,101 @@ class _Detail extends StatelessWidget {
       ],
     ),
   );
+}
+
+/// Lending is invisible to a bank alert, so this is where a person tells the
+/// ledger what really happened. Offered on every ordinary movement, and
+/// replaced by the loan itself once one exists.
+class _LoanSection extends StatelessWidget {
+  const _LoanSection({required this.viewModel, required this.transaction});
+
+  final SpendWiseViewModel viewModel;
+  final TransactionViewData transaction;
+
+  @override
+  Widget build(BuildContext context) {
+    if (transaction.kind == TransactionKind.transfer) {
+      return const SizedBox.shrink();
+    }
+    final debt = transaction.debtId == null
+        ? null
+        : viewModel.uiDebts
+              .where((item) => item.id == transaction.debtId)
+              .firstOrNull;
+
+    if (debt == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionHeading('Was this a loan?'),
+          const SizedBox(height: 8),
+          Text(
+            transaction.kind == TransactionKind.income
+                ? 'If somebody lent you this, it is not income — it goes back.'
+                : 'If you lent this out, it is not spending — it comes back.',
+            style: SpendWiseType.body.copyWith(fontSize: 13),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: () => debt_sheets.markAsLoan(
+              context,
+              viewModel: viewModel,
+              transaction: transaction,
+            ),
+            child: Text(
+              transaction.kind == TransactionKind.income
+                  ? 'I borrowed this'
+                  : 'I lent this out',
+            ),
+          ),
+          const SizedBox(height: 18),
+        ],
+      );
+    }
+
+    final tone = debt.lent ? SpendWiseColors.keep : SpendWiseColors.spend;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionHeading(debt.lent ? 'Lent out' : 'Borrowed'),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: () =>
+              debt_sheets.openDebt(context, viewModel: viewModel, debt: debt),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+            decoration: BoxDecoration(
+              border: Border(
+                left: BorderSide(color: tone, width: 2),
+                top: const BorderSide(color: SpendWiseColors.line),
+                right: const BorderSide(color: SpendWiseColors.line),
+                bottom: const BorderSide(color: SpendWiseColors.line),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(debt.counterparty, style: SpendWiseType.row),
+                      const SizedBox(height: 2),
+                      Text(
+                        debt.isSettled
+                            ? 'Settled'
+                            : '${formatAmount(debt.outstanding, cents: false)} still out',
+                        style: SpendWiseType.metaTight,
+                      ),
+                    ],
+                  ),
+                ),
+                const Text('→', style: TextStyle(color: SpendWiseColors.dim)),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+      ],
+    );
+  }
 }

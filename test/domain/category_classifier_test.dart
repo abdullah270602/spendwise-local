@@ -31,7 +31,7 @@ void main() {
 
   test('classifies broader everyday statement merchants', () {
     const cases = {
-      'IMTIAZ SUPERMARKET': 'groceries',
+      'SAMPLE SUPERMARKET': 'groceries',
       'CITY PHARMACY': 'health',
       'UNIVERSITY FEE': 'education',
       'AIRBLUE TICKET': 'travel',
@@ -71,7 +71,11 @@ void main() {
     }
   });
 
-  test('uses transfer and generic card fallbacks after specific merchants', () {
+  test('a transfer instrument is not a destination', () {
+    // "Between your accounts" means both legs landed somewhere the user owns,
+    // and only the reconciler can know that -- it says so by setting the kind.
+    // Reading it off the narration filed most of a month's real payments under
+    // that category and made the breakdown meaningless.
     expect(
       classifier
           .classify(
@@ -79,7 +83,8 @@ void main() {
             kind: TransactionKind.expense,
           )
           .categoryId,
-      'transfer',
+      isNot('transfer'),
+      reason: 'paying a person by IBFT is a payment, not an own-account move',
     );
     expect(
       classifier
@@ -88,8 +93,21 @@ void main() {
             kind: TransactionKind.income,
           )
           .categoryId,
-      'transfer',
+      'income',
     );
+    expect(
+      classifier
+          .classify(
+            text: 'RAAST P2P FUND TRANSFER TO SAMPLE PERSON',
+            kind: TransactionKind.transfer,
+          )
+          .categoryId,
+      'transfer',
+      reason: 'once the reconciler pairs both legs, it really is one',
+    );
+  });
+
+  test('generic card fallbacks apply after specific merchants', () {
     expect(
       classifier
           .classify(

@@ -3,16 +3,20 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../accounts/accounts_screen.dart';
 import '../dashboard/dashboard_screen.dart';
+import '../insights/insights_screen.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../review/review_inbox_screen.dart';
-import '../settings/settings_screen.dart';
+import '../review/review_rules.dart';
 import '../transactions/ledger_screen.dart';
+import '../tour/spotlight.dart';
 import '../transactions/manual_transaction_sheet.dart';
 import 'spendwise_view_model.dart';
 
 class SpendWiseShell extends StatefulWidget {
   const SpendWiseShell({super.key, required this.viewModel});
+
   final SpendWiseViewModel viewModel;
+
   @override
   State<SpendWiseShell> createState() => _SpendWiseShellState();
 }
@@ -22,9 +26,13 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
   late final PageController _pageController;
   late final List<Widget> _pages;
 
+  /// Measured to place the walkthrough's spotlight over each tab.
+  final _navKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
+    walkthroughRequested.addListener(_onWalkthroughRequested);
     _pageController = PageController();
     _pages = [
       _ReactivePage(
@@ -32,7 +40,7 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
         builder: () => DashboardScreen(
           viewModel: widget.viewModel,
           onSeeLedger: () => _selectPage(1),
-          onOpenAccounts: () => _selectPage(3),
+          onOpenAccounts: () => _selectPage(4),
         ),
       ),
       _ReactivePage(
@@ -45,19 +53,98 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
       ),
       _ReactivePage(
         viewModel: widget.viewModel,
-        builder: () => AccountsScreen(viewModel: widget.viewModel),
+        builder: () => InsightsScreen(viewModel: widget.viewModel),
       ),
       _ReactivePage(
         viewModel: widget.viewModel,
-        builder: () => SettingsScreen(viewModel: widget.viewModel),
+        builder: () => AccountsScreen(viewModel: widget.viewModel),
       ),
     ];
   }
 
   @override
   void dispose() {
+    walkthroughRequested.removeListener(_onWalkthroughRequested);
     _pageController.dispose();
     super.dispose();
+  }
+
+  /// The guide asks for the tour from two routes above here, so unwind back
+  /// to the tabs before pointing at them.
+  void _onWalkthroughRequested() {
+    if (!mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) startWalkthrough();
+    });
+  }
+
+  /// Where one tab sits on screen. The bar lays its destinations out in equal
+  /// columns, so the whole bar's box plus an index is enough -- and it stays
+  /// right if the bar moves, which a per-destination key could not be
+  /// attached to anyway.
+  Rect? _tabRect(int destination) {
+    final box = _navKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached || !box.hasSize) return null;
+    final origin = box.localToGlobal(Offset.zero);
+    final width = box.size.width / _destinations;
+    // Stop short of the gesture inset: the bar's box runs under Android's own
+    // navigation, and a spotlight drawn down there frames the system buttons
+    // as though they were part of the app.
+    final inset = MediaQuery.viewPaddingOf(context).bottom;
+    return Rect.fromLTWH(
+      origin.dx + width * destination,
+      origin.dy,
+      width,
+      (box.size.height - inset).clamp(24.0, box.size.height),
+    );
+  }
+
+  static const _destinations = 5;
+
+  /// Four stops over the live app, in the order money moves through it.
+  void startWalkthrough() {
+    Spotlight.run(
+      context,
+      [
+        SpotlightStop(
+          title: 'Home',
+          body:
+              'Of everything that arrived, how much is still yours. '
+              'Nothing else.',
+          rect: () => _tabRect(0) ?? Rect.zero,
+          onEnter: () => _selectPage(0),
+        ),
+        SpotlightStop(
+          title: 'Review',
+          body:
+              'Anything SpendWise is unsure of waits here. A badge of two '
+              'means two questions, not two alerts.',
+          rect: () => _tabRect(2) ?? Rect.zero,
+          onEnter: () => _selectPage(2),
+        ),
+        SpotlightStop(
+          title: 'Ledger',
+          body:
+              'Every entry, newest first. Tap one to fix its category, its '
+              'direction or its account.',
+          rect: () => _tabRect(1) ?? Rect.zero,
+          onEnter: () => _selectPage(1),
+        ),
+        SpotlightStop(
+          title: 'Accounts',
+          body:
+              'Where alerts land. Add the last digits and they file '
+              'themselves.',
+          rect: () => _tabRect(4) ?? Rect.zero,
+          onEnter: () => _selectPage(4),
+        ),
+      ],
+      onDone: () {
+        widget.viewModel.uiSetViewPreference('tour_seen', 'true');
+        if (mounted) _selectPage(0);
+      },
+    );
   }
 
   @override
@@ -67,6 +154,16 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
       if (!widget.viewModel.onboardingComplete) {
         return OnboardingScreen(viewModel: widget.viewModel);
       }
+      // The badge counts decisions, not alerts: fourteen unread alerts that
+      // collapse into two questions is a "2", and promising fourteen would be
+      // the same lie the old inbox told.
+      final decisions = buildReviewRules(
+        transactions: widget.viewModel.transactions,
+        reviews: widget.viewModel.reviews,
+        accounts: widget.viewModel.accounts,
+        unroutedAlerts: widget.viewModel.uiUnroutedAlerts,
+      ).length;
+
       return Scaffold(
         body: Stack(
           children: [
@@ -84,23 +181,32 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
               ),
             if (widget.viewModel.uiErrorMessage case final message?)
               Positioned(
-                left: 14,
-                right: 14,
-                bottom: 10,
+                left: SpendWiseTheme.gutter,
+                right: SpendWiseTheme.gutter,
+                bottom: 12,
                 child: Material(
-                  color: SpendWiseColors.expense,
-                  borderRadius: BorderRadius.circular(12),
+                  color: SpendWiseColors.spend,
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline_rounded),
-                        const SizedBox(width: 10),
-                        Expanded(child: Text(message)),
+                        Expanded(
+                          child: Text(
+                            message,
+                            style: SpendWiseType.row.copyWith(
+                              color: SpendWiseColors.bg,
+                            ),
+                          ),
+                        ),
                         IconButton(
                           onPressed: widget.viewModel.uiDismissError,
-                          tooltip: 'Dismiss error',
-                          icon: const Icon(Icons.close_rounded),
+                          tooltip: 'Dismiss',
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            size: 18,
+                            color: SpendWiseColors.bg,
+                          ),
                         ),
                       ],
                     ),
@@ -109,49 +215,56 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
               ),
           ],
         ),
-        floatingActionButton: index <= 1 && widget.viewModel.accounts.isNotEmpty
-            ? FloatingActionButton(
+        // Ledger only: on Home it floated over the last line of the summary,
+        // and adding an entry by hand is something you do while reading the
+        // register, not while reading the month's shape.
+        floatingActionButton: index == 1 && widget.viewModel.accounts.isNotEmpty
+            ? FloatingActionButton.small(
                 onPressed: () => _showManual(context),
-                tooltip: 'Add transaction',
-                backgroundColor: SpendWiseColors.accent,
-                foregroundColor: SpendWiseColors.background,
+                tooltip: 'Record something by hand',
+                elevation: 0,
+                shape: const RoundedRectangleBorder(),
+                backgroundColor: SpendWiseColors.fg,
+                foregroundColor: SpendWiseColors.bg,
                 child: const Icon(Icons.add_rounded),
               )
             : null,
-        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: index,
-          onDestinationSelected: _selectPage,
-          destinations: [
-            const NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home_rounded),
-              label: 'Home',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.receipt_long_outlined),
-              selectedIcon: Icon(Icons.receipt_long_rounded),
-              label: 'Ledger',
-            ),
-            NavigationDestination(
-              icon: _ReviewIcon(count: widget.viewModel.reviews.length),
-              selectedIcon: _ReviewIcon(
-                count: widget.viewModel.reviews.length,
-                selected: true,
+        bottomNavigationBar: DecoratedBox(
+          key: _navKey,
+          decoration: const BoxDecoration(
+            border: Border(top: BorderSide(color: SpendWiseColors.line)),
+          ),
+          child: NavigationBar(
+            selectedIndex: index,
+            onDestinationSelected: _selectPage,
+            destinations: [
+              const NavigationDestination(
+                icon: Icon(Icons.change_history_outlined),
+                selectedIcon: Icon(Icons.change_history_rounded),
+                label: 'Home',
               ),
-              label: 'Review',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.account_balance_wallet_outlined),
-              selectedIcon: Icon(Icons.account_balance_wallet_rounded),
-              label: 'Accounts',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.settings_outlined),
-              selectedIcon: Icon(Icons.settings_rounded),
-              label: 'Settings',
-            ),
-          ],
+              const NavigationDestination(
+                icon: Icon(Icons.notes_rounded),
+                selectedIcon: Icon(Icons.subject_rounded),
+                label: 'Ledger',
+              ),
+              NavigationDestination(
+                icon: _DecisionIcon(count: decisions),
+                selectedIcon: _DecisionIcon(count: decisions, selected: true),
+                label: 'Review',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.ssid_chart_outlined),
+                selectedIcon: Icon(Icons.ssid_chart_rounded),
+                label: 'Insights',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.grid_view_outlined),
+                selectedIcon: Icon(Icons.grid_view_rounded),
+                label: 'Accounts',
+              ),
+            ],
+          ),
         ),
       );
     },
@@ -185,16 +298,41 @@ class _ReactivePage extends StatelessWidget {
   );
 }
 
-class _ReviewIcon extends StatelessWidget {
-  const _ReviewIcon({required this.count, this.selected = false});
+class _DecisionIcon extends StatelessWidget {
+  const _DecisionIcon({required this.count, this.selected = false});
+
   final int count;
   final bool selected;
+
   @override
-  Widget build(BuildContext context) => Badge(
-    isLabelVisible: count > 0,
-    label: Text(count > 99 ? '99+' : '$count'),
-    child: Icon(
-      selected ? Icons.fact_check_rounded : Icons.fact_check_outlined,
-    ),
-  );
+  Widget build(BuildContext context) {
+    final icon = Icon(
+      selected ? Icons.help_center_rounded : Icons.help_center_outlined,
+    );
+    if (count == 0) return icon;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        icon,
+        Positioned(
+          top: -5,
+          right: -9,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+            color: SpendWiseColors.spend,
+            child: Text(
+              count > 9 ? '9+' : '$count',
+              style: const TextStyle(
+                fontFamily: SpendWiseType.sans,
+                fontSize: 9,
+                height: 1.3,
+                fontWeight: FontWeight.w700,
+                color: SpendWiseColors.bg,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }

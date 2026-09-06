@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app/theme.dart';
 import '../features/shell/spendwise_view_model.dart';
+import 'shape_kit.dart';
 
 String formatMoney(MoneyViewData money, {bool signed = false}) {
   final value = money.majorUnits.abs();
@@ -24,6 +25,9 @@ String titleCase(String value) {
   return '${value[0].toUpperCase()}${value.substring(1)}';
 }
 
+/// The "Split" mark: one band of income enters, and leaves as a wide band that
+/// is still yours plus a thin clay thread that is gone. It is the Home screen
+/// compressed into a glyph, which is why it is the app icon too.
 class SpendWiseMark extends StatelessWidget {
   const SpendWiseMark({super.key, this.size = 36});
 
@@ -33,113 +37,99 @@ class SpendWiseMark extends StatelessWidget {
   Widget build(BuildContext context) => Semantics(
     label: 'SpendWise',
     image: true,
-    child: ExcludeSemantics(
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: SpendWiseColors.accent,
-          borderRadius: BorderRadius.circular(size * .3),
-        ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Icon(
-              Icons.account_balance_wallet_rounded,
-              size: size * .58,
-              color: SpendWiseColors.background,
-            ),
-            Positioned(
-              right: size * .18,
-              top: size * .16,
-              child: Container(
-                width: size * .16,
-                height: size * .16,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFEAF2EE),
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    child: SizedBox.square(
+      dimension: size,
+      child: CustomPaint(painter: _SplitMarkPainter()),
     ),
   );
 }
 
+class _SplitMarkPainter extends CustomPainter {
+  /// Authored on the 64-unit grid used in `design/brand.html`; content spans
+  /// x 10..52 and y 8..56, so it is fitted rather than simply scaled.
+  static const _contentLeft = 10.0;
+  static const _contentTop = 8.0;
+  static const _contentWidth = 42.0;
+  static const _contentHeight = 48.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final scale =
+        size.shortestSide /
+        (_contentHeight > _contentWidth ? _contentHeight : _contentWidth);
+    final dx = (size.width - _contentWidth * scale) / 2 - _contentLeft * scale;
+    final dy = (size.height - _contentHeight * scale) / 2 - _contentTop * scale;
+
+    canvas
+      ..save()
+      ..translate(dx, dy)
+      ..scale(scale);
+
+    final kept = Path()
+      ..moveTo(24, 8)
+      ..lineTo(24, 20)
+      ..cubicTo(24, 34, 10, 40, 10, 56)
+      ..lineTo(22, 56)
+      ..cubicTo(22, 40, 36, 34, 36, 20)
+      ..lineTo(36, 8)
+      ..close();
+    final spent = Path()
+      ..moveTo(36, 8)
+      ..lineTo(36, 20)
+      ..cubicTo(36, 34, 49, 40, 49, 56)
+      ..lineTo(52, 56)
+      ..cubicTo(52, 40, 39, 34, 39, 20)
+      ..lineTo(39, 8)
+      ..close();
+
+    final paint = Paint()..style = PaintingStyle.fill;
+    canvas
+      ..drawPath(kept, paint..color = SpendWiseColors.fg)
+      ..drawPath(spent, paint..color = SpendWiseColors.spend)
+      ..restore();
+  }
+
+  @override
+  bool shouldRepaint(_SplitMarkPainter oldDelegate) => false;
+}
+
 class SectionHeading extends StatelessWidget {
   const SectionHeading(this.title, {super.key, this.action, this.onAction});
+
   final String title;
   final String? action;
   final VoidCallback? onAction;
 
   @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Expanded(
-        child: Text(title, style: Theme.of(context).textTheme.titleMedium),
-      ),
-      if (action != null) TextButton(onPressed: onAction, child: Text(action!)),
-    ],
-  );
-}
-
-class MetricCard extends StatelessWidget {
-  const MetricCard({
-    super.key,
-    required this.label,
-    required this.value,
-    required this.icon,
-    this.color = SpendWiseColors.accent,
-    this.detail,
-  });
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-  final String? detail;
-
-  @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: .13),
-                  borderRadius: BorderRadius.circular(9),
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 2),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Expanded(child: Eyebrow(title)),
+        if (action != null)
+          onAction == null
+              ? Text(
+                  action!,
+                  style: SpendWiseType.rowStrong.copyWith(fontSize: 13),
+                )
+              : TextButton(
+                  onPressed: onAction,
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(action!),
                 ),
-                child: Icon(icon, color: color, size: 17),
-              ),
-              const Spacer(),
-              if (detail != null)
-                Text(
-                  detail!,
-                  style: Theme.of(context).textTheme.bodySmall
-                      ?.copyWith(color: color),
-                ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(label, style: Theme.of(context).textTheme.bodySmall),
-          const SizedBox(height: 4),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(value, style: Theme.of(context).textTheme.titleLarge),
-          ),
-        ],
-      ),
+      ],
     ),
   );
 }
 
+/// Left-aligned, rule-led, no circle-in-a-tint icon: the same rest state the
+/// tab screens use, kept here for the routes pushed on top of them.
 class EmptyState extends StatelessWidget {
   const EmptyState({
     super.key,
@@ -149,132 +139,55 @@ class EmptyState extends StatelessWidget {
     this.action,
     this.onAction,
   });
+
   final IconData icon;
   final String title;
   final String message;
   final String? action;
   final VoidCallback? onAction;
+
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
-    child: Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: SpendWiseColors.accentMuted,
-          ),
-          child: Icon(icon, color: SpendWiseColors.accent, size: 28),
-        ),
-        const SizedBox(height: 18),
-        Text(title, style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 8),
-        Text(
-          message,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        if (action != null) ...[
-          const SizedBox(height: 18),
-          FilledButton(onPressed: onAction, child: Text(action!)),
-        ],
-      ],
-    ),
+  Widget build(BuildContext context) => RestState(
+    headline: title,
+    detail: message,
+    action: action == null
+        ? null
+        : OutlinedButton(onPressed: onAction, child: Text(action!)),
   );
 }
 
-class TransactionTile extends StatelessWidget {
-  const TransactionTile(this.transaction, {super.key, this.onTap});
-  final TransactionViewData transaction;
-  final VoidCallback? onTap;
-  @override
-  Widget build(BuildContext context) {
-    final (icon, color) = switch (transaction.kind) {
-      TransactionKind.income => (
-        Icons.south_west_rounded,
-        SpendWiseColors.income,
-      ),
-      TransactionKind.expense => (
-        Icons.north_east_rounded,
-        SpendWiseColors.expense,
-      ),
-      TransactionKind.transfer => (
-        Icons.swap_horiz_rounded,
-        SpendWiseColors.warning,
-      ),
-    };
-    return ListTile(
-      onTap: onTap,
-      dense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: .12),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(icon, color: color, size: 19),
-      ),
-      title: Text(
-        transaction.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontWeight: FontWeight.w600),
-      ),
-      subtitle: Text(
-        '${transaction.category} · ${transaction.subtitle}',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
-            formatMoney(
-              transaction.amount,
-              signed: transaction.kind != TransactionKind.transfer,
-            ),
-            style: TextStyle(fontWeight: FontWeight.w700, color: color),
-          ),
-          if (transaction.evidenceCount > 1)
-            Text(
-              '${transaction.evidenceCount} sources',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-        ],
-      ),
-    );
-  }
-}
-
+/// States the one promise the whole app is built on. Quiet by default -- it is
+/// reassurance, not an advertisement.
 class PrivacyBanner extends StatelessWidget {
   const PrivacyBanner({super.key, this.compact = false});
+
   final bool compact;
+
   @override
   Widget build(BuildContext context) => Container(
-    padding: EdgeInsets.all(compact ? 12 : 16),
-    decoration: BoxDecoration(
-      color: SpendWiseColors.accentMuted.withValues(alpha: .7),
-      border: Border.all(color: SpendWiseColors.accent.withValues(alpha: .22)),
-      borderRadius: BorderRadius.circular(16),
+    padding: EdgeInsets.only(top: compact ? 10 : 13),
+    decoration: const BoxDecoration(
+      border: Border(top: BorderSide(color: SpendWiseColors.edge)),
     ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(
-          Icons.lock_outline_rounded,
-          color: SpendWiseColors.accent,
-          size: 20,
+        Padding(
+          padding: EdgeInsets.only(top: 2),
+          child: Icon(
+            Icons.lock_outline_rounded,
+            color: SpendWiseColors.keep,
+            size: 15,
+          ),
         ),
-        const SizedBox(width: 11),
+        const SizedBox(width: 9),
         Expanded(
           child: Text(
-            'Your ledger stays encrypted on this device. SpendWise has no account, cloud, analytics, or hidden uploads.',
-            style: Theme.of(context).textTheme.bodySmall
-                ?.copyWith(color: const Color(0xFFB9D9C6)),
+            compact
+                ? 'Encrypted on this device. No account, no cloud.'
+                : 'Your ledger stays encrypted on this device. SpendWise has '
+                      'no account, cloud, analytics, or hidden uploads.',
+            style: SpendWiseType.body.copyWith(fontSize: 12.5),
           ),
         ),
       ],

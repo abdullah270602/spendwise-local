@@ -40,7 +40,7 @@ void main() {
 
   test('reads a wallet transfer that states the new balance afterwards', () {
     final candidate = parse(
-      'You have sent Rs. 80 to ALI RAZA. Your new balance is Rs. 500',
+      'You have sent Rs. 80 to SAMPLE PERSON. Your new balance is Rs. 500',
     );
     expect(candidate, isNotNull);
     expect(candidate!.direction, EntryDirection.debit);
@@ -49,7 +49,7 @@ void main() {
 
   test('reads the short "Avbl Bal" form', () {
     final candidate = parse(
-      'Rs.1,500 debited from a/c ***123 at IMTIAZ. Avbl Bal Rs.9,000',
+      'Rs.1,500 debited from a/c ***123 at SAMPLE SUPERMARKET. Avbl Bal Rs.9,000',
     );
     expect(candidate, isNotNull);
     expect(candidate!.amount.minorUnits, 150000);
@@ -71,12 +71,12 @@ void main() {
         kind: ObservationKind.notification,
         observedAt: DateTime.utc(2026, 9, 5, 12),
         title: '8558',
-        body: 'Rs.1,500 debited at IMTIAZ SUPERMARKET. Avbl Bal Rs.9,000',
+        body: 'Rs.1,500 debited at SAMPLE SUPERMARKET. Avbl Bal Rs.9,000',
         accountId: 'acct-1',
         sourcePackage: 'com.google.android.apps.messaging',
       ),
     );
-    expect(candidate!.description, 'IMTIAZ SUPERMARKET');
+    expect(candidate!.description, 'SAMPLE SUPERMARKET');
   });
 
   test('a sender code alone is not used as the transaction name', () {
@@ -96,10 +96,10 @@ void main() {
 
   test('stops the merchant name before trailing narration', () {
     final candidate = parse(
-      'PKR 2,086.20 debited at JENPHARM RETAIL as international transaction. '
+      'PKR 2,086.20 debited at DEMO PHARMACY as international transaction. '
       'Avl Bal PKR 5,000',
     );
-    expect(candidate!.description, 'JENPHARM RETAIL');
+    expect(candidate!.description, 'DEMO PHARMACY');
   });
 
   test('a card purchase is a debit even though "credit card" is named', () {
@@ -136,7 +136,7 @@ void main() {
     // Reading "credited" as money-in here would record an outgoing payment
     // as earnings. Contradictory wording is worth a person's judgement.
     expect(
-      parse('PKR 80 has been credited to ALI RAZA from your account'),
+      parse('PKR 80 has been credited to SAMPLE PERSON from your account'),
       isNull,
     );
   });

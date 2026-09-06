@@ -2,10 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../app/palette.dart';
+import '../../security/app_lock.dart';
+import '../help/help_screen.dart';
 import '../../app/theme.dart';
+import '../../main.dart';
 import '../../widgets/spendwise_components.dart';
 import '../shell/spendwise_view_model.dart';
+import 'app_lock_screen.dart';
 import 'source_selection_screen.dart';
+import '../reports/report_screen.dart';
+import 'home_period_screen.dart';
 import 'export_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -30,9 +37,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Settings & privacy')),
     body: ListView(
-      padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
+      padding: const EdgeInsets.fromLTRB(
+        SpendWiseTheme.gutter,
+        8,
+        SpendWiseTheme.gutter,
+        48,
+      ),
       children: [
         const PrivacyBanner(),
+        const SizedBox(height: 22),
+        // First, above everything a person might come here to change: the
+        // place that explains what any of it does.
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.menu_book_outlined),
+            title: const Text('How SpendWise works'),
+            subtitle: const Text(
+              'Worked examples, step by step, and what it never does',
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => HelpScreen(viewModel: viewModel),
+              ),
+            ),
+          ),
+        ),
         const SizedBox(height: 22),
         const SectionHeading('Capture'),
         const SizedBox(height: 8),
@@ -73,6 +104,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         const SizedBox(height: 22),
+        const SectionHeading('Security'),
+        const SizedBox(height: 8),
+        Builder(
+          builder: (context) {
+            final lock = AppLockScope.maybeOf(context);
+            return Card(
+              child: ListTile(
+                leading: const Icon(Icons.lock_outline_rounded),
+                title: const Text('App lock'),
+                subtitle: Text(
+                  lock == null
+                      ? 'Unavailable'
+                      : lock.enabled
+                      ? '${lock.biometricsEnabled ? 'PIN and fingerprint' : 'PIN'}'
+                            ', ${lock.delay.title.toLowerCase()}'
+                      : 'Off',
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: lock == null
+                    ? null
+                    : () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) => AppLockScreen(lock: lock),
+                          ),
+                        );
+                        if (mounted) setState(() {});
+                      },
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 22),
         const SectionHeading('Your identity'),
         const SizedBox(height: 8),
         Card(
@@ -85,7 +150,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   : viewModel.uiOwnNames.join(', '),
             ),
             trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () => _editOwnNames(context),
+            onTap: _editOwnNames,
           ),
         ),
         const SizedBox(height: 22),
@@ -94,6 +159,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Card(
           child: Column(
             children: [
+              ListTile(
+                leading: const Icon(Icons.picture_as_pdf_outlined),
+                title: const Text('Spending report'),
+                subtitle: const Text('A PDF of a month, a quarter, a year'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => ReportScreen(viewModel: viewModel),
+                  ),
+                ),
+              ),
+              const Divider(height: 1, indent: 56),
               ListTile(
                 leading: const Icon(Icons.download_outlined),
                 title: const Text('Export data'),
@@ -113,16 +191,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SectionHeading('Home'),
         const SizedBox(height: 8),
         Card(
-          child: SwitchListTile(
-            secondary: const Icon(Icons.savings_outlined),
-            title: const Text('Show savings on Home'),
-            subtitle: const Text(
-              'Savings always remain available in Accounts and Insights',
-            ),
-            value: viewModel.uiShowSavingsOnHome,
-            onChanged: changingSavingsVisibility ? null : _setSavingsVisibility,
+          child: Column(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.date_range_outlined),
+                title: const Text('What Home covers'),
+                subtitle: Text(viewModel.uiHomePeriod.title),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => HomePeriodScreen(viewModel: viewModel),
+                    ),
+                  );
+                  if (mounted) setState(() {});
+                },
+              ),
+              const Divider(height: 1, indent: 56),
+              SwitchListTile(
+                secondary: const Icon(Icons.savings_outlined),
+                title: const Text('Show savings on Home'),
+                subtitle: const Text(
+                  'Savings always remain available in Accounts and Insights',
+                ),
+                value: viewModel.uiShowSavingsOnHome,
+                onChanged: changingSavingsVisibility
+                    ? null
+                    : _setSavingsVisibility,
+              ),
+            ],
           ),
         ),
+        const SizedBox(height: 22),
+        const SectionHeading('Colour'),
+        const SizedBox(height: 8),
+        _PalettePicker(viewModel: viewModel),
         const SizedBox(height: 22),
         const SectionHeading('Sample data'),
         const SizedBox(height: 8),
@@ -177,7 +281,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Card(
           child: Column(
             children: [
-              const ListTile(
+              ListTile(
                 leading: Icon(
                   Icons.wifi_off_rounded,
                   color: SpendWiseColors.accent,
@@ -189,11 +293,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const Divider(height: 1, indent: 56),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.delete_forever_outlined,
                   color: SpendWiseColors.expense,
                 ),
-                title: const Text(
+                title: Text(
                   'Erase all local data',
                   style: TextStyle(color: SpendWiseColors.expense),
                 ),
@@ -258,7 +362,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<void> _editOwnNames(BuildContext context) async {
+  Future<void> _editOwnNames() async {
     final controller = TextEditingController(
       text: viewModel.uiOwnNames.join(', '),
     );
@@ -272,7 +376,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             Text(
               'As they appear in bank or wallet SMS/notifications, e.g. '
-              '"ABDULLAH NASEEM". Used only to recognize transfers between '
+              '"YOUR FULL NAME". Used only to recognize transfers between '
               'your own accounts — separate multiple names with commas.',
               style: Theme.of(dialogContext).textTheme.bodySmall,
             ),
@@ -280,9 +384,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             TextField(
               controller: controller,
               autofocus: true,
-              decoration: const InputDecoration(
-                hintText: 'Abdullah Naseem, A. Naseem',
-              ),
+              decoration: const InputDecoration(hintText: 'Your Name, Y. Name'),
             ),
           ],
         ),
@@ -298,7 +400,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
-    if (saved == true) {
+    // The dialog is an async gap: by the time it closes this screen may be
+    // gone, and the context that was good enough to open it is not
+    // automatically good enough to use again.
+    if (saved == true && mounted) {
       final names = controller.text
           .split(',')
           .map((name) => name.trim())
@@ -307,12 +412,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // that notifies listeners in the same frame the dialog route is still
       // unwinding is what produced the Dismissible zombie-widget bug earlier
       // in Review; the same race applies to any dialog-then-notify sequence.
+      // Grabbed before the gap: after an await, reading it off a context
+      // that may have gone is exactly the bug the lint is pointing at.
+      final messenger = ScaffoldMessenger.of(context);
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         try {
           await viewModel.uiSetOwnNames(names);
         } catch (error) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            messenger.showSnackBar(
               SnackBar(content: Text('Could not save your name(s): $error')),
             );
           }
@@ -368,4 +476,97 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
+}
+
+/// Five palettes, not a colour wheel. The ground, the type and the layout are
+/// the app's identity; what a person gets to choose is the temperament of the
+/// three colours that carry meaning. Every option is checked against the same
+/// dark ground, so none of them can make the app look worse than the default.
+class _PalettePicker extends StatefulWidget {
+  const _PalettePicker({required this.viewModel});
+
+  final SpendWiseViewModel viewModel;
+
+  @override
+  State<_PalettePicker> createState() => _PalettePickerState();
+}
+
+class _PalettePickerState extends State<_PalettePicker> {
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Column(
+      children: [
+        for (final palette in SpendWisePalette.all) ...[
+          if (palette != SpendWisePalette.all.first)
+            const Divider(height: 1, indent: 16),
+          InkWell(
+            onTap: () => _choose(palette),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
+              child: Row(
+                children: [
+                  _Swatch(palette: palette),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(palette.name, style: SpendWiseType.row),
+                        const SizedBox(height: 2),
+                        Text(
+                          palette.blurb,
+                          style: SpendWiseType.body.copyWith(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (palette.id == SpendWiseColors.palette.id)
+                    Text(
+                      '✓',
+                      style: TextStyle(
+                        color: SpendWiseColors.keep,
+                        fontSize: 16,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
+
+  void _choose(SpendWisePalette palette) {
+    if (palette.id == SpendWiseColors.palette.id) return;
+    SpendWiseColors.apply(palette);
+    widget.viewModel.uiSetViewPreference('palette', palette.id);
+    // Repaint from the root: ThemeData itself carries these colours.
+    paletteRevision.value++;
+    setState(() {});
+  }
+}
+
+/// The three tones that carry meaning, in the order the app uses them:
+/// kept, moved between your own accounts, gone.
+class _Swatch extends StatelessWidget {
+  const _Swatch({required this.palette});
+
+  final SpendWisePalette palette;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 46,
+    height: 26,
+    // Stretch, or a childless ColoredBox inside Expanded gets a tight width
+    // and zero height, and the swatch renders as nothing at all.
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(flex: 5, child: ColoredBox(color: palette.keep)),
+        Expanded(flex: 2, child: ColoredBox(color: palette.mine)),
+        Expanded(flex: 3, child: ColoredBox(color: palette.spend)),
+      ],
+    ),
+  );
 }

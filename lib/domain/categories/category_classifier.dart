@@ -33,13 +33,6 @@ final class CategoryClassifier {
       );
     }
     final normalized = normalize(text);
-    if (_transferTerms.any((term) => _containsPhrase(normalized, term))) {
-      return const CategoryClassification(
-        categoryId: 'transfer',
-        ruleId: 'narration.transfer',
-        confidence: .95,
-      );
-    }
     if (kind == TransactionKind.income) {
       return const CategoryClassification(
         categoryId: 'income',
@@ -96,16 +89,6 @@ final class CategoryClassifier {
   static bool _containsPhrase(String normalized, String phrase) =>
       ' $normalized '.contains(' ${normalize(phrase)} ');
 }
-
-const _transferTerms = <String>[
-  'raast p2p fund transfer',
-  'money transferred to',
-  'money received from',
-  'fund transfer to',
-  'fund transfer from',
-  'ibft to',
-  'ibft from',
-];
 
 const _cardPurchaseTerms = <String>['online purchase', 'pos transaction'];
 

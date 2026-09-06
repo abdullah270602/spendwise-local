@@ -109,6 +109,82 @@ final class UnparsedSourceSummary {
   final bool needsAccount;
 }
 
+/// One captured notification, exactly as it arrived. Review can summarise
+/// alerts into rules, but the user must always be able to read the raw text
+/// SpendWise made its decision from.
+/// Money that left but is still yours, or arrived but is not.
+///
+/// A loan is the one thing a ledger built on bank alerts cannot see: the alert
+/// for "PKR 20,000 sent to a friend" is identical to the alert for buying a
+/// phone. Only the person knows which it was, so this is marked by hand -- and
+/// once marked, it stops counting as spending, because it is coming back.
+final class StoredDebt {
+  const StoredDebt({
+    required this.id,
+    required this.lent,
+    required this.counterparty,
+    required this.principalMinor,
+    required this.settledMinor,
+    required this.currency,
+    required this.openedAt,
+    this.note,
+    this.closedAt,
+    this.openingTransactionId,
+  });
+
+  final String id;
+
+  /// True when the user lent the money out; false when they borrowed it.
+  final bool lent;
+  final String counterparty;
+  final int principalMinor;
+
+  /// How much has come back (or been repaid), across any number of payments.
+  final int settledMinor;
+  final String currency;
+  final DateTime openedAt;
+  final String? note;
+  final DateTime? closedAt;
+  final String? openingTransactionId;
+
+  int get outstandingMinor {
+    final left = principalMinor - settledMinor;
+    return left < 0 ? 0 : left;
+  }
+
+  bool get isSettled => closedAt != null || outstandingMinor == 0;
+}
+
+final class StoredAlert {
+  const StoredAlert({
+    required this.id,
+    required this.observedAt,
+    required this.title,
+    required this.body,
+    required this.sourceLabel,
+    required this.packageName,
+    required this.status,
+    this.reason,
+    this.accountId,
+    this.accountName,
+  });
+
+  final String id;
+  final DateTime observedAt;
+  final String title;
+  final String body;
+  final String sourceLabel;
+  final String? packageName;
+
+  /// 'parsed', 'review', 'error' or 'ignored'.
+  final String status;
+  final String? reason;
+  final String? accountId;
+  final String? accountName;
+
+  bool get reachedLedger => status == 'parsed';
+}
+
 final class LedgerSnapshot {
   const LedgerSnapshot({
     required this.accounts,
@@ -233,7 +309,7 @@ final class LocalLedger {
 
   @visibleForTesting
   void resetEvidenceRefreshForTests() => _db.execute(
-    "DELETE FROM app_settings WHERE key = 'refresh_stored_evidence_v10'",
+    "DELETE FROM app_settings WHERE key = 'refresh_stored_evidence_v11'",
   );
 
   T runAtomic<T>(T Function() operation) {
@@ -319,6 +395,24 @@ final class LocalLedger {
         transaction_id TEXT NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
         observation_id TEXT NOT NULL UNIQUE REFERENCES raw_observations(id),
         PRIMARY KEY(transaction_id, observation_id)
+      );
+      CREATE TABLE IF NOT EXISTS debts (
+        id TEXT PRIMARY KEY,
+        direction TEXT NOT NULL CHECK(direction IN ('lent','borrowed')),
+        counterparty TEXT NOT NULL,
+        principal_minor INTEGER NOT NULL CHECK(principal_minor > 0),
+        currency TEXT NOT NULL,
+        opened_at INTEGER NOT NULL,
+        opening_transaction_id TEXT REFERENCES transactions(id) ON DELETE SET NULL,
+        note TEXT,
+        closed_at INTEGER
+      );
+      CREATE TABLE IF NOT EXISTS debt_settlements (
+        id TEXT PRIMARY KEY,
+        debt_id TEXT NOT NULL REFERENCES debts(id) ON DELETE CASCADE,
+        transaction_id TEXT REFERENCES transactions(id) ON DELETE SET NULL,
+        amount_minor INTEGER NOT NULL CHECK(amount_minor > 0),
+        settled_at INTEGER NOT NULL
       );
       CREATE TABLE IF NOT EXISTS app_settings (
         key TEXT PRIMARY KEY,
@@ -473,6 +567,8 @@ final class LocalLedger {
       CREATE INDEX IF NOT EXISTS evidence_match_idx ON financial_evidence(currency, amount_minor, direction, occurred_at);
       CREATE INDEX IF NOT EXISTS import_hash_idx ON import_batches(file_sha256, account_id);
       CREATE INDEX IF NOT EXISTS category_rule_match_idx ON category_rules(priority DESC, normalized_match);
+      CREATE INDEX IF NOT EXISTS debt_open_idx ON debts(closed_at, opened_at DESC);
+      CREATE INDEX IF NOT EXISTS debt_settlement_idx ON debt_settlements(debt_id);
     ''');
 
     _addColumn('accounts', 'institution_name', 'TEXT');
@@ -531,6 +627,13 @@ final class LocalLedger {
     _addColumn('transactions', 'updated_at', 'INTEGER');
     _addColumn('transactions', 'category_rule_id', 'TEXT');
     _addColumn('transactions', 'note', 'TEXT');
+    // The link that takes a transaction out of the spending figures: it is
+    // either the moment a loan was made, or a payment against one.
+    _addColumn(
+      'transactions',
+      'debt_id',
+      'TEXT REFERENCES debts(id) ON DELETE SET NULL',
+    );
 
     _db.execute('''
       INSERT OR IGNORE INTO categories(id,name,icon_key,color_value,kind,is_system) VALUES
@@ -544,7 +647,9 @@ final class LocalLedger {
         ('health','Health & medical','medical_services',4283215696,'expense',1),
         ('education','Education','school',4280391411,'expense',1),
         ('travel','Travel','flight',4286208615,'expense',1),
-        ('personal-care','Personal care','self_care',4294198070,'expense',1),
+        ('personal-care','Self care','self_care',4294198070,'expense',1),
+        ('lent','Lent out','call_made',4283215696,'both',1),
+        ('borrowed','Borrowed','call_received',4294940672,'both',1),
         ('home','Home','home',4288585374,'expense',1),
         ('insurance','Insurance','verified_user',4280391411,'expense',1),
         ('gifts-charity','Gifts & charity','volunteer_activism',4286208615,'expense',1),
@@ -567,6 +672,9 @@ final class LocalLedger {
 
       UPDATE categories SET name = 'Between your accounts'
       WHERE id = 'transfer' AND is_system = 1;
+
+      UPDATE categories SET name = 'Self care'
+      WHERE id = 'personal-care' AND is_system = 1;
     ''');
     _recategorizeAutomaticTransactions();
     _dedupeRankingVolatileNotificationDuplicates();
@@ -589,7 +697,7 @@ final class LocalLedger {
 
   void _refreshStoredEvidenceInner() {
     final done = _db.select(
-      "SELECT 1 FROM app_settings WHERE key = 'refresh_stored_evidence_v10'",
+      "SELECT 1 FROM app_settings WHERE key = 'refresh_stored_evidence_v11'",
     );
     if (done.isNotEmpty) return;
     var refreshed = 0;
@@ -599,11 +707,13 @@ final class LocalLedger {
     // carrying a second amount, which is every bank SMS that quotes a
     // running balance. Deliberately skips 'ignored' — the user dismissed
     // those, and retrying them would undo that.
+    // Unrouted rows are included now: a shared source deliberately leaves the
+    // account empty rather than guessing, and this pass is the chance to route
+    // them from their own text.
     for (final row in _db.select('''
       SELECT * FROM raw_observations
       WHERE kind = 'notification'
         AND parse_status IN ('parsed', 'review', 'error')
-        AND account_id IS NOT NULL
       ''')) {
       // Re-attribute first. History was filed by delivering app, so every
       // bank's SMS sat on one account; the transactions built from it were
@@ -622,11 +732,39 @@ final class LocalLedger {
         ]);
         rerouted++;
       }
+      if (accountId == null) {
+        // Nothing to parse against yet, but the text can still be classified,
+        // so adverts and codes do not sit in the routing queue forever.
+        final triage = const NotificationParser().parseDetailed(
+          _rawFromRow(row, accountOverride: 'probe'),
+        );
+        if (triage.status == ParseStatus.unsupported) {
+          _db.execute(
+            "UPDATE raw_observations SET parse_status = 'ignored', "
+            'parse_error = ? WHERE id = ?',
+            [triage.reasons.join(' '), row['id']],
+          );
+        }
+        continue;
+      }
       final result = const NotificationParser().parseDetailed(
         _rawFromRow(row, accountOverride: accountId),
       );
       final candidate = result.candidate;
       if (candidate == null) {
+        // A row that used to parse but is now recognised as an advert or a
+        // verification code must lose the transaction it produced, or the
+        // reclassification would be cosmetic.
+        if (result.status == ParseStatus.unsupported) {
+          _db.execute(
+            'DELETE FROM financial_evidence WHERE raw_observation_id = ?',
+            [row['id']],
+          );
+          _db.execute('DELETE FROM event_candidates WHERE observation_id = ?', [
+            row['id'],
+          ]);
+          refreshed++;
+        }
         // Retire alerts that carry no amount at all: they were never
         // transactions, and listing them as "needs setup" buried the few
         // entries that genuinely needed a decision. Keep the explanation
@@ -654,7 +792,7 @@ final class LocalLedger {
     }
     debugPrint('SpendWisePerf: rerouted $rerouted observation(s) by content');
     _db.execute(
-      "INSERT OR REPLACE INTO app_settings(key,value) VALUES ('refresh_stored_evidence_v10','done')",
+      "INSERT OR REPLACE INTO app_settings(key,value) VALUES ('refresh_stored_evidence_v11','done')",
     );
     if (refreshed > 0) _reconcile();
   }
@@ -784,6 +922,137 @@ final class LocalLedger {
 
   /// Captured notifications that never produced a transaction, grouped by the
   /// app they came from and split by whether mapping an account would fix it.
+  /// Apps that carry more than one institution's alerts. A messaging app
+  /// relays every bank's SMS and a mail client every bank's statement, so
+  /// binding one to a single account files all of them into whichever account
+  /// it happens to be attached to. These route by what the alert says instead.
+  static const sharedSourcePackages = <String>{
+    'com.google.android.apps.messaging',
+    'com.samsung.android.messaging',
+    'com.android.mms',
+    'com.android.messaging',
+    'com.moez.QKSMS',
+    'com.textra',
+    'com.truecaller',
+    'com.google.android.gm',
+    'com.microsoft.office.outlook',
+    'com.yahoo.mobile.client.android.mail',
+  };
+
+  /// Shared by declaration, or shared in practice: a source the user has
+  /// attached to two or more accounts is telling us the same thing.
+  bool isSharedSource(String? packageName) {
+    if (packageName == null || packageName.isEmpty) return false;
+    if (sharedSourcePackages.contains(packageName)) return true;
+    final rows = _db.select(
+      '''
+      SELECT COUNT(DISTINCT a.account_id) AS accounts
+      FROM sources s
+      JOIN account_sources a ON a.source_id = s.id
+      WHERE s.package_name = ?
+      ''',
+      [packageName],
+    );
+    return rows.isNotEmpty && (rows.first['accounts'] as int) > 1;
+  }
+
+  /// Alerts that look like money but never reached an account, newest first.
+  /// These are the ones a shared source produces when the text names no
+  /// institution SpendWise recognises -- answerable, not unreadable.
+  List<StoredAlert> unroutedAlerts({String? packageName, int limit = 200}) =>
+      _alertQuery(
+        where: "r.account_id IS NULL AND r.parse_status IN ('review','error')",
+        packageName: packageName,
+        limit: limit,
+      );
+
+  /// Every captured alert, for the reader behind each Review rule.
+  List<StoredAlert> alerts({
+    String? packageName,
+    bool onlyUnresolved = true,
+    int limit = 200,
+  }) => _alertQuery(
+    where: onlyUnresolved ? "r.parse_status IN ('review','error')" : '1 = 1',
+    packageName: packageName,
+    limit: limit,
+  );
+
+  List<StoredAlert> _alertQuery({
+    required String where,
+    String? packageName,
+    required int limit,
+  }) {
+    final rows = _db.select(
+      '''
+      SELECT r.id, r.observed_at, r.title, r.body, r.parse_status, r.parse_error,
+             r.source_package, r.account_id,
+             COALESCE(s.display_name, r.source_package, 'Unknown app') AS label,
+             acc.name AS account_name
+      FROM raw_observations r
+      LEFT JOIN sources s ON s.id = r.source_id
+      LEFT JOIN accounts acc ON acc.id = r.account_id
+      WHERE $where
+        AND (? IS NULL OR r.source_package = ?)
+      ORDER BY r.observed_at DESC
+      LIMIT ?
+      ''',
+      [packageName, packageName, limit],
+    );
+    return [
+      for (final row in rows)
+        StoredAlert(
+          id: row['id'] as String,
+          observedAt: DateTime.fromMillisecondsSinceEpoch(
+            row['observed_at'] as int,
+            isUtc: true,
+          ),
+          title: (row['title'] as String?) ?? '',
+          body: (row['body'] as String?) ?? '',
+          sourceLabel: row['label'] as String,
+          packageName: row['source_package'] as String?,
+          status: row['parse_status'] as String,
+          reason: row['parse_error'] as String?,
+          accountId: row['account_id'] as String?,
+          accountName: row['account_name'] as String?,
+        ),
+    ];
+  }
+
+  /// Files a batch of raw alerts onto one account and re-reads them. This is
+  /// the answer to a shared source that could not name its own institution:
+  /// the text was always readable, it just had nowhere to go.
+  int routeAlerts(Iterable<String> observationIds, String accountId) {
+    final ids = observationIds.toList(growable: false);
+    if (ids.isEmpty) return 0;
+    final holes = List.filled(ids.length, '?').join(',');
+    final rows = _db.select(
+      'SELECT * FROM raw_observations WHERE id IN ($holes)',
+      ids,
+    );
+    var parsed = 0;
+    for (final row in rows) {
+      final raw = _rawFromRow(row, accountOverride: accountId);
+      final result = const NotificationParser().parseDetailed(raw);
+      final candidate = result.candidate;
+      _db.execute(
+        'UPDATE raw_observations SET account_id = ?, parse_status = ?, '
+        'parse_error = ? WHERE id = ?',
+        [
+          accountId,
+          candidate == null ? _statusName(result.status) : 'parsed',
+          candidate == null ? result.reasons.join(' ') : null,
+          raw.id,
+        ],
+      );
+      if (candidate != null) {
+        _insertCandidate(candidate);
+        parsed++;
+      }
+    }
+    _reconcile();
+    return parsed;
+  }
+
   List<UnparsedSourceSummary> unparsedBySource() {
     final rows = _db.select('''
       SELECT r.source_package AS package,
@@ -843,6 +1112,221 @@ final class LocalLedger {
         ),
       )
       .toList(growable: false);
+
+  /// Adds a category of the user's own. Returns the existing one when the
+  /// name is already taken, so adding "Groceries" twice is a no-op rather
+  /// than an error the user has to understand.
+  StoredCategory addCategory(String name, {String kind = 'expense'}) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError.value(name, 'name', 'A category needs a name');
+    }
+    final existing = _db.select(
+      'SELECT * FROM categories WHERE name = ? COLLATE NOCASE',
+      [trimmed],
+    );
+    if (existing.isNotEmpty) {
+      final row = existing.first;
+      return StoredCategory(
+        id: row['id'] as String,
+        name: row['name'] as String,
+        iconKey: row['icon_key'] as String,
+        colorValue: row['color_value'] as int,
+        kind: row['kind'] as String,
+      );
+    }
+    final id = 'custom:${_ids.v4()}';
+    _db.execute(
+      'INSERT INTO categories(id,name,icon_key,color_value,kind,is_system) '
+      'VALUES (?,?,?,?,?,0)',
+      [id, trimmed, 'label', 4288585374, kind],
+    );
+    return StoredCategory(
+      id: id,
+      name: trimmed,
+      iconKey: 'label',
+      colorValue: 4288585374,
+      kind: kind,
+    );
+  }
+
+  /// Removes a category the user added. System categories stay: the parser
+  /// and the classifier reference them by id. Anything filed under it falls
+  /// back to "Other" rather than losing its transaction.
+  void removeCategory(String id) {
+    final rows = _db.select('SELECT is_system FROM categories WHERE id = ?', [
+      id,
+    ]);
+    if (rows.isEmpty || (rows.first['is_system'] as int) == 1) return;
+    _db.execute(
+      "UPDATE transactions SET category_id = 'other' WHERE category_id = ?",
+      [id],
+    );
+    _db.execute('DELETE FROM category_rules WHERE category_id = ?', [id]);
+    _db.execute('DELETE FROM categories WHERE id = ?', [id]);
+  }
+
+  /// Marks an existing transaction as a loan, in either direction, and opens
+  /// the debt it belongs to. The transaction keeps its amount, date and
+  /// evidence -- only its meaning changes.
+  StoredDebt openDebt({
+    required String transactionId,
+    required bool lent,
+    required String counterparty,
+    String? note,
+  }) {
+    final rows = _db.select(
+      'SELECT amount_minor, currency, occurred_at FROM transactions '
+      'WHERE id = ? AND deleted_at IS NULL',
+      [transactionId],
+    );
+    if (rows.isEmpty) {
+      throw ArgumentError.value(
+        transactionId,
+        'transactionId',
+        'No such entry',
+      );
+    }
+    final row = rows.first;
+    final name = counterparty.trim();
+    if (name.isEmpty) {
+      throw ArgumentError.value(counterparty, 'counterparty', 'Needs a name');
+    }
+
+    final id = _ids.v4();
+    _db.execute(
+      'INSERT INTO debts(id,direction,counterparty,principal_minor,currency,'
+      'opened_at,opening_transaction_id,note) VALUES (?,?,?,?,?,?,?,?)',
+      [
+        id,
+        lent ? 'lent' : 'borrowed',
+        name,
+        (row['amount_minor'] as int).abs(),
+        row['currency'] as String,
+        row['occurred_at'] as int,
+        transactionId,
+        note?.trim().isEmpty == true ? null : note?.trim(),
+      ],
+    );
+    _db.execute(
+      'UPDATE transactions SET debt_id = ?, category_id = ?, category = ?, '
+      'needs_review = 0, locked = 1 WHERE id = ?',
+      [
+        id,
+        lent ? 'lent' : 'borrowed',
+        lent ? 'Lent out' : 'Borrowed',
+        transactionId,
+      ],
+    );
+    return debt(id)!;
+  }
+
+  /// Records money coming back against a loan. [transactionId] links a real
+  /// entry from the ledger; leaving it null records the payment as a note on
+  /// the debt alone, for cash that never touched a tracked account.
+  void settleDebt({
+    required String debtId,
+    required int amountMinor,
+    String? transactionId,
+    DateTime? at,
+  }) {
+    if (amountMinor <= 0) {
+      throw ArgumentError.value(amountMinor, 'amountMinor', 'Must be positive');
+    }
+    final existing = debt(debtId);
+    if (existing == null) {
+      throw ArgumentError.value(debtId, 'debtId', 'No such debt');
+    }
+    _db.execute(
+      'INSERT INTO debt_settlements(id,debt_id,transaction_id,amount_minor,'
+      'settled_at) VALUES (?,?,?,?,?)',
+      [
+        _ids.v4(),
+        debtId,
+        transactionId,
+        amountMinor,
+        (at ?? DateTime.now()).toUtc().millisecondsSinceEpoch,
+      ],
+    );
+    if (transactionId != null) {
+      // A repayment is not income either: it is the loan coming home.
+      _db.execute(
+        'UPDATE transactions SET debt_id = ?, category_id = ?, category = ?, '
+        'needs_review = 0, locked = 1 WHERE id = ?',
+        [
+          debtId,
+          existing.lent ? 'lent' : 'borrowed',
+          existing.lent ? 'Lent out' : 'Borrowed',
+          transactionId,
+        ],
+      );
+    }
+    final after = debt(debtId);
+    if (after != null && after.outstandingMinor == 0) {
+      closeDebt(debtId);
+    }
+  }
+
+  void closeDebt(String id) => _db.execute(
+    'UPDATE debts SET closed_at = ? WHERE id = ? AND closed_at IS NULL',
+    [_now, id],
+  );
+
+  void reopenDebt(String id) =>
+      _db.execute('UPDATE debts SET closed_at = NULL WHERE id = ?', [id]);
+
+  /// Forgets a debt without touching the money. The transactions go back to
+  /// being ordinary spending or income, which is the honest outcome: the
+  /// ledger recorded what happened, only the promise is gone.
+  void removeDebt(String id) {
+    _db.execute('UPDATE transactions SET debt_id = NULL WHERE debt_id = ?', [
+      id,
+    ]);
+    _db.execute('DELETE FROM debts WHERE id = ?', [id]);
+  }
+
+  StoredDebt? debt(String id) {
+    final rows = _debtQuery('WHERE d.id = ?', [id]);
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  List<StoredDebt> debts({bool includeSettled = true}) =>
+      _debtQuery(includeSettled ? '' : 'WHERE d.closed_at IS NULL', const []);
+
+  List<StoredDebt> _debtQuery(String where, List<Object?> parameters) {
+    final rows = _db.select('''
+      SELECT d.*, COALESCE((
+        SELECT SUM(s.amount_minor) FROM debt_settlements s
+        WHERE s.debt_id = d.id
+      ), 0) AS settled
+      FROM debts d
+      $where
+      ORDER BY d.closed_at IS NOT NULL, d.opened_at DESC
+      ''', parameters);
+    return [
+      for (final row in rows)
+        StoredDebt(
+          id: row['id'] as String,
+          lent: row['direction'] == 'lent',
+          counterparty: row['counterparty'] as String,
+          principalMinor: row['principal_minor'] as int,
+          settledMinor: (row['settled'] as num).toInt(),
+          currency: row['currency'] as String,
+          openedAt: DateTime.fromMillisecondsSinceEpoch(
+            row['opened_at'] as int,
+            isUtc: true,
+          ),
+          note: row['note'] as String?,
+          closedAt: row['closed_at'] == null
+              ? null
+              : DateTime.fromMillisecondsSinceEpoch(
+                  row['closed_at'] as int,
+                  isUtc: true,
+                ),
+          openingTransactionId: row['opening_transaction_id'] as String?,
+        ),
+    ];
+  }
 
   CategoryClassification classifyDescription({
     required String text,
@@ -999,9 +1483,14 @@ final class LocalLedger {
       )
       .toList(growable: false);
 
-  Map<String, int> spendingByCategory({required DateTime month}) {
-    final start = DateTime.utc(month.year, month.month);
-    final end = DateTime.utc(month.year, month.month + 1);
+  Map<String, int> spendingByCategory({
+    DateTime? month,
+    DateTime? from,
+    DateTime? to,
+  }) {
+    // Either a month, or any window Home's period setting resolves to.
+    final start = from ?? DateTime(month!.year, month.month);
+    final end = to ?? DateTime(month!.year, month.month + 1);
     return {
       for (final row in _db.select(
         '''
@@ -1009,10 +1498,14 @@ final class LocalLedger {
                SUM(t.amount_minor) AS total
         FROM transactions t LEFT JOIN categories c ON c.id = t.category_id
         WHERE t.deleted_at IS NULL AND t.kind = 'expense'
+          AND t.debt_id IS NULL
           AND t.occurred_at >= ? AND t.occurred_at < ?
         GROUP BY COALESCE(c.name,t.category,'Other') ORDER BY total DESC
         ''',
-        [start.millisecondsSinceEpoch, end.millisecondsSinceEpoch],
+        [
+          start.toUtc().millisecondsSinceEpoch,
+          end.toUtc().millisecondsSinceEpoch,
+        ],
       ))
         row['category_name'] as String: row['total'] as int,
     };
@@ -1590,8 +2083,14 @@ final class LocalLedger {
             sender: _notificationSender(envelope),
             accounts: _accountProfiles(),
           );
+    // A shared source never lends its own account to an alert it could not
+    // route: that is precisely how every bank's SMS ended up filed under
+    // whichever account the messaging app happened to be attached to.
     final accountId =
-        routed?.accountId ?? sourceAccount?['account_id'] as String?;
+        routed?.accountId ??
+        (isSharedSource(packageName)
+            ? null
+            : sourceAccount?['account_id'] as String?);
     final postedAt =
         (envelope['postedAt'] as num?)?.toInt() ??
         (envelope['postedAtEpochMs'] as num?)?.toInt() ??
@@ -1787,6 +2286,22 @@ final class LocalLedger {
     return null;
   }
 
+  /// The single place a parse outcome becomes a stored status. 'ignored'
+  /// is the quiet bucket: on record, never presented as pending work.
+  static String _statusName(ParseStatus status) => switch (status) {
+    ParseStatus.parsed => 'parsed',
+    // No account is mapped yet — attaching one makes this readable, so it
+    // stays actionable.
+    ParseStatus.invalid => 'error',
+    // An amount was present but could not be pinned down: this may well be
+    // a payment, so it is worth a person's attention.
+    ParseStatus.ambiguous => 'review',
+    // No amount at all. An enabled source carries everything the app posts
+    // — OTPs, delivery notices, personal messages — and none of that is a
+    // transaction. Kept on record, but never presented as pending work.
+    ParseStatus.unsupported => 'ignored',
+  };
+
   void _insertRawAndParse(
     RawObservation raw, {
     String? sourceId,
@@ -1799,19 +2314,7 @@ final class LocalLedger {
       'SpendWiseNotif: parse pkg=${raw.sourcePackage} status=${result.status} '
       'accountId=${raw.accountId} reasons=${result.reasons}',
     );
-    final storedStatus = switch (result.status) {
-      ParseStatus.parsed => 'parsed',
-      // No account is mapped yet — attaching one makes this readable, so it
-      // stays actionable.
-      ParseStatus.invalid => 'error',
-      // An amount was present but could not be pinned down: this may well be
-      // a payment, so it is worth a person's attention.
-      ParseStatus.ambiguous => 'review',
-      // No amount at all. An enabled source carries everything the app posts
-      // — OTPs, delivery notices, personal messages — and none of that is a
-      // transaction. Kept on record, but never presented as pending work.
-      ParseStatus.unsupported => 'ignored',
-    };
+    final storedStatus = _statusName(result.status);
     _db.execute(
       'INSERT OR IGNORE INTO raw_observations(id,kind,external_id,source_package,account_id,observed_at,title,body,parse_status,parse_error,source_id,content_hash,payload_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
       [
@@ -1955,6 +2458,22 @@ final class LocalLedger {
       "INSERT OR REPLACE INTO app_settings(key,value) VALUES ('show_savings_home',?)",
       [enabled ? 'true' : 'false'],
     );
+  }
+
+  /// Sticky per-screen view choices (Ledger chart/plain, Accounts map/plain).
+  /// Deliberately a free-form key so a new toggle does not need a migration.
+  String? viewPreference(String key) {
+    final rows = _db.select('SELECT value FROM app_settings WHERE key = ?', [
+      'view_$key',
+    ]);
+    return rows.isEmpty ? null : rows.first['value'] as String;
+  }
+
+  void setViewPreference(String key, String value) {
+    _db.execute('INSERT OR REPLACE INTO app_settings(key,value) VALUES (?,?)', [
+      'view_$key',
+      value,
+    ]);
   }
 
   List<String> get ownNames {
@@ -2112,6 +2631,58 @@ final class LocalLedger {
     _db.execute(
       'UPDATE transactions SET needs_review = 0, locked = 1 WHERE id = ?',
       [id],
+    );
+  }
+
+  /// Applies one Review decision to every alert it covers. Confirming a rule
+  /// used to mean N round-trips through reconciliation; these are single
+  /// statements so a ten-alert rule costs the same as a one-alert rule.
+  void confirmTransactions(Iterable<String> ids) {
+    final list = ids.toList(growable: false);
+    if (list.isEmpty) return;
+    final holes = List.filled(list.length, '?').join(',');
+    _db.execute(
+      'UPDATE transactions SET needs_review = 0, locked = 1 '
+      'WHERE id IN ($holes)',
+      list,
+    );
+  }
+
+  void categorizeTransactions(Iterable<String> ids, String? categoryId) {
+    final list = ids.toList(growable: false);
+    if (list.isEmpty) return;
+    final holes = List.filled(list.length, '?').join(',');
+    _db.execute(
+      'UPDATE transactions SET category = ?, needs_review = 0, locked = 1 '
+      'WHERE id IN ($holes)',
+      [categoryId, ...list],
+    );
+  }
+
+  /// Routes a batch of non-transfer transactions onto one account. Transfers
+  /// are skipped: they have two legs, so "which account" is not a single
+  /// answer and belongs in the per-transaction editor.
+  void routeTransactions(Iterable<String> ids, String accountId) {
+    final list = ids.toList(growable: false);
+    if (list.isEmpty) return;
+    final holes = List.filled(list.length, '?').join(',');
+    _db.execute(
+      'UPDATE transactions SET account_id = ?, needs_review = 0, locked = 1 '
+      "WHERE kind != 'transfer' AND id IN ($holes)",
+      [accountId, ...list],
+    );
+  }
+
+  /// Re-reads a batch as money out (or in) without touching anything else --
+  /// the Review rule for alerts whose direction the parser got backwards.
+  void redirectTransactions(Iterable<String> ids, {required bool expense}) {
+    final list = ids.toList(growable: false);
+    if (list.isEmpty) return;
+    final holes = List.filled(list.length, '?').join(',');
+    _db.execute(
+      'UPDATE transactions SET kind = ?, needs_review = 0, locked = 1 '
+      "WHERE kind != 'transfer' AND id IN ($holes)",
+      [expense ? 'expense' : 'income', ...list],
     );
   }
 
@@ -2578,6 +3149,7 @@ final class LocalLedger {
     needsReview: row['needs_review'] == 1,
     locked: row['locked'] == 1,
     origin: TransactionOrigin.values.byName(row['origin'] as String),
+    debtId: row['debt_id'] as String?,
     reconciliationState: ReconciliationState.values.byName(
       row['reconcile_state'] as String? ??
           (row['needs_review'] == 1 ? 'needsReview' : 'confirmed'),

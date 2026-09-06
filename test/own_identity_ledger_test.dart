@@ -8,8 +8,8 @@ void main() {
     addTearDown(ledger.close);
 
     expect(ledger.ownNames, isEmpty);
-    ledger.setOwnNames(['Abdullah Naseem', '  ', 'A. Naseem']);
-    expect(ledger.ownNames, ['Abdullah Naseem', 'A. Naseem']);
+    ledger.setOwnNames(['Your Full Name', '  ', 'Y. Name']);
+    expect(ledger.ownNames, ['Your Full Name', 'Y. Name']);
   });
 
   test('the transfer category is labelled for the user\'s own accounts', () {
@@ -60,7 +60,7 @@ void main() {
       'packageName': 'pk.example.ubl',
       'postedAt': start.millisecondsSinceEpoch,
       'title': 'Debit alert',
-      'text': 'PKR 5,000.00 sent to ABDULLAH NASEEM via IBFT',
+      'text': 'PKR 5,000.00 sent to YOUR FULL NAME via IBFT',
     });
     ledger.ingestNotification({
       'notificationKey': 'meezan:1',
@@ -91,7 +91,7 @@ void main() {
     final ledger = LocalLedger.openInMemoryForTests();
     addTearDown(ledger.close);
     final accounts = setUpUblAndMeezan(ledger);
-    ledger.setOwnNames(['Abdullah Naseem']);
+    ledger.setOwnNames(['Your Full Name']);
     ingestTransferLegs(ledger, DateTime.utc(2026, 8, 22, 9));
 
     final transactions = ledger.snapshot().transactions;
@@ -111,7 +111,7 @@ void main() {
     final ledger = LocalLedger.openInMemoryForTests();
     addTearDown(ledger.close);
     setUpUblAndMeezan(ledger);
-    ledger.setOwnNames(['Abdullah Naseem']);
+    ledger.setOwnNames(['Your Full Name']);
     ingestTransferLegs(
       ledger,
       DateTime.utc(2026, 8, 22, 9),

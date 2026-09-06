@@ -1,5 +1,8 @@
 import 'package:flutter/foundation.dart';
 
+import '../../app/home_period.dart';
+export '../../app/home_period.dart';
+
 enum TransactionKind { expense, income, transfer }
 
 enum ReviewReason {
@@ -44,6 +47,7 @@ class TransactionViewData {
     this.accountId,
     this.toAccountId,
     this.evidence = const [],
+    this.debtId,
   });
   final String id;
   final String title;
@@ -59,6 +63,12 @@ class TransactionViewData {
   final String? accountId;
   final String? toAccountId;
   final List<EvidenceViewData> evidence;
+
+  /// Set when this is a loan being made or repaid. Such a movement is
+  /// neither spending nor income, so it is left out of both.
+  final String? debtId;
+
+  bool get isLoanMovement => debtId != null;
 }
 
 @immutable
@@ -183,6 +193,149 @@ class ReviewViewData {
   final String title;
   final String description;
   final List<TransactionViewData> transactions;
+}
+
+/// What one tap on a Review rule does. Review used to ask the user to clear
+/// alerts one at a time; a decision now names every alert it covers, so the
+/// same tap that fixes one fixes ten.
+enum ReviewDecisionKind {
+  /// Accept the parse as-is and lock it.
+  confirm,
+
+  /// Accept, but file everything under one category first.
+  categorize,
+
+  /// Accept, but attach everything to one account first.
+  route,
+
+  /// The parser read the direction backwards; flip it, then accept.
+  redirect,
+
+  /// These were never transactions. Drop the raw alerts.
+  dismissSource,
+
+  /// The alert was readable all along; it just had nowhere to go. File the
+  /// raw alerts onto an account and read them again.
+  routeAlerts,
+}
+
+@immutable
+class ReviewDecision {
+  const ReviewDecision({
+    required this.kind,
+    this.transactionIds = const [],
+    this.category,
+    this.accountId,
+    this.expense = true,
+    this.packageName,
+    this.alertIds = const [],
+  });
+
+  final ReviewDecisionKind kind;
+  final List<String> transactionIds;
+  final String? category;
+  final String? accountId;
+  final bool expense;
+  final String? packageName;
+
+  /// Raw observation ids, for decisions that act before parsing.
+  final List<String> alertIds;
+
+  int get count => alertIds.isEmpty ? transactionIds.length : alertIds.length;
+}
+
+/// Money that left but is still yours, or arrived but is not.
+///
+/// A bank alert cannot tell a loan from a purchase -- both read "PKR 20,000
+/// sent". Only the person knows, so this is marked by hand, and once marked
+/// the money stops counting as spending because it is coming back.
+@immutable
+class DebtViewData {
+  const DebtViewData({
+    required this.id,
+    required this.lent,
+    required this.counterparty,
+    required this.principal,
+    required this.settled,
+    required this.outstanding,
+    required this.openedAt,
+    required this.isSettled,
+    this.note,
+    this.closedAt,
+  });
+
+  final String id;
+
+  /// True when the user lent it out; false when they borrowed it.
+  final bool lent;
+  final String counterparty;
+  final MoneyViewData principal;
+  final MoneyViewData settled;
+  final MoneyViewData outstanding;
+  final DateTime openedAt;
+  final bool isSettled;
+  final String? note;
+  final DateTime? closedAt;
+
+  bool get isPartlyPaid => settled.minorUnits > 0 && outstanding.minorUnits > 0;
+}
+
+/// A category the user can file a transaction under. System categories are
+/// the ones the classifier knows by name; the rest the user added.
+@immutable
+class CategoryViewData {
+  const CategoryViewData({
+    required this.id,
+    required this.name,
+    required this.kind,
+    this.isSystem = true,
+  });
+
+  final String id;
+  final String name;
+
+  /// 'expense', 'income' or 'both'.
+  final String kind;
+  final bool isSystem;
+
+  bool suits(TransactionKind transactionKind) => switch (transactionKind) {
+    TransactionKind.income => kind == 'income' || kind == 'both',
+    TransactionKind.expense => kind == 'expense' || kind == 'both',
+    TransactionKind.transfer => true,
+  };
+}
+
+/// One captured notification as it arrived. Review groups alerts into rules,
+/// but the raw text has to stay reachable -- a summary the user cannot check
+/// is just an assertion.
+@immutable
+class AlertViewData {
+  const AlertViewData({
+    required this.id,
+    required this.observedAt,
+    required this.title,
+    required this.body,
+    required this.sourceLabel,
+    required this.status,
+    this.packageName,
+    this.reason,
+    this.accountName,
+  });
+
+  final String id;
+  final DateTime observedAt;
+  final String title;
+  final String body;
+  final String sourceLabel;
+  final String? packageName;
+
+  /// 'parsed', 'review', 'error' or 'ignored'.
+  final String status;
+  final String? reason;
+  final String? accountName;
+
+  bool get reachedLedger => status == 'parsed';
+  bool get ignored => status == 'ignored';
 }
 
 @immutable
@@ -346,6 +499,60 @@ abstract class SpendWiseAdvancedViewModel implements SpendWiseViewModel {
   Future<void> archiveAccount(String id);
   Future<void> restoreAccount(String id);
   Future<NotificationTrayScanViewData> scanNotificationTray();
+  Future<void> applyReviewDecision(ReviewDecision decision);
+
+  /// What stretch of time Home is a picture of.
+  HomePeriod get homePeriod;
+  void setHomePeriod(HomePeriod period);
+
+  /// Loans made and taken, newest first.
+  List<DebtViewData> get debts;
+
+  /// Marks an existing entry as a loan and opens the debt behind it.
+  Future<void> openDebt({
+    required String transactionId,
+    required bool lent,
+    required String counterparty,
+    String? note,
+  });
+
+  /// Records money coming back. Pass [transactionId] when a real entry in the
+  /// ledger is the repayment; omit it for cash that never touched an account.
+  Future<void> settleDebt({
+    required String debtId,
+    required MoneyViewData amount,
+    String? transactionId,
+  });
+
+  Future<void> closeDebt(String id);
+  Future<void> removeDebt(String id);
+
+  /// Every category available to file under, system and user-added.
+  List<CategoryViewData> get categories;
+
+  /// Adds one of the user's own. Returns the name actually stored, which may
+  /// be an existing category if the name was already taken.
+  Future<String> addCategory(String name, {String kind});
+
+  Future<void> removeCategory(String id);
+
+  /// Captured alerts, newest first. Defaults to the ones still unresolved.
+  List<AlertViewData> alerts({String? packageName, bool onlyUnresolved = true});
+
+  /// Alerts that read like money but reached no account.
+  List<AlertViewData> get unroutedAlerts;
+
+  /// Apps that carry more than one institution, so they are never bound to a
+  /// single account.
+  bool isSharedSource(String packageName);
+
+  /// Every permission this build declares, read back from the installed
+  /// package. Shown in the guide so the privacy claim can be checked
+  /// rather than believed.
+  Future<List<String>> declaredPermissions();
+
+  String? viewPreference(String key);
+  void setViewPreference(String key, String value);
   void dismissError();
 }
 
@@ -419,5 +626,68 @@ extension SpendWiseAdvancedAccess on SpendWiseViewModel {
       Future.error(
         UnsupportedError('Notification tray recovery is not available'),
       );
+  List<AlertViewData> uiAlerts({
+    String? packageName,
+    bool onlyUnresolved = true,
+  }) =>
+      _advanced?.alerts(
+        packageName: packageName,
+        onlyUnresolved: onlyUnresolved,
+      ) ??
+      const [];
+  List<AlertViewData> get uiUnroutedAlerts =>
+      _advanced?.unroutedAlerts ?? const [];
+  bool uiIsSharedSource(String packageName) =>
+      _advanced?.isSharedSource(packageName) ?? false;
+  Future<List<String>> uiDeclaredPermissions() =>
+      _advanced?.declaredPermissions() ?? Future.value(const []);
+  HomePeriod get uiHomePeriod =>
+      _advanced?.homePeriod ?? HomePeriod.calendarMonth;
+  void uiSetHomePeriod(HomePeriod period) => _advanced?.setHomePeriod(period);
+  List<DebtViewData> get uiDebts => _advanced?.debts ?? const [];
+  Future<void> uiOpenDebt({
+    required String transactionId,
+    required bool lent,
+    required String counterparty,
+    String? note,
+  }) =>
+      _advanced?.openDebt(
+        transactionId: transactionId,
+        lent: lent,
+        counterparty: counterparty,
+        note: note,
+      ) ??
+      Future.error(UnsupportedError('Loans are not available'));
+  Future<void> uiSettleDebt({
+    required String debtId,
+    required MoneyViewData amount,
+    String? transactionId,
+  }) =>
+      _advanced?.settleDebt(
+        debtId: debtId,
+        amount: amount,
+        transactionId: transactionId,
+      ) ??
+      Future.error(UnsupportedError('Loans are not available'));
+  Future<void> uiCloseDebt(String id) =>
+      _advanced?.closeDebt(id) ?? Future.value();
+  Future<void> uiRemoveDebt(String id) =>
+      _advanced?.removeDebt(id) ?? Future.value();
+  List<CategoryViewData> get uiCategories => _advanced?.categories ?? const [];
+  Future<String> uiAddCategory(String name, {String kind = 'expense'}) =>
+      _advanced?.addCategory(name, kind: kind) ??
+      Future.error(UnsupportedError('Categories cannot be added'));
+  Future<void> uiRemoveCategory(String id) =>
+      _advanced?.removeCategory(id) ?? Future.value();
+  Future<void> uiApplyReviewDecision(ReviewDecision decision) =>
+      _advanced?.applyReviewDecision(decision) ??
+      Future.error(UnsupportedError('Review rules are not available'));
+
+  /// Sticky view choices (Ledger chart/plain, Accounts map/plain). Reads are
+  /// synchronous and writes are fire-and-forget so a toggle never waits on
+  /// storage -- these are preferences, not data.
+  String? uiViewPreference(String key) => _advanced?.viewPreference(key);
+  void uiSetViewPreference(String key, String value) =>
+      _advanced?.setViewPreference(key, value);
   void uiDismissError() => _advanced?.dismissError();
 }
