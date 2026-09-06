@@ -207,12 +207,36 @@ void main() {
       );
     });
 
-    test('only three of them touch the shape itself', () {
+    test('four of them touch the shape itself', () {
       expect(HomeSavingsStyle.values.where((s) => s.changesTheShape), [
+        HomeSavingsStyle.available,
         HomeSavingsStyle.siblings,
         HomeSavingsStyle.divided,
         HomeSavingsStyle.seam,
       ]);
+    });
+
+    test('two take saving out of the headline, only one names it', () {
+      // "Only what I can spend" is the whole point of the unnamed one: the
+      // money is yours, it is simply not available to you, and you would
+      // rather not be shown a figure for it.
+      expect(HomeSavingsStyle.values.where((s) => s.setsSavingAside), [
+        HomeSavingsStyle.available,
+        HomeSavingsStyle.siblings,
+      ]);
+      expect(HomeSavingsStyle.values.where((s) => s.namesTheSaving), [
+        HomeSavingsStyle.siblings,
+      ]);
+    });
+
+    test('anything that sets saving aside must relabel the headline', () {
+      // Guards the mistake this whole design turned on: a figure that
+      // excludes savings cannot be called "still yours", because savings is
+      // still yours.
+      for (final style in HomeSavingsStyle.values) {
+        if (!style.setsSavingAside) continue;
+        expect(style.changesTheShape, isTrue, reason: style.id);
+      }
     });
 
     test('every option is named after a question, not a drawing', () {

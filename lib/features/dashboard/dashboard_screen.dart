@@ -162,6 +162,7 @@ class DashboardScreen extends StatelessWidget {
                           spentMinor: spent,
                           savedMinor: savedMinor,
                           saved: switch (savingsStyle) {
+                            HomeSavingsStyle.available ||
                             HomeSavingsStyle.siblings => SavedTreatment.branch,
                             HomeSavingsStyle.divided => SavedTreatment.inset,
                             HomeSavingsStyle.seam => SavedTreatment.seam,
@@ -175,8 +176,8 @@ class DashboardScreen extends StatelessWidget {
                         kept: kept,
                         spent: spent,
                         savedMinor: savedMinor,
-                        setsSavingAside:
-                            savingsStyle == HomeSavingsStyle.siblings,
+                        setsSavingAside: savingsStyle.setsSavingAside,
+                        namesTheSaving: savingsStyle.namesTheSaving,
                       ),
                     ] else
                       _SpentOnly(spent: spent, period: month),
@@ -244,7 +245,8 @@ class DashboardScreen extends StatelessWidget {
             // "what I put away" needs a line of its own since it changes
             // nothing about the shape.
             if (savingsStyle != HomeSavingsStyle.off &&
-                savingsStyle != HomeSavingsStyle.balance)
+                savingsStyle != HomeSavingsStyle.balance &&
+                savingsStyle != HomeSavingsStyle.available)
               SliverToBoxAdapter(
                 child: _PutAwayNote(
                   savedMinor: savedMinor,
@@ -293,6 +295,7 @@ class MonthLegend extends StatelessWidget {
     required this.spent,
     this.savedMinor = 0,
     this.setsSavingAside = false,
+    this.namesTheSaving = true,
   });
 
   final int received;
@@ -306,6 +309,11 @@ class MonthLegend extends StatelessWidget {
   /// figure stops being "still yours" and becomes "available" -- the label has
   /// to move with the arithmetic or one of them is lying.
   final bool setsSavingAside;
+
+  /// Whether the amount set aside is named. Taking saving out of the figure
+  /// without itemising it is a deliberate choice -- Home then answers exactly
+  /// one question, which is what is left to spend.
+  final bool namesTheSaving;
 
   @override
   Widget build(BuildContext context) {
@@ -328,7 +336,7 @@ class MonthLegend extends StatelessWidget {
             color: headline < 0 ? SpendWiseColors.spend : SpendWiseColors.fg,
           ),
         ),
-        if (aside > 0)
+        if (aside > 0 && namesTheSaving)
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: _LegendEntry(

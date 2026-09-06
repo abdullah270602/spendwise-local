@@ -100,6 +100,30 @@ void main() {
       }
     });
 
+    testWidgets('only what I can spend hides the saved figure entirely', (
+      tester,
+    ) async {
+      // The money is yours; it is simply not available to you, and you would
+      // rather not be shown a number for it.
+      await pump(
+        tester,
+        DashboardScreen(
+          viewModel: _Fake('available'),
+          onSeeLedger: () {},
+          onOpenAccounts: () {},
+        ),
+      );
+      expect(find.text('AVAILABLE'), findsOneWidget);
+      expect(find.text('SAVED'), findsNothing);
+      expect(find.textContaining('put away'), findsNothing);
+      // The shape still accounts for it -- a picture that does not add up is
+      // worse than one mentioning something you would rather not see.
+      expect(
+        tester.widget<FlowShape>(find.byType(FlowShape)).saved,
+        SavedTreatment.branch,
+      );
+    });
+
     testWidgets('money taken back out is a different sentence', (tester) async {
       await pump(
         tester,

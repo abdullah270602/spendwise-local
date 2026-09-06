@@ -226,6 +226,7 @@ class _Preview extends StatelessWidget {
           spentMinor: spentMinor,
           savedMinor: savedMinor,
           saved: switch (style) {
+            HomeSavingsStyle.available ||
             HomeSavingsStyle.siblings => SavedTreatment.branch,
             HomeSavingsStyle.divided => SavedTreatment.inset,
             HomeSavingsStyle.seam => SavedTreatment.seam,
@@ -238,7 +239,8 @@ class _Preview extends StatelessWidget {
           kept: keptMinor,
           spent: spentMinor,
           savedMinor: savedMinor,
-          setsSavingAside: style == HomeSavingsStyle.siblings,
+          setsSavingAside: style.setsSavingAside,
+          namesTheSaving: style.namesTheSaving,
         ),
         if (style == HomeSavingsStyle.balance ||
             style == HomeSavingsStyle.moved) ...[

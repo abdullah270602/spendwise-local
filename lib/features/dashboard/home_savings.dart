@@ -35,6 +35,17 @@ enum HomeSavingsStyle {
         'under the shape.',
   ),
 
+  /// Saving is taken out of the headline and not named. The shape still
+  /// accounts for it, because a picture that does not add up is worse than
+  /// one that mentions something you would rather not see.
+  available(
+    id: 'available',
+    title: 'Only what I can spend',
+    detail:
+        'Saving comes out of the figure and is not itemised. Home answers '
+        'one question: what is left to spend.',
+  ),
+
   /// Received splits three ways at once.
   siblings(
     id: 'siblings',
@@ -72,7 +83,15 @@ enum HomeSavingsStyle {
 
   /// Whether the shape itself has to draw the saved portion.
   bool get changesTheShape =>
-      this == siblings || this == divided || this == seam;
+      this == available || this == siblings || this == divided || this == seam;
+
+  /// Whether saving is counted out of the headline figure, which is what
+  /// turns "still yours" into "available".
+  bool get setsSavingAside => this == available || this == siblings;
+
+  /// Whether the saved amount is named beside the headline. Taking it out
+  /// without naming it is a deliberate option, not an oversight.
+  bool get namesTheSaving => this == siblings;
 
   static HomeSavingsStyle fromId(String? id, {required bool legacyOn}) {
     for (final style in values) {
