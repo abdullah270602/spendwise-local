@@ -155,44 +155,35 @@ void main() {
     testWidgets('each option shows what it will actually look like', (
       tester,
     ) async {
-      // Described in words these are indistinguishable; the whole difference
-      // is what they look like. The list builds lazily, so each option is
-      // scrolled to and checked in turn.
+      // One preview, at Home's size, not a thumbnail per row.
       await pump(tester, HomeSavingsScreen(viewModel: _Fake('off')));
-      for (final style in HomeSavingsStyle.values) {
-        await tester.scrollUntilVisible(find.text(style.title), 120);
-        expect(
-          find.descendant(
-            of: find.ancestor(
-              of: find.text(style.title),
-              matching: find.byType(Column),
-            ),
-            matching: find.byType(FlowShape),
-          ),
-          findsWidgets,
-          reason: style.id,
-        );
-      }
+      expect(find.byType(FlowShape), findsOneWidget);
+      expect(find.textContaining('ON HOME'), findsOneWidget);
     });
 
     testWidgets('the preview relabels when saving is counted out', (
       tester,
     ) async {
-      await pump(tester, HomeSavingsScreen(viewModel: _Fake('off')));
-      // Only the sibling treatment takes saving out of the headline, so only
-      // its preview says AVAILABLE. Everything else keeps STILL YOURS.
+      // The preview follows the selection, and the headline is relabelled
+      // only where saving is actually counted out of it.
+      final viewModel = _Fake('divided');
+      await pump(tester, HomeSavingsScreen(viewModel: viewModel));
+      expect(find.text('STILL YOURS'), findsOneWidget);
+      expect(find.text('AVAILABLE'), findsNothing);
+
       await tester.scrollUntilVisible(
         find.text(HomeSavingsStyle.siblings.title),
         120,
       );
+      await tester.tap(find.text(HomeSavingsStyle.siblings.title));
+      await tester.pumpAndSettle();
+
+      // The preview sits at the top; scrolling down to the option left it
+      // off-screen, and a lazy list does not build what is off-screen.
+      await tester.scrollUntilVisible(find.textContaining('ON HOME'), -120);
       expect(find.text('AVAILABLE'), findsOneWidget);
       expect(find.text('SAVED'), findsOneWidget);
-
-      await tester.scrollUntilVisible(
-        find.text(HomeSavingsStyle.divided.title),
-        120,
-      );
-      expect(find.text('STILL YOURS'), findsWidgets);
+      expect(find.text('STILL YOURS'), findsNothing);
     });
 
     testWidgets('and it shows the real figures, not an abstraction', (

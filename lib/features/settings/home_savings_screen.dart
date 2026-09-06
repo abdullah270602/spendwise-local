@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
 import '../../widgets/shape_kit.dart';
+import '../dashboard/dashboard_screen.dart';
 import '../dashboard/home_savings.dart';
 import '../shell/spendwise_view_model.dart';
 
@@ -87,22 +88,23 @@ class _HomeSavingsScreenState extends State<HomeSavingsScreen> {
                 style: SpendWiseType.body.copyWith(fontSize: 13),
               ),
             ),
+          // One preview, at the size Home draws it, showing whatever is
+          // selected. Six thumbnails said the same thing six times over and
+          // none of them at a size where the difference was legible.
+          _Preview(
+            style: current,
+            receivedMinor: received,
+            keptMinor: kept,
+            spentMinor: spent,
+            savedMinor: saved,
+            heldMinor: held,
+          ),
+          const SizedBox(height: 22),
           for (final style in HomeSavingsStyle.values)
             _Choice(
               style: style,
               selected: style == current,
               onTap: () => _choose(style),
-              // Drawn from the real figures. Described in words these options
-              // are indistinguishable -- the whole difference is what they
-              // look like, so the choice has to be shown, not explained.
-              preview: _Preview(
-                style: style,
-                receivedMinor: received,
-                keptMinor: kept,
-                spentMinor: spent,
-                savedMinor: saved,
-                heldMinor: held,
-              ),
             ),
           const SizedBox(height: 20),
           Text(
@@ -125,13 +127,11 @@ class _Choice extends StatelessWidget {
     required this.style,
     required this.selected,
     required this.onTap,
-    required this.preview,
   });
 
   final HomeSavingsStyle style;
   final bool selected;
   final VoidCallback onTap;
-  final Widget preview;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -175,8 +175,6 @@ class _Choice extends StatelessWidget {
                       color: SpendWiseColors.dim,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  preview,
                 ],
               ),
             ),
@@ -187,7 +185,10 @@ class _Choice extends StatelessWidget {
   );
 }
 
-/// What Home will actually look like, at a size that fits beside the words.
+/// Home's own widgets, at Home's own size, drawn from the real figures.
+///
+/// Not an illustration of the choice -- the choice itself, rendered by the
+/// same code the dashboard uses, so it cannot quietly stop matching.
 class _Preview extends StatelessWidget {
   const _Preview({
     required this.style,
@@ -206,16 +207,19 @@ class _Preview extends StatelessWidget {
   final int heldMinor;
 
   @override
-  Widget build(BuildContext context) {
-    final aside = style == HomeSavingsStyle.siblings && savedMinor > 0
-        ? savedMinor
-        : 0;
-    final headline = keptMinor - aside;
-    return Column(
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
+    decoration: BoxDecoration(
+      border: Border.all(color: SpendWiseColors.edge),
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Eyebrow('On Home  ${formatMinor(receivedMinor, cents: false)} in'),
+        const SizedBox(height: 10),
         FlowShape(
-          height: 62,
+          height: 150,
           animate: false,
           receivedMinor: receivedMinor,
           keptMinor: keptMinor,
@@ -228,72 +232,49 @@ class _Preview extends StatelessWidget {
             _ => SavedTreatment.none,
           },
         ),
-        const SizedBox(height: 8),
-        // The words under the shape move with it: counting saving out of the
-        // headline means the headline is no longer "still yours".
-        Row(
-          children: [
-            Expanded(
-              child: _Chip(
-                label: aside > 0 ? 'AVAILABLE' : 'STILL YOURS',
-                value: formatMinor(headline, cents: false),
-                color: SpendWiseColors.fg,
-              ),
-            ),
-            if (aside > 0)
-              _Chip(
-                label: 'SAVED',
-                value: formatMinor(aside, cents: false),
-                color: SpendWiseColors.mine,
-              ),
-            _Chip(
-              label: 'GONE',
-              value: formatMinor(spentMinor, cents: false),
-              color: SpendWiseColors.spend,
-            ),
-          ],
+        const SizedBox(height: 14),
+        MonthLegend(
+          received: receivedMinor,
+          kept: keptMinor,
+          spent: spentMinor,
+          savedMinor: savedMinor,
+          setsSavingAside: style == HomeSavingsStyle.siblings,
         ),
         if (style == HomeSavingsStyle.balance ||
             style == HomeSavingsStyle.moved) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
           Container(
-            padding: const EdgeInsets.only(top: 7),
+            width: double.infinity,
+            padding: const EdgeInsets.only(top: 11),
             decoration: const BoxDecoration(
               border: Border(top: BorderSide(color: SpendWiseColors.line)),
             ),
-            child: Text(
-              style == HomeSavingsStyle.balance
-                  ? 'SAVINGS  ${formatMinor(heldMinor, cents: false)}'
-                  : '${formatMinor(savedMinor, cents: false)} put away',
-              style: SpendWiseType.metaTight,
-            ),
+            child: style == HomeSavingsStyle.balance
+                ? Eyebrow(
+                    'Savings',
+                    trailing: Text(
+                      formatMinor(heldMinor, cents: false),
+                      style: SpendWiseType.rowStrong.copyWith(fontSize: 14),
+                    ),
+                  )
+                : Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: formatMinor(savedMinor.abs(), cents: false),
+                          style: SpendWiseType.rowStrong.copyWith(fontSize: 15),
+                        ),
+                        TextSpan(
+                          text: savedMinor < 0
+                              ? ' taken back out of savings.'
+                              : ' put away this period.',
+                          style: SpendWiseType.body.copyWith(fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
           ),
         ],
-      ],
-    );
-  }
-}
-
-class _Chip extends StatelessWidget {
-  const _Chip({required this.label, required this.value, required this.color});
-
-  final String label;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(right: 12),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(label, style: SpendWiseType.metaTight.copyWith(fontSize: 8)),
-        const SizedBox(height: 1),
-        Text(
-          value,
-          style: SpendWiseType.rowStrong.copyWith(fontSize: 12, color: color),
-        ),
       ],
     ),
   );

@@ -170,7 +170,7 @@ class DashboardScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      _Legend(
+                      MonthLegend(
                         received: received,
                         kept: kept,
                         spent: spent,
@@ -280,8 +280,14 @@ class DashboardScreen extends StatelessWidget {
   }
 }
 
-class _Legend extends StatelessWidget {
-  const _Legend({
+/// The figures under the month's shape.
+///
+/// Public so the Settings preview can draw the real thing rather than an
+/// imitation of it -- a preview that can drift from what it previews is worse
+/// than none.
+class MonthLegend extends StatelessWidget {
+  const MonthLegend({
+    super.key,
     required this.received,
     required this.kept,
     required this.spent,
