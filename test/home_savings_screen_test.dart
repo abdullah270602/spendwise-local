@@ -152,11 +152,54 @@ void main() {
       expect(viewModel.preferences['home_savings'], 'divided');
     });
 
+    testWidgets('each option shows what it will actually look like', (
+      tester,
+    ) async {
+      // Described in words these are indistinguishable; the whole difference
+      // is what they look like. The list builds lazily, so each option is
+      // scrolled to and checked in turn.
+      await pump(tester, HomeSavingsScreen(viewModel: _Fake('off')));
+      for (final style in HomeSavingsStyle.values) {
+        await tester.scrollUntilVisible(find.text(style.title), 120);
+        expect(
+          find.descendant(
+            of: find.ancestor(
+              of: find.text(style.title),
+              matching: find.byType(Column),
+            ),
+            matching: find.byType(FlowShape),
+          ),
+          findsWidgets,
+          reason: style.id,
+        );
+      }
+    });
+
+    testWidgets('the preview relabels when saving is counted out', (
+      tester,
+    ) async {
+      await pump(tester, HomeSavingsScreen(viewModel: _Fake('off')));
+      // Only the sibling treatment takes saving out of the headline, so only
+      // its preview says AVAILABLE. Everything else keeps STILL YOURS.
+      await tester.scrollUntilVisible(
+        find.text(HomeSavingsStyle.siblings.title),
+        120,
+      );
+      expect(find.text('AVAILABLE'), findsOneWidget);
+      expect(find.text('SAVED'), findsOneWidget);
+
+      await tester.scrollUntilVisible(
+        find.text(HomeSavingsStyle.divided.title),
+        120,
+      );
+      expect(find.text('STILL YOURS'), findsWidgets);
+    });
+
     testWidgets('and it shows the real figures, not an abstraction', (
       tester,
     ) async {
       await pump(tester, HomeSavingsScreen(viewModel: _Fake('off')));
-      expect(find.textContaining('40,000'), findsOneWidget);
+      expect(find.textContaining('40,000'), findsWidgets);
     });
   });
 }

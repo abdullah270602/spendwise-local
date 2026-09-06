@@ -170,7 +170,14 @@ class DashboardScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      _Legend(received: received, kept: kept, spent: spent),
+                      _Legend(
+                        received: received,
+                        kept: kept,
+                        spent: spent,
+                        savedMinor: savedMinor,
+                        setsSavingAside:
+                            savingsStyle == HomeSavingsStyle.siblings,
+                      ),
                     ] else
                       _SpentOnly(spent: spent, period: month),
                   ],
@@ -278,35 +285,64 @@ class _Legend extends StatelessWidget {
     required this.received,
     required this.kept,
     required this.spent,
+    this.savedMinor = 0,
+    this.setsSavingAside = false,
   });
 
   final int received;
   final int kept;
   final int spent;
+  final int savedMinor;
+
+  /// Whether saving is counted out of the headline figure.
+  ///
+  /// It is money you still own either way, so when it is counted out the
+  /// figure stops being "still yours" and becomes "available" -- the label has
+  /// to move with the arithmetic or one of them is lying.
+  final bool setsSavingAside;
 
   @override
-  Widget build(BuildContext context) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Expanded(
-        child: _LegendEntry(
-          label: kept < 0 ? 'Overspent' : 'Still yours',
-          value: formatMinor(kept, cents: false),
-          note: received > 0
-              ? '${DashboardScreen._percent(kept.abs(), received)} of what came in'
-              : 'nothing came in this month',
-          color: kept < 0 ? SpendWiseColors.spend : SpendWiseColors.fg,
+  Widget build(BuildContext context) {
+    final aside = setsSavingAside && savedMinor > 0 ? savedMinor : 0;
+    final headline = kept - aside;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: _LegendEntry(
+            label: headline < 0
+                ? 'Overspent'
+                : aside > 0
+                ? 'Available'
+                : 'Still yours',
+            value: formatMinor(headline, cents: false),
+            note: received > 0
+                ? '${DashboardScreen._percent(headline.abs(), received)} of what came in'
+                : 'nothing came in this month',
+            color: headline < 0 ? SpendWiseColors.spend : SpendWiseColors.fg,
+          ),
         ),
-      ),
-      _LegendEntry(
-        label: 'Gone',
-        value: formatMinor(spent, cents: false),
-        note: DashboardScreen._percent(spent, received),
-        color: SpendWiseColors.spend,
-        alignRight: true,
-      ),
-    ],
-  );
+        if (aside > 0)
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: _LegendEntry(
+              label: 'Saved',
+              value: formatMinor(aside, cents: false),
+              note: DashboardScreen._percent(aside, received),
+              color: SpendWiseColors.mine,
+              alignRight: true,
+            ),
+          ),
+        _LegendEntry(
+          label: 'Gone',
+          value: formatMinor(spent, cents: false),
+          note: DashboardScreen._percent(spent, received),
+          color: SpendWiseColors.spend,
+          alignRight: true,
+        ),
+      ],
+    );
+  }
 }
 
 class _LegendEntry extends StatelessWidget {

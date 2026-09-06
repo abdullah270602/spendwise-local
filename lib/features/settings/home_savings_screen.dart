@@ -53,6 +53,10 @@ class _HomeSavingsScreenState extends State<HomeSavingsScreen> {
       0,
       (sum, account) => sum + account.balance.minorUnits,
     );
+    final dashboard = viewModel.dashboard;
+    final received = dashboard.incomeThisMonth.minorUnits;
+    final spent = dashboard.spendingThisMonth.minorUnits;
+    final kept = received - spent;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Savings on Home')),
@@ -88,6 +92,17 @@ class _HomeSavingsScreenState extends State<HomeSavingsScreen> {
               style: style,
               selected: style == current,
               onTap: () => _choose(style),
+              // Drawn from the real figures. Described in words these options
+              // are indistinguishable -- the whole difference is what they
+              // look like, so the choice has to be shown, not explained.
+              preview: _Preview(
+                style: style,
+                receivedMinor: received,
+                keptMinor: kept,
+                spentMinor: spent,
+                savedMinor: saved,
+                heldMinor: held,
+              ),
             ),
           const SizedBox(height: 20),
           Text(
@@ -110,11 +125,13 @@ class _Choice extends StatelessWidget {
     required this.style,
     required this.selected,
     required this.onTap,
+    required this.preview,
   });
 
   final HomeSavingsStyle style;
   final bool selected;
   final VoidCallback onTap;
+  final Widget preview;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -158,12 +175,126 @@ class _Choice extends StatelessWidget {
                       color: SpendWiseColors.dim,
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  preview,
                 ],
               ),
             ),
           ],
         ),
       ),
+    ),
+  );
+}
+
+/// What Home will actually look like, at a size that fits beside the words.
+class _Preview extends StatelessWidget {
+  const _Preview({
+    required this.style,
+    required this.receivedMinor,
+    required this.keptMinor,
+    required this.spentMinor,
+    required this.savedMinor,
+    required this.heldMinor,
+  });
+
+  final HomeSavingsStyle style;
+  final int receivedMinor;
+  final int keptMinor;
+  final int spentMinor;
+  final int savedMinor;
+  final int heldMinor;
+
+  @override
+  Widget build(BuildContext context) {
+    final aside = style == HomeSavingsStyle.siblings && savedMinor > 0
+        ? savedMinor
+        : 0;
+    final headline = keptMinor - aside;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FlowShape(
+          height: 62,
+          animate: false,
+          receivedMinor: receivedMinor,
+          keptMinor: keptMinor,
+          spentMinor: spentMinor,
+          savedMinor: savedMinor,
+          saved: switch (style) {
+            HomeSavingsStyle.siblings => SavedTreatment.branch,
+            HomeSavingsStyle.divided => SavedTreatment.inset,
+            HomeSavingsStyle.seam => SavedTreatment.seam,
+            _ => SavedTreatment.none,
+          },
+        ),
+        const SizedBox(height: 8),
+        // The words under the shape move with it: counting saving out of the
+        // headline means the headline is no longer "still yours".
+        Row(
+          children: [
+            Expanded(
+              child: _Chip(
+                label: aside > 0 ? 'AVAILABLE' : 'STILL YOURS',
+                value: formatMinor(headline, cents: false),
+                color: SpendWiseColors.fg,
+              ),
+            ),
+            if (aside > 0)
+              _Chip(
+                label: 'SAVED',
+                value: formatMinor(aside, cents: false),
+                color: SpendWiseColors.mine,
+              ),
+            _Chip(
+              label: 'GONE',
+              value: formatMinor(spentMinor, cents: false),
+              color: SpendWiseColors.spend,
+            ),
+          ],
+        ),
+        if (style == HomeSavingsStyle.balance ||
+            style == HomeSavingsStyle.moved) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.only(top: 7),
+            decoration: const BoxDecoration(
+              border: Border(top: BorderSide(color: SpendWiseColors.line)),
+            ),
+            child: Text(
+              style == HomeSavingsStyle.balance
+                  ? 'SAVINGS  ${formatMinor(heldMinor, cents: false)}'
+                  : '${formatMinor(savedMinor, cents: false)} put away',
+              style: SpendWiseType.metaTight,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _Chip extends StatelessWidget {
+  const _Chip({required this.label, required this.value, required this.color});
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(right: 12),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label, style: SpendWiseType.metaTight.copyWith(fontSize: 8)),
+        const SizedBox(height: 1),
+        Text(
+          value,
+          style: SpendWiseType.rowStrong.copyWith(fontSize: 12, color: color),
+        ),
+      ],
     ),
   );
 }
