@@ -112,12 +112,30 @@ class ViewToggle extends StatelessWidget {
 /// The Home screen in one object: a bar of everything that came in, splitting
 /// into the share still yours and the share that left. True proportion -- the
 /// thin clay thread is thin because 11% is thin.
+/// Where the saved slice is drawn, when there is one.
+enum SavedTreatment {
+  /// Not drawn at all.
+  none,
+
+  /// Its own branch, beside kept and spent.
+  branch,
+
+  /// A division marked inside the kept footing, which keeps "still yours"
+  /// meaning what it already means.
+  inset,
+
+  /// The same division, shaded along the inner edge of the kept ribbon.
+  seam,
+}
+
 class FlowShape extends StatelessWidget {
   const FlowShape({
     super.key,
     required this.receivedMinor,
     required this.keptMinor,
     required this.spentMinor,
+    this.savedMinor = 0,
+    this.saved = SavedTreatment.none,
     this.height = 168,
     this.animate = true,
   });
@@ -125,6 +143,11 @@ class FlowShape extends StatelessWidget {
   final int receivedMinor;
   final int keptMinor;
   final int spentMinor;
+
+  /// Money moved into savings over the same period. Never more than what was
+  /// kept: it came out of that, not out of thin air.
+  final int savedMinor;
+  final SavedTreatment saved;
   final double height;
   final bool animate;
 
@@ -132,13 +155,28 @@ class FlowShape extends StatelessWidget {
   Widget build(BuildContext context) {
     final total = math.max(1, keptMinor.abs() + spentMinor.abs());
     final keptFraction = (keptMinor.abs() / total).clamp(0.0, 1.0);
+    // Saving is a slice of what was kept, so it is measured against that and
+    // can never exceed it -- a shape where the part is bigger than the whole
+    // is worse than one that omits the part.
+    final savedOfKept = keptMinor.abs() == 0
+        ? 0.0
+        : (savedMinor.clamp(0, keptMinor.abs()) / keptMinor.abs()).clamp(
+            0.0,
+            1.0,
+          );
+    final treatment = savedMinor <= 0 ? SavedTreatment.none : saved;
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: animate ? 0 : 1, end: 1),
       duration: const Duration(milliseconds: 620),
       curve: Curves.easeOutCubic,
       builder: (context, t, _) => CustomPaint(
         size: Size.infinite,
-        painter: _FlowShapePainter(keptFraction: keptFraction, reveal: t),
+        painter: _FlowShapePainter(
+          keptFraction: keptFraction,
+          savedOfKept: savedOfKept,
+          saved: treatment,
+          reveal: t,
+        ),
         child: SizedBox(height: height, width: double.infinity),
       ),
     );
@@ -146,9 +184,16 @@ class FlowShape extends StatelessWidget {
 }
 
 class _FlowShapePainter extends CustomPainter {
-  _FlowShapePainter({required this.keptFraction, required this.reveal});
+  _FlowShapePainter({
+    required this.keptFraction,
+    required this.savedOfKept,
+    required this.saved,
+    required this.reveal,
+  });
 
   final double keptFraction;
+  final double savedOfKept;
+  final SavedTreatment saved;
   final double reveal;
 
   @override
@@ -187,23 +232,83 @@ class _FlowShapePainter extends CustomPainter {
 
     final paint = Paint()..style = PaintingStyle.fill;
 
+    // A branch of its own comes out of the kept side, because that is where
+    // the money actually came from -- so kept narrows by exactly the saved
+    // slice and the two still add up to what was kept before.
+    final asBranch = saved == SavedTreatment.branch;
+    final savedTopW = asBranch ? keptW * savedOfKept : 0.0;
+    final liveKeptW = keptW - savedTopW;
+    final savedBotW = asBranch ? keptW * savedOfKept : 0.0;
+
     canvas.drawPath(
-      ribbon(topX, splitX, keptBotX, keptBotX + keptW),
+      ribbon(topX, topX + liveKeptW, keptBotX, keptBotX + liveKeptW),
       paint..color = SpendWiseColors.keep.withValues(alpha: .30),
     );
+    if (asBranch) {
+      final gap = savedBotW > 0 ? 6.0 * reveal : 0.0;
+      canvas.drawPath(
+        ribbon(
+          topX + liveKeptW,
+          splitX,
+          keptBotX + liveKeptW + gap,
+          keptBotX + liveKeptW + gap + savedBotW,
+        ),
+        paint..color = SpendWiseColors.mine.withValues(alpha: .34),
+      );
+    }
     canvas.drawPath(
       ribbon(splitX, topX + topW, spentBotX, spentBotX + spentW),
       paint..color = SpendWiseColors.spend.withValues(alpha: .48),
     );
 
+    // A seam shades the inner edge of the kept ribbon rather than dividing it,
+    // so "still yours" is still one shape and still one number.
+    if (saved == SavedTreatment.seam) {
+      final seamW = keptW * savedOfKept;
+      canvas.drawPath(
+        ribbon(
+          topX + keptW - seamW,
+          splitX,
+          keptBotX + keptW - seamW,
+          keptBotX + keptW,
+        ),
+        paint..color = SpendWiseColors.mine.withValues(alpha: .30),
+      );
+    }
+
     canvas.drawRect(
       Rect.fromLTWH(topX, topY, topW, barH),
       paint..color = SpendWiseColors.fg,
     );
-    canvas.drawRect(
-      Rect.fromLTWH(keptBotX, botY, keptW, barH),
-      paint..color = SpendWiseColors.keep,
-    );
+    if (asBranch) {
+      final gap = savedBotW > 0 ? 6.0 * reveal : 0.0;
+      canvas.drawRect(
+        Rect.fromLTWH(keptBotX, botY, liveKeptW, barH),
+        paint..color = SpendWiseColors.keep,
+      );
+      canvas.drawRect(
+        Rect.fromLTWH(keptBotX + liveKeptW + gap, botY, savedBotW, barH),
+        paint..color = SpendWiseColors.mine,
+      );
+    } else {
+      canvas.drawRect(
+        Rect.fromLTWH(keptBotX, botY, keptW, barH),
+        paint..color = SpendWiseColors.keep,
+      );
+      // The inset marks the saved part of the footing itself: same bar, same
+      // total, a shaded portion and a tick where it divides.
+      if (saved == SavedTreatment.inset) {
+        final insetW = keptW * savedOfKept;
+        canvas.drawRect(
+          Rect.fromLTWH(keptBotX + keptW - insetW, botY, insetW, barH),
+          paint..color = SpendWiseColors.mine,
+        );
+        canvas.drawRect(
+          Rect.fromLTWH(keptBotX + keptW - insetW - 1, botY, 1, barH),
+          paint..color = SpendWiseColors.background,
+        );
+      }
+    }
     canvas.drawRect(
       Rect.fromLTWH(spentBotX, botY, spentW, barH),
       paint..color = SpendWiseColors.spend,
@@ -212,7 +317,10 @@ class _FlowShapePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_FlowShapePainter old) =>
-      old.keptFraction != keptFraction || old.reveal != reveal;
+      old.keptFraction != keptFraction ||
+      old.savedOfKept != savedOfKept ||
+      old.saved != saved ||
+      old.reveal != reveal;
 }
 
 /// A month of running balance, drawn as steps: money does not drift, it lands

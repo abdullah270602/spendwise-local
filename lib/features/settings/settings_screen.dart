@@ -13,7 +13,9 @@ import '../shell/spendwise_view_model.dart';
 import 'app_lock_screen.dart';
 import 'source_selection_screen.dart';
 import '../reports/report_screen.dart';
+import '../dashboard/home_savings.dart';
 import 'home_period_screen.dart';
+import 'home_savings_screen.dart';
 import 'export_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -29,7 +31,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   );
 
   bool changingDemoData = false;
-  bool changingSavingsVisibility = false;
   late final Future<PackageInfo> packageInfo = PackageInfo.fromPlatform();
 
   SpendWiseViewModel get viewModel => widget.viewModel;
@@ -210,16 +211,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 },
               ),
               const Divider(height: 1, indent: 56),
-              SwitchListTile(
-                secondary: const Icon(Icons.savings_outlined),
-                title: const Text('Show savings on Home'),
-                subtitle: const Text(
-                  'Savings always remain available in Accounts and Insights',
+              // A switch could only ever ask "on or off", and there are two
+              // different questions here -- what you put away over the period,
+              // and what you hold. So it opens a choice that names them.
+              ListTile(
+                leading: const Icon(Icons.savings_outlined),
+                title: const Text('Savings on Home'),
+                subtitle: Text(
+                  HomeSavingsStyle.fromId(
+                    viewModel.uiViewPreference('home_savings'),
+                    legacyOn: viewModel.uiShowSavingsOnHome,
+                  ).title,
                 ),
-                value: viewModel.uiShowSavingsOnHome,
-                onChanged: changingSavingsVisibility
-                    ? null
-                    : _setSavingsVisibility,
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => HomeSavingsScreen(viewModel: viewModel),
+                    ),
+                  );
+                  if (mounted) setState(() {});
+                },
               ),
             ],
           ),
@@ -345,21 +358,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } finally {
       if (mounted) setState(() => changingDemoData = false);
-    }
-  }
-
-  Future<void> _setSavingsVisibility(bool enabled) async {
-    setState(() => changingSavingsVisibility = true);
-    try {
-      await viewModel.uiSetShowSavingsOnHome(enabled);
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not update Home: $error')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => changingSavingsVisibility = false);
     }
   }
 

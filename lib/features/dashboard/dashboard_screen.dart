@@ -5,6 +5,7 @@ import '../../widgets/shape_kit.dart';
 import '../settings/settings_screen.dart';
 import '../tour/spotlight.dart';
 import '../shell/spendwise_view_model.dart';
+import 'home_savings.dart';
 
 /// Home is one idea: of everything that arrived this month, this much is still
 /// yours and this much is gone -- drawn to true proportion, then zoomed into
@@ -45,6 +46,21 @@ class DashboardScreen extends StatelessWidget {
     );
 
     final (windowFrom, windowTo) = period.resolve(now);
+    final savingsStyle = HomeSavingsStyle.fromId(
+      viewModel.uiViewPreference('home_savings'),
+      legacyOn: viewModel.uiShowSavingsOnHome,
+    );
+    // Read over the same window as everything else on Home, so a fortnight
+    // view reports what was put away in that fortnight.
+    final savedMinor = savedInWindow(
+      transactions: viewModel.transactions,
+      savingsAccountIds: {
+        for (final account in viewModel.accounts)
+          if (!account.isIncluded) account.id,
+      },
+      from: windowFrom,
+      to: windowTo,
+    );
     final ownMoves = viewModel.transactions.where((item) {
       final local = item.occurredAt.toLocal();
       return item.kind == TransactionKind.transfer &&
@@ -91,7 +107,7 @@ class DashboardScreen extends StatelessWidget {
           if (viewModel.uiViewPreference('tour_seen') != 'true' &&
               viewModel.accounts.isNotEmpty)
             SliverToBoxAdapter(child: _TourOffer(viewModel: viewModel)),
-          if (!anything && viewModel.uiShowSavingsOnHome)
+          if (!anything && savingsStyle == HomeSavingsStyle.balance)
             SliverToBoxAdapter(
               child: _SavingsStrip(
                 accounts: viewModel.accounts,
@@ -144,6 +160,13 @@ class DashboardScreen extends StatelessWidget {
                           receivedMinor: received,
                           keptMinor: kept,
                           spentMinor: spent,
+                          savedMinor: savedMinor,
+                          saved: switch (savingsStyle) {
+                            HomeSavingsStyle.siblings => SavedTreatment.branch,
+                            HomeSavingsStyle.divided => SavedTreatment.inset,
+                            HomeSavingsStyle.seam => SavedTreatment.seam,
+                            _ => SavedTreatment.none,
+                          },
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -203,10 +226,21 @@ class DashboardScreen extends StatelessWidget {
                 ),
               ),
             ),
-            if (viewModel.uiShowSavingsOnHome)
+            if (savingsStyle == HomeSavingsStyle.balance)
               SliverToBoxAdapter(
                 child: _SavingsStrip(
                   accounts: viewModel.accounts,
+                  onTap: onOpenAccounts,
+                ),
+              ),
+            // The shape treatments need a figure to go with the drawing, and
+            // "what I put away" needs a line of its own since it changes
+            // nothing about the shape.
+            if (savingsStyle != HomeSavingsStyle.off &&
+                savingsStyle != HomeSavingsStyle.balance)
+              SliverToBoxAdapter(
+                child: _PutAwayNote(
+                  savedMinor: savedMinor,
                   onTap: onOpenAccounts,
                 ),
               ),
@@ -341,6 +375,71 @@ class _CategoryRow extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// What was put away over the period Home covers.
+///
+/// A figure, not a balance: it is the movement the shape is drawing, said in
+/// words so the drawing is checkable rather than decorative. Nothing is shown
+/// when nothing moved -- a line reading "0 put away" is noise, and a negative
+/// one is a different sentence entirely.
+class _PutAwayNote extends StatelessWidget {
+  const _PutAwayNote({required this.savedMinor, required this.onTap});
+
+  final int savedMinor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (savedMinor == 0) return const SizedBox.shrink();
+    final out = savedMinor < 0;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        SpendWiseTheme.gutter,
+        18,
+        SpendWiseTheme.gutter,
+        0,
+      ),
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.only(top: 13),
+          decoration: const BoxDecoration(
+            border: Border(top: BorderSide(color: SpendWiseColors.line)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 9,
+                height: 9,
+                margin: const EdgeInsets.only(top: 5, right: 11),
+                color: out ? SpendWiseColors.spend : SpendWiseColors.mine,
+              ),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: formatMinor(savedMinor.abs(), cents: false),
+                        style: SpendWiseType.rowStrong.copyWith(fontSize: 15),
+                      ),
+                      TextSpan(
+                        text: out
+                            ? ' taken back out of savings.'
+                            : ' put away this period.',
+                        style: SpendWiseType.body.copyWith(fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Savings are deliberately absent from the month's shape -- money set aside
@@ -634,9 +733,17 @@ class _TrayScanState extends State<_TrayScan> {
                 color: SpendWiseColors.dim,
               ),
               const SizedBox(width: 7),
-              Text(
-                running ? 'SCANNING TRAY…' : 'MISSING SOMETHING? SCAN THE TRAY',
-                style: SpendWiseType.metaTight,
+              // The label is wider than a 360dp phone once the border and
+              // padding are counted, so it yields rather than running off.
+              Flexible(
+                child: Text(
+                  running
+                      ? 'SCANNING TRAY…'
+                      : 'MISSING SOMETHING? SCAN THE TRAY',
+                  style: SpendWiseType.metaTight,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
