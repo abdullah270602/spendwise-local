@@ -84,9 +84,7 @@ List<ReviewRule> buildReviewRules({
   final claimed = <String>{};
   final rules = <ReviewRule>[];
 
-  List<TransactionViewData> take(
-    bool Function(TransactionViewData) predicate,
-  ) {
+  List<TransactionViewData> take(bool Function(TransactionViewData) predicate) {
     final matched = pending
         .where((item) => !claimed.contains(item.id) && predicate(item))
         .toList();
@@ -110,7 +108,8 @@ List<ReviewRule> buildReviewRules({
         id: 'route-alerts:$app',
         count: group.length,
         unit: group.length == 1 ? 'alert from $app' : 'alerts from $app',
-        claim: '$app carries more than one bank, and these did not name one '
+        claim:
+            '$app carries more than one bank, and these did not name one '
             'SpendWise recognises.',
         evidence: _trim(group.first.body),
         actionLabel: group.length == 1
@@ -201,7 +200,9 @@ List<ReviewRule> buildReviewRules({
       ReviewRule(
         id: 'transfer',
         count: ownMoves.length,
-        unit: ownMoves.length == 1 ? 'suspected own transfer' : 'suspected own transfers',
+        unit: ownMoves.length == 1
+            ? 'suspected own transfer'
+            : 'suspected own transfers',
         claim: 'Money moved between accounts you own — not spending.',
         evidence: _sampleTitles(ownMoves),
         actionLabel: ownMoves.length == 1
@@ -295,7 +296,9 @@ List<ReviewRule> buildReviewRules({
         id: review.id,
         count: count,
         unit: app == null
-            ? (count == 1 ? 'alert SpendWise cannot read' : 'alerts SpendWise cannot read')
+            ? (count == 1
+                  ? 'alert SpendWise cannot read'
+                  : 'alerts SpendWise cannot read')
             : 'unread from $app',
         claim: app == null
             ? 'Nothing here parsed as a transaction.'

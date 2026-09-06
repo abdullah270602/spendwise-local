@@ -41,11 +41,7 @@ Future<void> main() async {
 final paletteRevision = ValueNotifier<int>(0);
 
 class SpendWiseApp extends StatelessWidget {
-  const SpendWiseApp({
-    super.key,
-    required this.controller,
-    required this.lock,
-  });
+  const SpendWiseApp({super.key, required this.controller, required this.lock});
 
   final SpendWiseController controller;
   final AppLockController lock;

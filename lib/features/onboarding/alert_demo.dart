@@ -211,9 +211,7 @@ class _AlertCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-    decoration: BoxDecoration(
-      border: Border.all(color: SpendWiseColors.edge),
-    ),
+    decoration: BoxDecoration(border: Border.all(color: SpendWiseColors.edge)),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -221,7 +219,10 @@ class _AlertCard extends StatelessWidget {
           children: [
             Container(width: 5, height: 5, color: SpendWiseColors.dim),
             const SizedBox(width: 7),
-            Text(example.sourceLabel.toUpperCase(), style: SpendWiseType.metaTight),
+            Text(
+              example.sourceLabel.toUpperCase(),
+              style: SpendWiseType.metaTight,
+            ),
           ],
         ),
         const SizedBox(height: 9),
@@ -265,10 +266,7 @@ class _AlertCard extends StatelessWidget {
                 left: BorderSide(color: SpendWiseColors.edge, width: 2),
               ),
             ),
-            child: Text(
-              note,
-              style: SpendWiseType.body.copyWith(fontSize: 12),
-            ),
+            child: Text(note, style: SpendWiseType.body.copyWith(fontSize: 12)),
           ),
         ],
       ],

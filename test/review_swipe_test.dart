@@ -159,6 +159,5 @@ class _FakeReviewViewModel extends ChangeNotifier
   String? get errorMessage => null;
 
   @override
-  dynamic noSuchMethod(Invocation invocation) =>
-      super.noSuchMethod(invocation);
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

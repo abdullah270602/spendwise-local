@@ -219,10 +219,7 @@ class _PeriodTile extends StatelessWidget {
                           (kept < 0 ? 1.0 : totals.spent / totals.received)
                               .clamp(0.0, 1.0),
                         ],
-                        colors: [
-                          SpendWiseColors.keep,
-                          SpendWiseColors.spend,
-                        ],
+                        colors: [SpendWiseColors.keep, SpendWiseColors.spend],
                         height: 8,
                         gap: 2,
                       ),
@@ -232,10 +229,7 @@ class _PeriodTile extends StatelessWidget {
                           Expanded(
                             child: _Figure(
                               label: 'Received',
-                              value: formatMinor(
-                                totals.received,
-                                cents: false,
-                              ),
+                              value: formatMinor(totals.received, cents: false),
                               tone: SpendWiseColors.fg,
                             ),
                           ),
@@ -270,11 +264,7 @@ class _PeriodTile extends StatelessWidget {
 }
 
 class _Figure extends StatelessWidget {
-  const _Figure({
-    required this.label,
-    required this.value,
-    required this.tone,
-  });
+  const _Figure({required this.label, required this.value, required this.tone});
 
   final String label;
   final String value;

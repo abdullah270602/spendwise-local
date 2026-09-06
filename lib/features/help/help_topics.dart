@@ -128,7 +128,8 @@ List<HelpTopic> helpTopics(SpendWiseViewModel viewModel) => [
       const HelpHeading('Which stretch of time'),
       const HelpContrast(
         leftLabel: 'On the 1st',
-        left: 'A calendar month has almost nothing in it yet, so the share '
+        left:
+            'A calendar month has almost nothing in it yet, so the share '
             'means nothing.',
         rightLabel: 'Your cycle',
         right: 'A window that opens on payday always has one full cycle in it.',
@@ -401,8 +402,7 @@ List<HelpTopic> helpTopics(SpendWiseViewModel viewModel) => [
     body: () => [
       HelpExample(
         framed: false,
-        caption:
-            'Read from the installed package, not typed into this page.',
+        caption: 'Read from the installed package, not typed into this page.',
         child: PermissionsFigure(viewModel: viewModel),
       ),
       const HelpProse(

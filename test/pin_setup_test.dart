@@ -24,7 +24,8 @@ void main() {
                 context,
                 MaterialPageRoute(
                   builder: (_) =>
-                      screen?.call() ?? const PinSetupScreen(title: 'Set a PIN'),
+                      screen?.call() ??
+                      const PinSetupScreen(title: 'Set a PIN'),
                 ),
               );
             },

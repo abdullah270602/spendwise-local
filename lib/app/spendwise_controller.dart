@@ -790,39 +790,40 @@ final class SpendWiseController extends ChangeNotifier
   /// reconciliation pass at the end. The old screen ran one round-trip per
   /// item, which is why clearing an inbox of six felt like work.
   @override
-  Future<void> applyReviewDecision(ReviewDecision decision) => _runBusy(() async {
-    switch (decision.kind) {
-      case ReviewDecisionKind.confirm:
-        _ledger.confirmTransactions(decision.transactionIds);
-      case ReviewDecisionKind.categorize:
-        _ledger.categorizeTransactions(
-          decision.transactionIds,
-          _categoryId(decision.category ?? ''),
-        );
-      case ReviewDecisionKind.route:
-        final accountId = decision.accountId;
-        if (accountId == null) {
-          throw ArgumentError('Routing needs an account');
+  Future<void> applyReviewDecision(ReviewDecision decision) =>
+      _runBusy(() async {
+        switch (decision.kind) {
+          case ReviewDecisionKind.confirm:
+            _ledger.confirmTransactions(decision.transactionIds);
+          case ReviewDecisionKind.categorize:
+            _ledger.categorizeTransactions(
+              decision.transactionIds,
+              _categoryId(decision.category ?? ''),
+            );
+          case ReviewDecisionKind.route:
+            final accountId = decision.accountId;
+            if (accountId == null) {
+              throw ArgumentError('Routing needs an account');
+            }
+            _ledger.routeTransactions(decision.transactionIds, accountId);
+          case ReviewDecisionKind.redirect:
+            _ledger.redirectTransactions(
+              decision.transactionIds,
+              expense: decision.expense,
+            );
+          case ReviewDecisionKind.routeAlerts:
+            final target = decision.accountId;
+            if (target == null) {
+              throw ArgumentError('Routing needs an account');
+            }
+            _ledger.routeAlerts(decision.alertIds, target);
+          case ReviewDecisionKind.dismissSource:
+            final package = decision.packageName;
+            _ledger.dismissUnparsed(
+              packageName: package == null || package.isEmpty ? null : package,
+            );
         }
-        _ledger.routeTransactions(decision.transactionIds, accountId);
-      case ReviewDecisionKind.redirect:
-        _ledger.redirectTransactions(
-          decision.transactionIds,
-          expense: decision.expense,
-        );
-      case ReviewDecisionKind.routeAlerts:
-        final target = decision.accountId;
-        if (target == null) {
-          throw ArgumentError('Routing needs an account');
-        }
-        _ledger.routeAlerts(decision.alertIds, target);
-      case ReviewDecisionKind.dismissSource:
-        final package = decision.packageName;
-        _ledger.dismissUnparsed(
-          packageName: package == null || package.isEmpty ? null : package,
-        );
-    }
-  });
+      });
 
   @override
   List<AlertViewData> alerts({
@@ -947,8 +948,9 @@ final class SpendWiseController extends ChangeNotifier
   }
 
   @override
-  HomePeriod get homePeriod =>
-      _homePeriodCache ??= HomePeriod.decode(_ledger.viewPreference('home_period'));
+  HomePeriod get homePeriod => _homePeriodCache ??= HomePeriod.decode(
+    _ledger.viewPreference('home_period'),
+  );
 
   @override
   void setHomePeriod(HomePeriod period) {
@@ -959,8 +961,7 @@ final class SpendWiseController extends ChangeNotifier
   }
 
   @override
-  Future<List<String>> declaredPermissions() =>
-      _bridge.declaredPermissions();
+  Future<List<String>> declaredPermissions() => _bridge.declaredPermissions();
 
   @override
   String? viewPreference(String key) => _ledger.viewPreference(key);

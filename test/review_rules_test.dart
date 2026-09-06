@@ -45,9 +45,7 @@ void main() {
   );
 
   test('ten alerts of the same shape become one decision', () {
-    final result = rules([
-      for (var i = 0; i < 10; i++) pending(id: 'tx-$i'),
-    ]);
+    final result = rules([for (var i = 0; i < 10; i++) pending(id: 'tx-$i')]);
 
     expect(result, hasLength(1));
     expect(result.single.count, 10);

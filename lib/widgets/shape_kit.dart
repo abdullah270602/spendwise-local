@@ -8,7 +8,11 @@ import '../features/shell/spendwise_view_model.dart';
 /// Amount without the currency code. Every dense surface in the redesign shows
 /// bare figures -- the currency is stated once per screen, not once per row,
 /// which is what let the register get twice as tight.
-String formatAmount(MoneyViewData money, {bool signed = false, bool cents = true}) {
+String formatAmount(
+  MoneyViewData money, {
+  bool signed = false,
+  bool cents = true,
+}) {
   final value = money.majorUnits.abs();
   final fixed = value.toStringAsFixed(2);
   final pieces = fixed.split('.');
@@ -22,11 +26,7 @@ String formatAmount(MoneyViewData money, {bool signed = false, bool cents = true
 }
 
 String formatMinor(int minorUnits, {bool signed = false, bool cents = true}) =>
-    formatAmount(
-      MoneyViewData(minorUnits),
-      signed: signed,
-      cents: cents,
-    );
+    formatAmount(MoneyViewData(minorUnits), signed: signed, cents: cents);
 
 /// Uppercase tracked label. The only kind of section header in the app.
 class Eyebrow extends StatelessWidget {
@@ -46,7 +46,10 @@ class Eyebrow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,
-      children: [Expanded(child: label), trailing!],
+      children: [
+        Expanded(child: label),
+        trailing!,
+      ],
     );
   }
 }
@@ -67,9 +70,7 @@ class ViewToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(
-      border: Border.all(color: SpendWiseColors.edge),
-    ),
+    decoration: BoxDecoration(border: Border.all(color: SpendWiseColors.edge)),
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -81,10 +82,11 @@ class ViewToggle extends StatelessWidget {
               onTap: i == selected ? null : () => onSelected(i),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 120),
-                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-                color: i == selected
-                    ? SpendWiseColors.fg
-                    : Colors.transparent,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 7,
+                ),
+                color: i == selected ? SpendWiseColors.fg : Colors.transparent,
                 child: Text(
                   options[i].toUpperCase(),
                   style: TextStyle(
@@ -377,9 +379,7 @@ class RegisterDay extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
-        Expanded(
-          child: Container(height: 1, color: SpendWiseColors.line),
-        ),
+        Expanded(child: Container(height: 1, color: SpendWiseColors.line)),
         const SizedBox(width: 10),
         Text(total, style: SpendWiseType.metaTight),
       ],

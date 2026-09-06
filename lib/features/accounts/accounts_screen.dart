@@ -68,7 +68,8 @@ class _AccountsScreenState extends State<AccountsScreen> {
         bottom: false,
         child: RestState(
           headline: 'No accounts yet.',
-          detail: 'An account is what a bank alert gets attached to. Without '
+          detail:
+              'An account is what a bank alert gets attached to. Without '
               'one, nothing SpendWise captures can reach a balance.',
           action: FilledButton(
             onPressed: () => _addAccount(context),
@@ -176,11 +177,11 @@ class _AccountsScreenState extends State<AccountsScreen> {
             ),
           SliverPadding(
             padding: EdgeInsets.fromLTRB(
-                SpendWiseTheme.gutter,
-                0,
-                SpendWiseTheme.gutter,
-                96 + MediaQuery.viewPaddingOf(context).bottom,
-              ),
+              SpendWiseTheme.gutter,
+              0,
+              SpendWiseTheme.gutter,
+              96 + MediaQuery.viewPaddingOf(context).bottom,
+            ),
             sliver: SliverList.list(
               children: [
                 if (everyday.isNotEmpty) ...[
@@ -208,10 +209,8 @@ class _AccountsScreenState extends State<AccountsScreen> {
     if (open.isEmpty) return const [];
     final owedToYou = open.where((item) => item.lent).toList();
     final youOwe = open.where((item) => !item.lent).toList();
-    int total(List<DebtViewData> items) => items.fold<int>(
-      0,
-      (sum, item) => sum + item.outstanding.minorUnits,
-    );
+    int total(List<DebtViewData> items) =>
+        items.fold<int>(0, (sum, item) => sum + item.outstanding.minorUnits);
 
     return [
       if (owedToYou.isNotEmpty) ...[
@@ -230,11 +229,8 @@ class _AccountsScreenState extends State<AccountsScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 5),
       child: InkWell(
-        onTap: () => debt_sheets.openDebt(
-          context,
-          viewModel: viewModel,
-          debt: debt,
-        ),
+        onTap: () =>
+            debt_sheets.openDebt(context, viewModel: viewModel, debt: debt),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
           decoration: BoxDecoration(
@@ -350,7 +346,8 @@ class _AccountsScreenState extends State<AccountsScreen> {
                       ),
                     ),
                     TextSpan(
-                      text: 'Alerts cannot be matched to '
+                      text:
+                          'Alerts cannot be matched to '
                           '${accounts.length == 1 ? 'it' : 'them'} until they '
                           'are added.',
                       style: SpendWiseType.body.copyWith(fontSize: 13),
@@ -1272,4 +1269,3 @@ final class _ThousandsSeparatedAmountFormatter extends TextInputFormatter {
     );
   }
 }
-

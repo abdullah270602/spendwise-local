@@ -81,8 +81,9 @@ final class NotificationBridge {
   /// asking to be believed.
   Future<List<String>> declaredPermissions() async {
     try {
-      final names =
-          await _channel.invokeListMethod<String>('listDeclaredPermissions');
+      final names = await _channel.invokeListMethod<String>(
+        'listDeclaredPermissions',
+      );
       return (names ?? const <String>[])..sort();
     } on PlatformException {
       return const [];

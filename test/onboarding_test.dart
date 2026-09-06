@@ -126,9 +126,7 @@ void main() {
     expect(find.widgetWithText(TextField, 'Balance now'), findsOneWidget);
   });
 
-  testWidgets('you can keep adding accounts, not just the one', (
-    tester,
-  ) async {
+  testWidgets('you can keep adding accounts, not just the one', (tester) async {
     await pump(tester);
     for (final label in ['Set it up', 'Next', 'Next']) {
       await tapOn(tester, label);

@@ -334,9 +334,7 @@ class _DebtSheetState extends State<_DebtSheet> {
                         ),
                         style: SpendWiseType.figure.copyWith(
                           fontSize: 30,
-                          color: current.isSettled
-                              ? SpendWiseColors.dim
-                              : tone,
+                          color: current.isSettled ? SpendWiseColors.dim : tone,
                         ),
                       ),
                     ],
@@ -394,7 +392,9 @@ class _DebtSheetState extends State<_DebtSheet> {
             const SizedBox(height: 24),
             if (!current.isSettled) ...[
               Eyebrow(
-                current.lent ? 'Record money coming back' : 'Record a repayment',
+                current.lent
+                    ? 'Record money coming back'
+                    : 'Record a repayment',
               ),
               const SizedBox(height: 8),
               Row(
@@ -481,10 +481,8 @@ class _DebtSheetState extends State<_DebtSheet> {
 
   Future<void> _close() => _run(() => widget.viewModel.uiCloseDebt(debt.id));
 
-  Future<void> _forget() => _run(
-    () => widget.viewModel.uiRemoveDebt(debt.id),
-    closeAfter: true,
-  );
+  Future<void> _forget() =>
+      _run(() => widget.viewModel.uiRemoveDebt(debt.id), closeAfter: true);
 
   Future<void> _run(
     Future<void> Function() action, {
@@ -505,9 +503,8 @@ class _DebtSheetState extends State<_DebtSheet> {
     } catch (error) {
       if (!mounted) return;
       setState(() => working = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not do that: $error')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Could not do that: $error')));
     }
   }
 }

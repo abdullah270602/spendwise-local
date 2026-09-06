@@ -70,7 +70,10 @@ class _EnterState extends State<_Enter> with SingleTickerProviderStateMixin {
     super.initState();
     // Someone who turned animations off is usually telling you they make
     // them ill, so land on the finished frame straight away.
-    if (WidgetsBinding.instance.platformDispatcher.accessibilityFeatures
+    if (WidgetsBinding
+        .instance
+        .platformDispatcher
+        .accessibilityFeatures
         .disableAnimations) {
       controller.value = 1;
     } else {
@@ -127,9 +130,7 @@ class ClosedCircuit extends StatelessWidget {
                   label,
                   textAlign: TextAlign.center,
                   style: SpendWiseType.metaTight.copyWith(
-                    color: granted
-                        ? SpendWiseColors.fg
-                        : SpendWiseColors.dim,
+                    color: granted ? SpendWiseColors.fg : SpendWiseColors.dim,
                   ),
                 ),
               ),
@@ -166,10 +167,7 @@ class ClosedCircuit extends StatelessWidget {
       ),
       SizedBox(
         height: 34,
-        child: CustomPaint(
-          size: Size.infinite,
-          painter: _BlockedPainter(),
-        ),
+        child: CustomPaint(size: Size.infinite, painter: _BlockedPainter()),
       ),
       Text(
         'Nothing leaves the phone',

@@ -19,19 +19,15 @@ void main() {
           builder: (context) => Scaffold(
             body: Center(
               child: TextButton(
-                onPressed: () => Spotlight.run(
-                  context,
-                  [
-                    for (var i = 0; i < stops; i++)
-                      SpotlightStop(
-                        title: 'Stop $i',
-                        body: 'What stop $i is for.',
-                        rect: () => const Rect.fromLTWH(10, 500, 80, 60),
-                        onEnter: () => entered.add('Stop $i'),
-                      ),
-                  ],
-                  onDone: onDone,
-                ),
+                onPressed: () => Spotlight.run(context, [
+                  for (var i = 0; i < stops; i++)
+                    SpotlightStop(
+                      title: 'Stop $i',
+                      body: 'What stop $i is for.',
+                      rect: () => const Rect.fromLTWH(10, 500, 80, 60),
+                      onEnter: () => entered.add('Stop $i'),
+                    ),
+                ], onDone: onDone),
                 child: const Text('go'),
               ),
             ),
@@ -64,9 +60,7 @@ void main() {
     expect(find.text('Next'), findsNothing);
   });
 
-  testWidgets('finishing removes the overlay and reports back', (
-    tester,
-  ) async {
+  testWidgets('finishing removes the overlay and reports back', (tester) async {
     var done = false;
     await start(tester, stops: 2, onDone: () => done = true);
     await tester.tap(find.text('Next'));

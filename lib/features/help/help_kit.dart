@@ -79,10 +79,7 @@ class HelpStep extends StatelessWidget {
             children: [
               Text(title, style: SpendWiseType.row),
               const SizedBox(height: 3),
-              Text(
-                detail,
-                style: SpendWiseType.body.copyWith(fontSize: 13),
-              ),
+              Text(detail, style: SpendWiseType.body.copyWith(fontSize: 13)),
             ],
           ),
         ),
@@ -178,20 +175,20 @@ class HelpContrast extends StatelessWidget {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: _Side(label: leftLabel, text: left, good: false)),
+        Expanded(
+          child: _Side(label: leftLabel, text: left, good: false),
+        ),
         const SizedBox(width: 12),
-        Expanded(child: _Side(label: rightLabel, text: right, good: true)),
+        Expanded(
+          child: _Side(label: rightLabel, text: right, good: true),
+        ),
       ],
     ),
   );
 }
 
 class _Side extends StatelessWidget {
-  const _Side({
-    required this.label,
-    required this.text,
-    required this.good,
-  });
+  const _Side({required this.label, required this.text, required this.good});
 
   final String label;
   final String text;

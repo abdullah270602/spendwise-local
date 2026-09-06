@@ -241,8 +241,7 @@ class ReviewDecision {
   /// Raw observation ids, for decisions that act before parsing.
   final List<String> alertIds;
 
-  int get count =>
-      alertIds.isEmpty ? transactionIds.length : alertIds.length;
+  int get count => alertIds.isEmpty ? transactionIds.length : alertIds.length;
 }
 
 /// Money that left but is still yours, or arrived but is not.
@@ -278,8 +277,7 @@ class DebtViewData {
   final String? note;
   final DateTime? closedAt;
 
-  bool get isPartlyPaid =>
-      settled.minorUnits > 0 && outstanding.minorUnits > 0;
+  bool get isPartlyPaid => settled.minorUnits > 0 && outstanding.minorUnits > 0;
 }
 
 /// A category the user can file a transaction under. System categories are

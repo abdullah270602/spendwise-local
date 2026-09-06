@@ -151,10 +151,8 @@ class AppLockController extends ChangeNotifier with WidgetsBindingObserver {
   static const minPinLength = 4;
   static const maxPinLength = 10;
   int get pinLength =>
-      int.tryParse(_prefs.read(lengthKey) ?? '')?.clamp(
-        minPinLength,
-        maxPinLength,
-      ) ??
+      int.tryParse(_prefs.read(lengthKey) ?? '')
+          ?.clamp(minPinLength, maxPinLength) ??
       minPinLength;
 
   /// Ask the platform what it actually has, once, at startup. A device with no
@@ -374,21 +372,15 @@ class AppLockController extends ChangeNotifier with WidgetsBindingObserver {
 /// Reaches the lock from anywhere without threading it through Home and the
 /// shell, neither of which has any business knowing about it.
 class AppLockScope extends InheritedWidget {
-  const AppLockScope({
-    super.key,
-    required this.lock,
-    required super.child,
-  });
+  const AppLockScope({super.key, required this.lock, required super.child});
 
   final AppLockController lock;
 
-  static AppLockController of(BuildContext context) => context
-      .dependOnInheritedWidgetOfExactType<AppLockScope>()!
-      .lock;
+  static AppLockController of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<AppLockScope>()!.lock;
 
-  static AppLockController? maybeOf(BuildContext context) => context
-      .dependOnInheritedWidgetOfExactType<AppLockScope>()
-      ?.lock;
+  static AppLockController? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<AppLockScope>()?.lock;
 
   @override
   bool updateShouldNotify(AppLockScope oldWidget) => oldWidget.lock != lock;

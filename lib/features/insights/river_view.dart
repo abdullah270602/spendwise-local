@@ -28,7 +28,8 @@ class RiverView extends StatelessWidget {
       return const SliverToBoxAdapter(
         child: RestState(
           headline: 'The river has not started yet.',
-          detail: 'Once alerts reach your ledger, every one of them shows up '
+          detail:
+              'Once alerts reach your ledger, every one of them shows up '
               'here as a branch off the spine — in on the left, out on the '
               'right, all the way back through your history.',
         ),
@@ -51,11 +52,11 @@ class RiverView extends StatelessWidget {
 
     return SliverPadding(
       padding: EdgeInsets.fromLTRB(
-                SpendWiseTheme.gutter,
-                0,
-                SpendWiseTheme.gutter,
-                96 + MediaQuery.viewPaddingOf(context).bottom,
-              ),
+        SpendWiseTheme.gutter,
+        0,
+        SpendWiseTheme.gutter,
+        96 + MediaQuery.viewPaddingOf(context).bottom,
+      ),
       sliver: SliverList.builder(
         itemCount: rows.length,
         itemBuilder: (context, index) {
@@ -76,7 +77,11 @@ class RiverView extends StatelessWidget {
 
 /// The header that names the two banks of the river.
 class RiverHeading extends StatelessWidget {
-  const RiverHeading({super.key, required this.inTotal, required this.outTotal});
+  const RiverHeading({
+    super.key,
+    required this.inTotal,
+    required this.outTotal,
+  });
 
   final int inTotal;
   final int outTotal;
@@ -304,11 +309,7 @@ class _SpinePainter extends CustomPainter {
       canvas.drawLine(Offset(0, midY), Offset(size.width, midY), arm);
     }
 
-    canvas.drawCircle(
-      Offset(centre, midY),
-      3.4,
-      Paint()..color = tone,
-    );
+    canvas.drawCircle(Offset(centre, midY), 3.4, Paint()..color = tone);
   }
 
   @override
@@ -339,12 +340,7 @@ class _Side extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.fromLTRB(
-      alignEnd ? 0 : 4,
-      11,
-      alignEnd ? 4 : 0,
-      11,
-    ),
+    padding: EdgeInsets.fromLTRB(alignEnd ? 0 : 4, 11, alignEnd ? 4 : 0, 11),
     child: Column(
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: alignEnd

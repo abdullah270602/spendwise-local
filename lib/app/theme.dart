@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'palette.dart';
 
 /// The palette is the one signed off in `design/shape.html`: a graphite ground

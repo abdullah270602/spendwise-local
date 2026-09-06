@@ -75,10 +75,7 @@ void main() {
     });
 
     test('after that each guess costs more', () {
-      expect(
-        AppLockController.penaltyFor(5),
-        const Duration(seconds: 30),
-      );
+      expect(AppLockController.penaltyFor(5), const Duration(seconds: 30));
       expect(AppLockController.penaltyFor(6), const Duration(minutes: 1));
       expect(AppLockController.penaltyFor(7), const Duration(minutes: 5));
       expect(AppLockController.penaltyFor(8), const Duration(minutes: 15));
@@ -122,10 +119,7 @@ void main() {
         AppLockController.lengthKey: '4',
       });
       var clock = DateTime(2026, 9, 6, 12);
-      final first = AppLockController(
-        preferences: storage,
-        now: () => clock,
-      );
+      final first = AppLockController(preferences: storage, now: () => clock);
       for (var i = 0; i < 5; i++) {
         expect(await first.submit('0000'), UnlockOutcome.wrong);
       }

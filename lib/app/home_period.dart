@@ -108,7 +108,10 @@ class HomePeriod {
             ? DateTime(anchor.year, anchor.month, endDay)
             : DateTime(anchor.year, anchor.month + 1, endDay);
         final endExclusive = closes.add(const Duration(days: 1));
-        return (anchor, endExclusive.isAfter(tomorrow) ? tomorrow : endExclusive);
+        return (
+          anchor,
+          endExclusive.isAfter(tomorrow) ? tomorrow : endExclusive,
+        );
     }
   }
 
@@ -138,9 +141,10 @@ class HomePeriod {
     HomePeriodKind.lastSevenDays => 'Last 7 days',
     HomePeriodKind.lastFourteenDays => 'Last 14 days',
     HomePeriodKind.lastThirtyDays => 'Last 30 days',
-    HomePeriodKind.dayRange => endDay > 0
-        ? 'The ${_ordinal(startDay)} to the ${_ordinal(endDay)}'
-        : 'From the ${_ordinal(startDay)} each month',
+    HomePeriodKind.dayRange =>
+      endDay > 0
+          ? 'The ${_ordinal(startDay)} to the ${_ordinal(endDay)}'
+          : 'From the ${_ordinal(startDay)} each month',
   };
 
   String get blurb => switch (kind) {
@@ -151,9 +155,10 @@ class HomePeriod {
       'A rolling fortnight, for pay that arrives every two weeks.',
     HomePeriodKind.lastThirtyDays =>
       'Always contains one pay cycle, whatever day it lands on.',
-    HomePeriodKind.dayRange => endDay > 0
-        ? 'A fixed window each cycle.'
-        : 'Your month starts when you get paid.',
+    HomePeriodKind.dayRange =>
+      endDay > 0
+          ? 'A fixed window each cycle.'
+          : 'Your month starts when you get paid.',
   };
 
   @override

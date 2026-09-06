@@ -48,8 +48,8 @@ class _LedgerScreenState extends State<LedgerScreen> {
 
   /// A search or a filter is a question about the whole ledger, not about one
   /// month, so it drops the month scope rather than quietly hiding matches.
-  bool get scoped => query.isEmpty && kind == null && accountId == null &&
-      category == null;
+  bool get scoped =>
+      query.isEmpty && kind == null && accountId == null && category == null;
 
   @override
   Widget build(BuildContext context) {
@@ -102,8 +102,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                 ),
               ),
             ),
-          if (scoped && showChart)
-            SliverToBoxAdapter(child: _chart(visible)),
+          if (scoped && showChart) SliverToBoxAdapter(child: _chart(visible)),
           if (!scoped)
             SliverToBoxAdapter(
               child: Padding(
@@ -346,8 +345,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
     return month.year == now.year && month.month == now.month;
   }
 
-  String get _currency =>
-      widget.viewModel.accounts.isEmpty
+  String get _currency => widget.viewModel.accounts.isEmpty
       ? 'PKR'
       : widget.viewModel.accounts.first.currency;
 
@@ -445,7 +443,9 @@ class _LedgerScreenState extends State<LedgerScreen> {
     var draftAccountId = accountId;
     var draftCategory = category;
     final categories =
-        widget.viewModel.transactions.map((item) => item.category).toSet()
+        widget.viewModel.transactions
+            .map((item) => item.category)
+            .toSet()
             .toList()
           ..sort();
     showModalBottomSheet<void>(
@@ -481,9 +481,8 @@ class _LedgerScreenState extends State<LedgerScreen> {
                           TransactionKind.transfer => 'Between your accounts',
                         }),
                         selected: draftKind == value,
-                        onSelected: (selected) => refresh(
-                          () => draftKind = selected ? value : null,
-                        ),
+                        onSelected: (selected) =>
+                            refresh(() => draftKind = selected ? value : null),
                       ),
                   ],
                 ),

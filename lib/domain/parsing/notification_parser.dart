@@ -21,6 +21,7 @@ final class NotificationParser {
     r'\bbal(?:ance)?\b[^0-9]{0,15}$',
     caseSensitive: false,
   );
+
   /// A charge quoted beside the amount is not the amount. Pakistani transfer
   /// alerts routinely end "... Fee: Rs.15.00", which used to make the alert
   /// ambiguous and drop a real payment on the floor.
@@ -345,8 +346,10 @@ final class NotificationParser {
       final prefix = name.substring(0, iban.start).trim();
       // "RAAST IBAN:" adds nothing once the bank is named.
       final label = prefix
-          .replaceAll(RegExp(r'\b(?:IBAN|RAAST|A\/?C)\b[:\s]*',
-              caseSensitive: false), '')
+          .replaceAll(
+            RegExp(r'\b(?:IBAN|RAAST|A\/?C)\b[:\s]*', caseSensitive: false),
+            '',
+          )
           .trim();
       return label.isEmpty ? '$bank ••$tail' : '$label · $bank ••$tail';
     }

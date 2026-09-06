@@ -134,10 +134,7 @@ void main() {
     expect(HomePeriod.calendarMonth.label(now), 'November');
     expect(HomePeriod.lastThirtyDays.label(now), 'Last 30 days');
     expect(
-      const HomePeriod(
-        kind: HomePeriodKind.dayRange,
-        startDay: 3,
-      ).label(now),
+      const HomePeriod(kind: HomePeriodKind.dayRange, startDay: 3).label(now),
       '3 Nov – 10 Nov',
     );
     expect(

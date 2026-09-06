@@ -96,7 +96,8 @@ void main() {
       expect(
         result.parserId,
         'pk.otp',
-        reason: 'the bank sends the settlement separately; booking both '
+        reason:
+            'the bank sends the settlement separately; booking both '
             'double-counts the purchase',
       );
     });
@@ -117,10 +118,13 @@ void main() {
     });
   });
 
-  test('an advert with no amount is dropped as marketing, not as unreadable', () {
-    // Both paths end in "ignored", but the reason is what the user reads.
-    final result = parse('Congratulations! Big prizes await. Dial *123 now.');
-    expect(result.parserId, 'pk.marketing');
-    expect(result.reasons.single, contains('Promotional'));
-  });
+  test(
+    'an advert with no amount is dropped as marketing, not as unreadable',
+    () {
+      // Both paths end in "ignored", but the reason is what the user reads.
+      final result = parse('Congratulations! Big prizes await. Dial *123 now.');
+      expect(result.parserId, 'pk.marketing');
+      expect(result.reasons.single, contains('Promotional'));
+    },
+  );
 }

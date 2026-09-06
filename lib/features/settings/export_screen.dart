@@ -24,7 +24,12 @@ class _ExportScreenState extends State<ExportScreen> {
     body: SafeArea(
       top: false,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(SpendWiseTheme.gutter, 8, SpendWiseTheme.gutter, 48),
+        padding: const EdgeInsets.fromLTRB(
+          SpendWiseTheme.gutter,
+          8,
+          SpendWiseTheme.gutter,
+          48,
+        ),
         children: [
           Container(
             padding: const EdgeInsets.all(14),

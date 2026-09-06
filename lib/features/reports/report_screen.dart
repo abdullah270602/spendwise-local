@@ -137,9 +137,8 @@ class _ReportScreenState extends State<ReportScreen> {
     setState(() => working = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final bytes = await SpendingReport(
-        palette: SpendWiseColors.palette,
-      ).build(data);
+      final bytes = await SpendingReport(palette: SpendWiseColors.palette)
+          .build(data);
       final name =
           'spendwise-${data.request.label.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-')}.pdf';
       final saved = await FilePicker.platform.saveFile(
@@ -152,9 +151,7 @@ class _ReportScreenState extends State<ReportScreen> {
       if (!mounted) return;
       messenger.showSnackBar(
         SnackBar(
-          content: Text(
-            saved == null ? 'Report discarded.' : 'Report saved.',
-          ),
+          content: Text(saved == null ? 'Report discarded.' : 'Report saved.'),
         ),
       );
     } catch (error) {
@@ -249,7 +246,10 @@ class _TemplateThumb extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Expanded(flex: 7, child: Container(color: SpendWiseColors.keep)),
+                Expanded(
+                  flex: 7,
+                  child: Container(color: SpendWiseColors.keep),
+                ),
                 const SizedBox(width: 2),
                 Expanded(
                   flex: 3,

@@ -109,28 +109,32 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
       [
         SpotlightStop(
           title: 'Home',
-          body: 'Of everything that arrived, how much is still yours. '
+          body:
+              'Of everything that arrived, how much is still yours. '
               'Nothing else.',
           rect: () => _tabRect(0) ?? Rect.zero,
           onEnter: () => _selectPage(0),
         ),
         SpotlightStop(
           title: 'Review',
-          body: 'Anything SpendWise is unsure of waits here. A badge of two '
+          body:
+              'Anything SpendWise is unsure of waits here. A badge of two '
               'means two questions, not two alerts.',
           rect: () => _tabRect(2) ?? Rect.zero,
           onEnter: () => _selectPage(2),
         ),
         SpotlightStop(
           title: 'Ledger',
-          body: 'Every entry, newest first. Tap one to fix its category, its '
+          body:
+              'Every entry, newest first. Tap one to fix its category, its '
               'direction or its account.',
           rect: () => _tabRect(1) ?? Rect.zero,
           onEnter: () => _selectPage(1),
         ),
         SpotlightStop(
           title: 'Accounts',
-          body: 'Where alerts land. Add the last digits and they file '
+          body:
+              'Where alerts land. Add the last digits and they file '
               'themselves.',
           rect: () => _tabRect(4) ?? Rect.zero,
           onEnter: () => _selectPage(4),
@@ -214,8 +218,7 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
         // Ledger only: on Home it floated over the last line of the summary,
         // and adding an entry by hand is something you do while reading the
         // register, not while reading the month's shape.
-        floatingActionButton:
-            index == 1 && widget.viewModel.accounts.isNotEmpty
+        floatingActionButton: index == 1 && widget.viewModel.accounts.isNotEmpty
             ? FloatingActionButton.small(
                 onPressed: () => _showManual(context),
                 tooltip: 'Record something by hand',

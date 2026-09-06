@@ -54,7 +54,8 @@ class _SplitMarkPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final scale = size.shortestSide /
+    final scale =
+        size.shortestSide /
         (_contentHeight > _contentWidth ? _contentHeight : _contentWidth);
     final dx = (size.width - _contentWidth * scale) / 2 - _contentLeft * scale;
     final dy = (size.height - _contentHeight * scale) / 2 - _contentTop * scale;

@@ -145,9 +145,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 child: PrimaryAction(
                   label: switch (page) {
                     0 => 'Set it up',
-                    1 => viewModel.notificationAccessGranted
-                        ? 'Next'
-                        : 'Skip for now',
+                    1 =>
+                      viewModel.notificationAccessGranted
+                          ? 'Next'
+                          : 'Skip for now',
                     _ => 'Next',
                   },
                   onPressed: () => _go(page + 1),

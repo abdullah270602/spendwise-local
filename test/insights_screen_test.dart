@@ -34,10 +34,7 @@ void main() {
 
     await tester.tap(find.text('Entertainment'));
     await tester.pumpAndSettle();
-    expect(
-      find.text('ENTERTAINMENT SPENDING OVER TIME'),
-      findsOneWidget,
-    );
+    expect(find.text('ENTERTAINMENT SPENDING OVER TIME'), findsOneWidget);
     expect(find.text('WHERE YOUR MONEY WENT'), findsNothing);
   });
 }

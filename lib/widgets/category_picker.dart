@@ -19,11 +19,8 @@ Future<String?> pickCategory(
   isScrollControlled: true,
   showDragHandle: true,
   useSafeArea: true,
-  builder: (sheetContext) => _CategorySheet(
-    viewModel: viewModel,
-    kind: kind,
-    current: current,
-  ),
+  builder: (sheetContext) =>
+      _CategorySheet(viewModel: viewModel, kind: kind, current: current),
 );
 
 /// Twenty categories in one alphabetical column is a list you read; grouped by
@@ -88,7 +85,9 @@ class _CategorySheetState extends State<_CategorySheet> {
     final usable = widget.viewModel.uiCategories
         .where((item) => !_loanCategories.contains(item.id))
         .where((item) => item.suits(widget.kind))
-        .where((item) => query.isEmpty || item.name.toLowerCase().contains(query))
+        .where(
+          (item) => query.isEmpty || item.name.toLowerCase().contains(query),
+        )
         .toList();
 
     final mine = usable.where((item) => !item.isSystem).toList();

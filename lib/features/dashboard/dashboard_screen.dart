@@ -218,14 +218,9 @@ class DashboardScreen extends StatelessWidget {
             ),
             if (ownMoves.isNotEmpty)
               SliverToBoxAdapter(
-                child: _OwnMovesNote(
-                  moves: ownMoves,
-                  onTap: onOpenAccounts,
-                ),
+                child: _OwnMovesNote(moves: ownMoves, onTap: onOpenAccounts),
               ),
-            SliverToBoxAdapter(
-              child: _TrayScan(viewModel: viewModel),
-            ),
+            SliverToBoxAdapter(child: _TrayScan(viewModel: viewModel)),
           ],
           SliverToBoxAdapter(
             child: SizedBox(
@@ -411,10 +406,7 @@ class _SavingsStrip extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        formatMinor(
-                          account.balance.minorUnits,
-                          cents: false,
-                        ),
+                        formatMinor(account.balance.minorUnits, cents: false),
                         style: SpendWiseType.rowStrong.copyWith(fontSize: 13.5),
                       ),
                     ],
@@ -445,14 +437,12 @@ class _LoansNote extends StatelessWidget {
   Widget build(BuildContext context) {
     final open = viewModel.uiDebts.where((item) => !item.isSettled).toList();
     if (open.isEmpty) return const SizedBox.shrink();
-    final lentOut = open.where((item) => item.lent).fold<int>(
-      0,
-      (sum, item) => sum + item.outstanding.minorUnits,
-    );
-    final owed = open.where((item) => !item.lent).fold<int>(
-      0,
-      (sum, item) => sum + item.outstanding.minorUnits,
-    );
+    final lentOut = open
+        .where((item) => item.lent)
+        .fold<int>(0, (sum, item) => sum + item.outstanding.minorUnits);
+    final owed = open
+        .where((item) => !item.lent)
+        .fold<int>(0, (sum, item) => sum + item.outstanding.minorUnits);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -671,20 +661,18 @@ class _TrayScanState extends State<_TrayScan> {
           'Picked up ${result.queuedCount} '
               '${result.queuedCount == 1 ? 'alert' : 'alerts'} from the tray.',
       };
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not read the tray: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not read the tray: $error')),
+      );
     } finally {
       if (mounted) setState(() => running = false);
     }
   }
 }
-
 
 /// What Home says before any money has arrived in the window. It states the
 /// one true thing -- this much has gone out -- instead of drawing a
@@ -713,7 +701,6 @@ class _SpentOnly extends StatelessWidget {
     ],
   );
 }
-
 
 /// A single line, once, and then never again.
 ///

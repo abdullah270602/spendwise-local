@@ -101,7 +101,9 @@ class Spotlight with WidgetsBindingObserver {
     _index++;
     _stops[_index].onEnter?.call();
     // One frame for the tab switch to lay out before the hole is measured.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _entry?.markNeedsBuild());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _entry?.markNeedsBuild(),
+    );
     _entry?.markNeedsBuild();
   }
 

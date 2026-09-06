@@ -56,9 +56,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
               ),
               child: Row(
                 children: [
-                  Expanded(
-                    child: Text('Insights', style: SpendWiseType.title),
-                  ),
+                  Expanded(child: Text('Insights', style: SpendWiseType.title)),
                   ViewToggle(
                     options: const ['River', 'Flow', 'Detail'],
                     selected: view.index,
@@ -258,10 +256,8 @@ class FlowSpine extends StatelessWidget {
     if (buckets.isEmpty) return SizedBox(height: height);
     final peak = buckets.fold<int>(
       1,
-      (best, bucket) => math.max(
-        best,
-        math.max(bucket.incomeMinor, bucket.spendingMinor),
-      ),
+      (best, bucket) =>
+          math.max(best, math.max(bucket.incomeMinor, bucket.spendingMinor)),
     );
     // Wide enough that a column is readable, narrow enough that a year of
     // months does not need six swipes.
@@ -272,9 +268,7 @@ class FlowSpine extends StatelessWidget {
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         reverse: true,
-        padding: const EdgeInsets.symmetric(
-          horizontal: SpendWiseTheme.gutter,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: SpendWiseTheme.gutter),
         itemCount: buckets.length,
         itemBuilder: (context, index) {
           final bucket = buckets[buckets.length - 1 - index];
@@ -390,7 +384,6 @@ class _SpineColumn extends StatelessWidget {
     );
   }
 }
-
 
 /// A one-line figure on the spine, in a box tall enough for exactly one line.
 class _Tick extends StatelessWidget {
@@ -665,10 +658,7 @@ class _TrendChartState extends State<_TrendChart> {
                 if (analytics.category == null)
                   _LegendDot(label: 'Income', color: SpendWiseColors.income),
                 const SizedBox(width: 12),
-                _LegendDot(
-                  label: 'Spent',
-                  color: SpendWiseColors.expense,
-                ),
+                _LegendDot(label: 'Spent', color: SpendWiseColors.expense),
               ],
             ),
             const SizedBox(height: 18),
@@ -689,8 +679,7 @@ class _TrendChartState extends State<_TrendChart> {
                       child: _BarColumn(
                         bucket: analytics.buckets[index],
                         maxValue: maxValue,
-                        selected:
-                            index == (selectedIndex ?? count - 1),
+                        selected: index == (selectedIndex ?? count - 1),
                         showIncome: analytics.category == null,
                         currency: analytics.currency,
                         onTap: () => setState(() => selectedIndex = index),

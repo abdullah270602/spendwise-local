@@ -103,18 +103,21 @@ void main() {
       accountSuffixes: {'nayapay': '9005'},
     );
 
-    test('the RAAST beneficiary IBAN matches the configured NayaPay account', () {
-      final result = read(
-        'RAAST Payment Rs. 80.0 successfully sent to RAAST IBAN: '
-        'PK00NAYA0000000000009005 from your JazzCash account.',
-      );
+    test(
+      'the RAAST beneficiary IBAN matches the configured NayaPay account',
+      () {
+        final result = read(
+          'RAAST Payment Rs. 80.0 successfully sent to RAAST IBAN: '
+          'PK00NAYA0000000000009005 from your JazzCash account.',
+        );
 
-      expect(
-        ownNayaPay.matchesAccount(result.candidate?.counterparty, 'nayapay'),
-        isTrue,
-        reason: 'JazzCash to your own NayaPay is a move, not spending',
-      );
-    });
+        expect(
+          ownNayaPay.matchesAccount(result.candidate?.counterparty, 'nayapay'),
+          isTrue,
+          reason: 'JazzCash to your own NayaPay is a move, not spending',
+        );
+      },
+    );
 
     test('a stranger at another bank does not match', () {
       final result = read(

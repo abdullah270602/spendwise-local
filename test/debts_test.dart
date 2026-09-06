@@ -37,10 +37,10 @@ void main() {
     final id = spend(ledger, 2000000);
 
     expect(
-      ledger.spendingByCategory(month: DateTime.utc(2026, 9)).values.fold<int>(
-        0,
-        (a, b) => a + b,
-      ),
+      ledger
+          .spendingByCategory(month: DateTime.utc(2026, 9))
+          .values
+          .fold<int>(0, (a, b) => a + b),
       2000000,
       reason: 'before marking, it is ordinary spending',
     );
@@ -128,10 +128,9 @@ void main() {
       transactionId: repayment,
     );
 
-    final settled = ledger
-        .snapshot()
-        .transactions
-        .firstWhere((item) => item.id == repayment);
+    final settled = ledger.snapshot().transactions.firstWhere(
+      (item) => item.id == repayment,
+    );
     expect(
       settled.debtId,
       debt.id,
@@ -172,7 +171,8 @@ void main() {
     expect(
       restored.debtId,
       isNull,
-      reason: 'what happened to the money is unchanged; only the promise is '
+      reason:
+          'what happened to the money is unchanged; only the promise is '
           'gone, so it counts as spending again',
     );
   });

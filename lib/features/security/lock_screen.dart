@@ -192,7 +192,9 @@ class _LockScreenState extends State<LockScreen>
           : 'Wrong PIN. $left tries before a wait.';
     }
     if (checking) return 'Checking';
-    return lock.biometricsEnabled ? 'Enter your PIN, or use your fingerprint' : '';
+    return lock.biometricsEnabled
+        ? 'Enter your PIN, or use your fingerprint'
+        : '';
   }
 
   static String _spell(Duration value) {

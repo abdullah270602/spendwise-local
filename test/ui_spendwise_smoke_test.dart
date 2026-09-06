@@ -32,24 +32,23 @@ void main() {
     expect(find.byTooltip('Settings and privacy'), findsOneWidget);
   });
 
-  testWidgets(
-    'settings sits on Home and manual entry stays account-gated',
-    (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: SpendWiseTheme.dark,
-          home: SpendWiseShell(viewModel: _EmptyViewModel()),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.byType(FloatingActionButton), findsNothing);
-      // The tab bar is five destinations of daily work; settings is a control.
-      expect(find.text('Settings'), findsNothing);
-      await tester.tap(find.byTooltip('Settings and privacy'));
-      await tester.pumpAndSettle();
-      expect(find.text('Settings & privacy'), findsOneWidget);
-    },
-  );
+  testWidgets('settings sits on Home and manual entry stays account-gated', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: SpendWiseShell(viewModel: _EmptyViewModel()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(FloatingActionButton), findsNothing);
+    // The tab bar is five destinations of daily work; settings is a control.
+    expect(find.text('Settings'), findsNothing);
+    await tester.tap(find.byTooltip('Settings and privacy'));
+    await tester.pumpAndSettle();
+    expect(find.text('Settings & privacy'), findsOneWidget);
+  });
 
   testWidgets('settings shows the installed version and GitHub repository', (
     tester,

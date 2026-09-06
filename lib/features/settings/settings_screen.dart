@@ -37,7 +37,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Settings & privacy')),
     body: ListView(
-      padding: const EdgeInsets.fromLTRB(SpendWiseTheme.gutter, 8, SpendWiseTheme.gutter, 48),
+      padding: const EdgeInsets.fromLTRB(
+        SpendWiseTheme.gutter,
+        8,
+        SpendWiseTheme.gutter,
+        48,
+      ),
       children: [
         const PrivacyBanner(),
         const SizedBox(height: 22),
@@ -145,7 +150,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   : viewModel.uiOwnNames.join(', '),
             ),
             trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () => _editOwnNames(context),
+            onTap: _editOwnNames,
           ),
         ),
         const SizedBox(height: 22),
@@ -207,9 +212,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               SwitchListTile(
                 secondary: const Icon(Icons.savings_outlined),
                 title: const Text('Show savings on Home'),
-            subtitle: const Text(
-              'Savings always remain available in Accounts and Insights',
-            ),
+                subtitle: const Text(
+                  'Savings always remain available in Accounts and Insights',
+                ),
                 value: viewModel.uiShowSavingsOnHome,
                 onChanged: changingSavingsVisibility
                     ? null
@@ -357,7 +362,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<void> _editOwnNames(BuildContext context) async {
+  Future<void> _editOwnNames() async {
     final controller = TextEditingController(
       text: viewModel.uiOwnNames.join(', '),
     );
@@ -379,9 +384,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             TextField(
               controller: controller,
               autofocus: true,
-              decoration: const InputDecoration(
-                hintText: 'Your Name, Y. Name',
-              ),
+              decoration: const InputDecoration(hintText: 'Your Name, Y. Name'),
             ),
           ],
         ),
@@ -397,7 +400,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
-    if (saved == true) {
+    // The dialog is an async gap: by the time it closes this screen may be
+    // gone, and the context that was good enough to open it is not
+    // automatically good enough to use again.
+    if (saved == true && mounted) {
       final names = controller.text
           .split(',')
           .map((name) => name.trim())
@@ -406,12 +412,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // that notifies listeners in the same frame the dialog route is still
       // unwinding is what produced the Dismissible zombie-widget bug earlier
       // in Review; the same race applies to any dialog-then-notify sequence.
+      // Grabbed before the gap: after an await, reading it off a context
+      // that may have gone is exactly the bug the lint is pointing at.
+      final messenger = ScaffoldMessenger.of(context);
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         try {
           await viewModel.uiSetOwnNames(names);
         } catch (error) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            messenger.showSnackBar(
               SnackBar(content: Text('Could not save your name(s): $error')),
             );
           }

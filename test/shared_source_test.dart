@@ -85,28 +85,22 @@ void main() {
     expect(transaction.accountId, ubl.id);
   });
 
-  test(
-    'an unroutable SMS is held for routing, never filed under the attached '
-    'account',
-    () {
-      final ledger = ledgerWithTwoBanks();
-      addTearDown(ledger.close);
+  test('an unroutable SMS is held for routing, never filed under the attached '
+      'account', () {
+    final ledger = ledgerWithTwoBanks();
+    addTearDown(ledger.close);
 
-      expect(
-        ingest(ledger, 'PKR 4,500.00 debited at EXAMPLE CLINIC'),
-        isTrue,
-      );
+    expect(ingest(ledger, 'PKR 4,500.00 debited at EXAMPLE CLINIC'), isTrue);
 
-      expect(
-        ledger.snapshot().transactions,
-        isEmpty,
-        reason: 'guessing an account is worse than asking',
-      );
-      final pending = ledger.unroutedAlerts();
-      expect(pending, hasLength(1));
-      expect(pending.single.body, contains('EXAMPLE CLINIC'));
-    },
-  );
+    expect(
+      ledger.snapshot().transactions,
+      isEmpty,
+      reason: 'guessing an account is worse than asking',
+    );
+    final pending = ledger.unroutedAlerts();
+    expect(pending, hasLength(1));
+    expect(pending.single.body, contains('EXAMPLE CLINIC'));
+  });
 
   test('routing held alerts files and re-reads them in one pass', () {
     final ledger = ledgerWithTwoBanks();
@@ -117,22 +111,15 @@ void main() {
     final held = ledger.unroutedAlerts();
     expect(held, hasLength(2));
 
-    final meezan = ledger
-        .snapshot()
-        .accounts
-        .firstWhere((a) => a.name == 'Meezan Debit');
-    final parsed = ledger.routeAlerts(
-      held.map((alert) => alert.id),
-      meezan.id,
+    final meezan = ledger.snapshot().accounts.firstWhere(
+      (a) => a.name == 'Meezan Debit',
     );
+    final parsed = ledger.routeAlerts(held.map((alert) => alert.id), meezan.id);
 
     expect(parsed, 2);
     expect(ledger.unroutedAlerts(), isEmpty);
     final transactions = ledger.snapshot().transactions;
     expect(transactions, hasLength(2));
-    expect(
-      transactions.every((item) => item.accountId == meezan.id),
-      isTrue,
-    );
+    expect(transactions.every((item) => item.accountId == meezan.id), isTrue);
   });
 }

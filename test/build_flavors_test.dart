@@ -34,12 +34,10 @@ void main() {
   test('each install says which one it is', () {
     // Same icon, same everything inside: without distinct labels these are
     // two identical rows in the launcher.
-    final live = File(
-      'android/app/src/live/res/values/strings.xml',
-    ).readAsStringSync();
-    final sandbox = File(
-      'android/app/src/sandbox/res/values/strings.xml',
-    ).readAsStringSync();
+    final live = File('android/app/src/live/res/values/strings.xml')
+        .readAsStringSync();
+    final sandbox = File('android/app/src/sandbox/res/values/strings.xml')
+        .readAsStringSync();
     expect(live, contains('>SpendWise<'));
     expect(sandbox, contains('>SpendWise Sandbox<'));
     expect(
@@ -51,9 +49,8 @@ void main() {
   test('class names in the manifest are spelled out in full', () {
     // Relative names would resolve against the sandbox application id, where
     // the classes do not exist, and the sandbox build would crash on launch.
-    final manifest = File(
-      'android/app/src/main/AndroidManifest.xml',
-    ).readAsStringSync();
+    final manifest = File('android/app/src/main/AndroidManifest.xml')
+        .readAsStringSync();
     expect(manifest, contains('android:name="com.spendwise.app.MainActivity"'));
     expect(
       manifest,
@@ -65,15 +62,15 @@ void main() {
   });
 
   test('no flavour smuggles in a permission', () {
-    final flavourManifests = [
-      'android/app/src/live',
-      'android/app/src/sandbox',
-    ].map(Directory.new).where((dir) => dir.existsSync()).expand(
-      (dir) => dir
-          .listSync(recursive: true)
-          .whereType<File>()
-          .where((file) => file.path.endsWith('AndroidManifest.xml')),
-    );
+    final flavourManifests = ['android/app/src/live', 'android/app/src/sandbox']
+        .map(Directory.new)
+        .where((dir) => dir.existsSync())
+        .expand(
+          (dir) => dir
+              .listSync(recursive: true)
+              .whereType<File>()
+              .where((file) => file.path.endsWith('AndroidManifest.xml')),
+        );
     for (final manifest in flavourManifests) {
       expect(
         manifest.readAsStringSync(),

@@ -197,10 +197,7 @@ class _PadKey extends StatelessWidget {
           : null,
       child: Opacity(
         opacity: enabled ? 1 : .35,
-        child: SizedBox(
-          height: 72,
-          child: Center(child: child),
-        ),
+        child: SizedBox(height: 72, child: Center(child: child)),
       ),
     ),
   );
@@ -220,9 +217,7 @@ class ShakeBox extends StatelessWidget {
       final t = animation.value;
       // Three decaying swings: enough to read as "no", short enough not to
       // delay the next attempt.
-      final offset = t == 0
-          ? 0.0
-          : (1 - t) * 9 * math.sin(t * math.pi * 6);
+      final offset = t == 0 ? 0.0 : (1 - t) * 9 * math.sin(t * math.pi * 6);
       return Transform.translate(offset: Offset(offset, 0), child: inner);
     },
     child: child,

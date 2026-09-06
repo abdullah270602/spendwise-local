@@ -65,16 +65,18 @@ void main() {
     ),
   ];
 
-  ReportData dataFor(ReportTemplate template, {List<TransactionViewData>? of}) =>
-      ReportData.gather(
-        request: ReportRequest.forRange(
-          ReportRange.thisMonth,
-          template,
-          now: DateTime(2026, 9, 30),
-        ),
-        transactions: of ?? ledger,
-        accounts: const [],
-      );
+  ReportData dataFor(
+    ReportTemplate template, {
+    List<TransactionViewData>? of,
+  }) => ReportData.gather(
+    request: ReportRequest.forRange(
+      ReportRange.thisMonth,
+      template,
+      now: DateTime(2026, 9, 30),
+    ),
+    transactions: of ?? ledger,
+    accounts: const [],
+  );
 
   test('the numbers a report is built from', () {
     final data = dataFor(ReportTemplate.shape);
@@ -90,9 +92,8 @@ void main() {
   });
 
   test('the shape template builds one page', () async {
-    final bytes = await const SpendingReport(
-      palette: SpendWisePalette.sage,
-    ).build(dataFor(ReportTemplate.shape));
+    final bytes = await const SpendingReport(palette: SpendWisePalette.sage)
+        .build(dataFor(ReportTemplate.shape));
 
     expect(bytes.lengthInBytes, greaterThan(2000));
     expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
@@ -100,18 +101,16 @@ void main() {
   });
 
   test('the statement template adds the register', () async {
-    final bytes = await const SpendingReport(
-      palette: SpendWisePalette.tide,
-    ).build(dataFor(ReportTemplate.statement));
+    final bytes = await const SpendingReport(palette: SpendWisePalette.tide)
+        .build(dataFor(ReportTemplate.statement));
 
     expect(bytes.lengthInBytes, greaterThan(2000));
     await File('build/report-statement.pdf').writeAsBytes(bytes);
   });
 
   test('an empty period still produces a readable page', () async {
-    final bytes = await const SpendingReport(
-      palette: SpendWisePalette.sage,
-    ).build(dataFor(ReportTemplate.shape, of: const []));
+    final bytes = await const SpendingReport(palette: SpendWisePalette.sage)
+        .build(dataFor(ReportTemplate.shape, of: const []));
 
     expect(bytes.lengthInBytes, greaterThan(1000));
     await File('build/report-empty.pdf').writeAsBytes(bytes);
@@ -119,9 +118,8 @@ void main() {
 
   test('every palette renders', () async {
     for (final palette in SpendWisePalette.all) {
-      final bytes = await SpendingReport(
-        palette: palette,
-      ).build(dataFor(ReportTemplate.shape));
+      final bytes = await SpendingReport(palette: palette)
+          .build(dataFor(ReportTemplate.shape));
       expect(bytes.lengthInBytes, greaterThan(2000), reason: palette.id);
     }
   });

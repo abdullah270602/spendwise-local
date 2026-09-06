@@ -760,10 +760,9 @@ final class LocalLedger {
             'DELETE FROM financial_evidence WHERE raw_observation_id = ?',
             [row['id']],
           );
-          _db.execute(
-            'DELETE FROM event_candidates WHERE observation_id = ?',
-            [row['id']],
-          );
+          _db.execute('DELETE FROM event_candidates WHERE observation_id = ?', [
+            row['id'],
+          ]);
           refreshed++;
         }
         // Retire alerts that carry no amount at all: they were never
@@ -1155,10 +1154,9 @@ final class LocalLedger {
   /// and the classifier reference them by id. Anything filed under it falls
   /// back to "Other" rather than losing its transaction.
   void removeCategory(String id) {
-    final rows = _db.select(
-      'SELECT is_system FROM categories WHERE id = ?',
-      [id],
-    );
+    final rows = _db.select('SELECT is_system FROM categories WHERE id = ?', [
+      id,
+    ]);
     if (rows.isEmpty || (rows.first['is_system'] as int) == 1) return;
     _db.execute(
       "UPDATE transactions SET category_id = 'other' WHERE category_id = ?",
@@ -1183,7 +1181,11 @@ final class LocalLedger {
       [transactionId],
     );
     if (rows.isEmpty) {
-      throw ArgumentError.value(transactionId, 'transactionId', 'No such entry');
+      throw ArgumentError.value(
+        transactionId,
+        'transactionId',
+        'No such entry',
+      );
     }
     final row = rows.first;
     final name = counterparty.trim();
@@ -1288,10 +1290,8 @@ final class LocalLedger {
     return rows.isEmpty ? null : rows.first;
   }
 
-  List<StoredDebt> debts({bool includeSettled = true}) => _debtQuery(
-    includeSettled ? '' : 'WHERE d.closed_at IS NULL',
-    const [],
-  );
+  List<StoredDebt> debts({bool includeSettled = true}) =>
+      _debtQuery(includeSettled ? '' : 'WHERE d.closed_at IS NULL', const []);
 
   List<StoredDebt> _debtQuery(String where, List<Object?> parameters) {
     final rows = _db.select('''

@@ -44,9 +44,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
             child: SwitchListTile(
               secondary: const Icon(Icons.lock_outline_rounded),
               title: const Text('Require a PIN'),
-              subtitle: Text(
-                lock.enabled ? '${lock.pinLength} digits' : 'Off',
-              ),
+              subtitle: Text(lock.enabled ? '${lock.pinLength} digits' : 'Off'),
               value: lock.enabled,
               onChanged: busy ? null : _toggle,
             ),
@@ -212,9 +210,8 @@ class _AppLockScreenState extends State<AppLockScreen> {
     await lock.enable(next, useBiometrics: lock.biometricsEnabled);
     if (!mounted) return;
     setState(() => busy = false);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('PIN changed')));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('PIN changed')));
   }
 }
 
@@ -224,5 +221,6 @@ class _Heading extends StatelessWidget {
   final String text;
 
   @override
-  Widget build(BuildContext context) => Text(text, style: SpendWiseType.eyebrow);
+  Widget build(BuildContext context) =>
+      Text(text, style: SpendWiseType.eyebrow);
 }

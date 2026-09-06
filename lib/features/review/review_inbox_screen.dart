@@ -94,11 +94,11 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: EdgeInsets.fromLTRB(
-                SpendWiseTheme.gutter,
-                22,
-                SpendWiseTheme.gutter,
-                96 + MediaQuery.viewPaddingOf(context).bottom,
-              ),
+                  SpendWiseTheme.gutter,
+                  22,
+                  SpendWiseTheme.gutter,
+                  96 + MediaQuery.viewPaddingOf(context).bottom,
+                ),
                 child: Container(
                   padding: const EdgeInsets.only(top: 13),
                   decoration: const BoxDecoration(

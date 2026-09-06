@@ -108,7 +108,10 @@ class _TopicRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(topic.title, style: SpendWiseType.lead.copyWith(fontSize: 16)),
+                Text(
+                  topic.title,
+                  style: SpendWiseType.lead.copyWith(fontSize: 16),
+                ),
                 const SizedBox(height: 2),
                 Text(
                   topic.summary,

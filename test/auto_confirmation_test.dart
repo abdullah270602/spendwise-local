@@ -195,9 +195,6 @@ void main() {
       isEmpty,
       reason: 'it must not surface as pending work in Review',
     );
-    expect(
-      ledger.alerts(onlyUnresolved: false).single.status,
-      'ignored',
-    );
+    expect(ledger.alerts(onlyUnresolved: false).single.status, 'ignored');
   });
 }

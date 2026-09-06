@@ -44,7 +44,12 @@ class TransactionDetailsScreen extends StatelessWidget {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(SpendWiseTheme.gutter, 10, SpendWiseTheme.gutter, 48),
+        padding: const EdgeInsets.fromLTRB(
+          SpendWiseTheme.gutter,
+          10,
+          SpendWiseTheme.gutter,
+          48,
+        ),
         children: [
           Card(
             child: Padding(
@@ -121,10 +126,7 @@ class TransactionDetailsScreen extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.layers_outlined,
-                    color: SpendWiseColors.accent,
-                  ),
+                  Icon(Icons.layers_outlined, color: SpendWiseColors.accent),
                   const SizedBox(width: 13),
                   Expanded(
                     child: Column(
@@ -586,7 +588,6 @@ class _Detail extends StatelessWidget {
     ),
   );
 }
-
 
 /// Lending is invisible to a bank alert, so this is where a person tells the
 /// ledger what really happened. Offered on every ordinary movement, and

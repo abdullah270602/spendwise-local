@@ -88,10 +88,7 @@ class ReportRequest {
         DateTime(today.year),
         DateTime(today.year, 12, 31),
       ),
-      ReportRange.everything => (
-        earliest ?? DateTime(today.year - 5),
-        today,
-      ),
+      ReportRange.everything => (earliest ?? DateTime(today.year - 5), today),
       ReportRange.custom => (
         customFrom ?? DateTime(today.year, today.month),
         customTo ?? today,
@@ -143,9 +140,8 @@ class ReportData {
 
   int get keptMinor => receivedMinor - spentMinor;
 
-  double get keptFraction => receivedMinor <= 0
-      ? 0
-      : (keptMinor / receivedMinor).clamp(0.0, 1.0);
+  double get keptFraction =>
+      receivedMinor <= 0 ? 0 : (keptMinor / receivedMinor).clamp(0.0, 1.0);
 
   bool get isEmpty => transactions.isEmpty;
 
@@ -162,11 +158,10 @@ class ReportData {
       59,
       59,
     );
-    final within =
-        transactions.where((item) {
-          final at = item.occurredAt.toLocal();
-          return !at.isBefore(request.from) && !at.isAfter(to);
-        }).toList()..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
+    final within = transactions.where((item) {
+      final at = item.occurredAt.toLocal();
+      return !at.isBefore(request.from) && !at.isAfter(to);
+    }).toList()..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
 
     var received = 0, spent = 0, moved = 0;
     final categories = <String, int>{};
@@ -320,53 +315,52 @@ class SpendingReport {
     ),
   );
 
-  pw.Widget _masthead(ReportData data, pw.Font bold, pw.Font mono) =>
-      pw.Column(
+  pw.Widget _masthead(ReportData data, pw.Font bold, pw.Font mono) => pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+      pw.Row(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.SizedBox(
-                width: 25,
-                height: 29,
-                child: pw.CustomPaint(painter: _paintMark),
-              ),
-              pw.SizedBox(width: 13),
-              pw.Expanded(
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(
-                      data.request.label,
-                      style: pw.TextStyle(
-                        font: bold,
-                        fontSize: 30,
-                        color: _ink,
-                        letterSpacing: -1,
-                      ),
-                    ),
-                    pw.SizedBox(height: 2),
-                    pw.Text(
-                      'SpendWise · ${data.transactions.length} '
-                      '${data.transactions.length == 1 ? 'entry' : 'entries'} '
-                      '· ${data.currency}',
-                      style: pw.TextStyle(
-                        font: mono,
-                        fontSize: 8,
-                        color: _muted,
-                        letterSpacing: .8,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          pw.SizedBox(
+            width: 25,
+            height: 29,
+            child: pw.CustomPaint(painter: _paintMark),
           ),
-          pw.SizedBox(height: 16),
-          pw.Container(height: 1.6, color: _ink),
+          pw.SizedBox(width: 13),
+          pw.Expanded(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  data.request.label,
+                  style: pw.TextStyle(
+                    font: bold,
+                    fontSize: 30,
+                    color: _ink,
+                    letterSpacing: -1,
+                  ),
+                ),
+                pw.SizedBox(height: 2),
+                pw.Text(
+                  'SpendWise · ${data.transactions.length} '
+                  '${data.transactions.length == 1 ? 'entry' : 'entries'} '
+                  '· ${data.currency}',
+                  style: pw.TextStyle(
+                    font: mono,
+                    fontSize: 8,
+                    color: _muted,
+                    letterSpacing: .8,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
-      );
+      ),
+      pw.SizedBox(height: 16),
+      pw.Container(height: 1.6, color: _ink),
+    ],
+  );
 
   pw.Widget _eyebrow(String text, pw.Font mono) => pw.Text(
     text.toUpperCase(),
@@ -786,11 +780,7 @@ class SpendingReport {
                 child: pw.Text(
                   _money(item.amount.minorUnits.abs()),
                   textAlign: pw.TextAlign.right,
-                  style: pw.TextStyle(
-                    font: medium,
-                    fontSize: 9.5,
-                    color: tone,
-                  ),
+                  style: pw.TextStyle(font: medium, fontSize: 9.5, color: tone),
                 ),
               ),
             ],
@@ -891,9 +881,7 @@ class SpendingReport {
   /// out. Authored on a 64-unit grid spanning x 10..52 and y 8..56, so it is
   /// fitted to the box rather than scaled off one axis.
   void _paintMark(PdfGraphics canvas, PdfPoint size) {
-    final scale = (size.x / 42) < (size.y / 48)
-        ? size.x / 42
-        : size.y / 48;
+    final scale = (size.x / 42) < (size.y / 48) ? size.x / 42 : size.y / 48;
     final dx = (size.x - 42 * scale) / 2;
     final dy = (size.y - 48 * scale) / 2;
     double x(double value) => dx + (value - 10) * scale;
@@ -921,9 +909,8 @@ class SpendingReport {
       ..fillPath();
   }
 
-  PdfColor _ramp(int index) => PdfColor.fromInt(
-    palette.ramp[index % palette.ramp.length].toARGB32(),
-  );
+  PdfColor _ramp(int index) =>
+      PdfColor.fromInt(palette.ramp[index % palette.ramp.length].toARGB32());
 
   static String _money(int minorUnits) {
     final value = (minorUnits.abs() / 100).toStringAsFixed(2);

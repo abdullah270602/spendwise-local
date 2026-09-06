@@ -98,10 +98,7 @@ class _Hint extends StatelessWidget {
       children: [
         Icon(icon, size: 16, color: tone),
         const SizedBox(width: 6),
-        Text(
-          label,
-          style: SpendWiseType.metaTight.copyWith(color: tone),
-        ),
+        Text(label, style: SpendWiseType.metaTight.copyWith(color: tone)),
       ],
     ),
   );
@@ -125,9 +122,7 @@ class _Outcome extends StatelessWidget {
                 : 'Deleted. It was never a transaction.',
             style: SpendWiseType.row.copyWith(
               fontSize: 14,
-              color: confirmed
-                  ? SpendWiseColors.keep
-                  : SpendWiseColors.spend,
+              color: confirmed ? SpendWiseColors.keep : SpendWiseColors.spend,
             ),
           ),
         ),
@@ -257,8 +252,7 @@ class CopyPromptButton extends StatelessWidget {
       'the device.\n\n'
       'Here is the part of its guide I am asking about.';
 
-  String get prompt =>
-      '$_preamble\n\n--- $title ---\n$brief\n\nMy question: ';
+  String get prompt => '$_preamble\n\n--- $title ---\n$brief\n\nMy question: ';
 
   Future<void> _copy(BuildContext context) async {
     await Clipboard.setData(ClipboardData(text: prompt));
@@ -291,9 +285,7 @@ class CopyPromptButton extends StatelessWidget {
                 children: [
                   const Eyebrow('What went on the clipboard'),
                   const SizedBox(height: 9),
-                  const _Bullet(
-                    'What SpendWise is, and that it works offline',
-                  ),
+                  const _Bullet('What SpendWise is, and that it works offline'),
                   _Bullet('This whole section: $title'),
                   _Bullet('A blank line for your question at the end'),
                 ],
@@ -387,10 +379,7 @@ class _Bullet extends StatelessWidget {
         ),
         const SizedBox(width: 9),
         Expanded(
-          child: Text(
-            text,
-            style: SpendWiseType.body.copyWith(fontSize: 12.5),
-          ),
+          child: Text(text, style: SpendWiseType.body.copyWith(fontSize: 12.5)),
         ),
       ],
     ),

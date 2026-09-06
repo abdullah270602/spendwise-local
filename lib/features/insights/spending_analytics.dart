@@ -15,8 +15,7 @@ extension AnalyticsResolutionCopy on AnalyticsResolution {
 
   /// The unit one bar covers.
   String get cadence => switch (this) {
-    AnalyticsResolution.last7Days ||
-    AnalyticsResolution.last30Days => 'day',
+    AnalyticsResolution.last7Days || AnalyticsResolution.last30Days => 'day',
     AnalyticsResolution.months => 'month',
     AnalyticsResolution.years => 'year',
   };
@@ -104,16 +103,13 @@ final class SpendingAnalytics {
     // The comparison period is always the window immediately before this one,
     // so "spending rate" answers "against the last stretch of the same length".
     final previousStart = switch (resolution) {
-      AnalyticsResolution.last7Days ||
-      AnalyticsResolution.last30Days => start.subtract(
-        Duration(days: resolution.dayCount),
-      ),
+      AnalyticsResolution.last7Days || AnalyticsResolution.last30Days =>
+        start.subtract(Duration(days: resolution.dayCount)),
       AnalyticsResolution.months => DateTime(start.year - 1, start.month),
       AnalyticsResolution.years => start,
     };
     final previousEndExclusive = switch (resolution) {
-      AnalyticsResolution.last7Days ||
-      AnalyticsResolution.last30Days => start,
+      AnalyticsResolution.last7Days || AnalyticsResolution.last30Days => start,
       AnalyticsResolution.months => DateTime(
         endExclusive.year - 1,
         endExclusive.month,
