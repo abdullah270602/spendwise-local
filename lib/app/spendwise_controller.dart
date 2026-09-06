@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import '../core/perf.dart';
+import '../core/source_label.dart';
 import '../data/ledger_exporter.dart';
 import '../data/local_ledger.dart';
 import '../domain/domain.dart' as domain;
@@ -370,18 +371,25 @@ final class SpendWiseController extends ChangeNotifier
         ),
     // Grouped per app: a single "N observations need setup" total gave no
     // clue which app to fix, so the whole pile stayed untouched.
-    for (final source in _ledger.unparsedBySource())
-      ReviewViewData(
-        id: '$_unparsedPrefix${source.packageName ?? ''}',
-        reason: ReviewReason.parseFailed,
-        title:
-            '${source.count} unread alert${source.count == 1 ? '' : 's'} from ${source.displayName}',
-        description: source.needsAccount
-            ? 'These are not linked to an account yet, so nothing from ${source.displayName} reaches your ledger. Attach it to an account to capture them.'
-            : '${source.reason ?? 'SpendWise could not read these as transactions.'} If ${source.displayName} does not send payment alerts, dismiss them.',
-        transactions: const [],
-      ),
+    for (final source in _ledger.unparsedBySource()) _unparsedReview(source),
   ];
+
+  /// One "we could not read these" question, named after the app a person
+  /// would recognise rather than the package id the database happened to
+  /// store.
+  ReviewViewData _unparsedReview(UnparsedSourceSummary source) {
+    final app = _appLabel(source.packageName, source.displayName);
+    return ReviewViewData(
+      id: '$_unparsedPrefix${source.packageName ?? ''}',
+      reason: ReviewReason.parseFailed,
+      title:
+          '${source.count} unread alert${source.count == 1 ? '' : 's'} from $app',
+      description: source.needsAccount
+          ? 'These are not linked to an account yet, so nothing from $app reaches your ledger. Attach it to an account to capture them.'
+          : '${source.reason ?? 'SpendWise could not read these as transactions.'} If $app does not send payment alerts, dismiss them.',
+      transactions: const [],
+    );
+  }
 
   @override
   List<SourceViewData> get sources => _nativeSources
@@ -663,6 +671,18 @@ final class SpendWiseController extends ChangeNotifier
   }
 
   static const _unparsedPrefix = 'unparsed:';
+
+  /// Real app names for everything Android currently reports, so Review can
+  /// name the app instead of quoting its package id.
+  Map<String, String> get _installedLabels => {
+    for (final source in _nativeSources) source.packageName: source.label,
+  };
+
+  String _appLabel(String? packageName, String stored) => sourceLabel(
+    packageName: packageName,
+    stored: stored,
+    installedLabels: _installedLabels,
+  );
 
   @override
   Future<void> resolveReview(String id, {required bool merge}) async {

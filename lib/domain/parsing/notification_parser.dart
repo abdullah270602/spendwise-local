@@ -33,6 +33,11 @@ final class NotificationParser {
   static final RegExp _debitWords = RegExp(
     r'\b(?:debit(?:ed)?|paid|sent|spent|purchase(?:d)?|withdrawn?|withdrawal|'
     r'deducted|charged|transfer(?:red)?\s+to|used\s+(?:at|for|on)|'
+    // A telco or a merchant app reports a purchase in service words, never in
+    // banking ones: "You subscribed to X for Rs 4,500" is money leaving even
+    // though no bank verb appears. Past tense only -- "subscribe to our
+    // newsletter" is an invitation, and "subscribe now" is already marketing.
+    r'subscribed\s+to|renewed|recharged\s+(?:with|for)|topped\s+up\s+with|'
     // "credited to <someone> from your account" is money leaving. Marking
     // the source side as a debit signal makes such wording read as
     // contradictory, so it goes to review instead of being booked as income.
