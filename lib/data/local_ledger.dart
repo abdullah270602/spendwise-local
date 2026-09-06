@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:uuid/uuid.dart';
 
+import '../core/notification_noise.dart';
 import '../core/perf.dart';
 import '../domain/domain.dart';
 
@@ -311,6 +312,17 @@ final class LocalLedger {
   void resetEvidenceRefreshForTests() => _db.execute(
     "DELETE FROM app_settings WHERE key = 'refresh_stored_evidence_v11'",
   );
+
+  @visibleForTesting
+  void resetBackgroundNoticeCleanupForTests() => _db.execute(
+    "DELETE FROM app_settings WHERE key = 'drop_background_notices_v1'",
+  );
+
+  /// Stores a notice the way builds before the capture filter did, so the
+  /// cleanup migration has something to clean up.
+  @visibleForTesting
+  bool ingestNoticeBypassingFilterForTests(Map<String, Object?> envelope) =>
+      _ingestNotification(envelope, reconcile: true, filterNoise: false);
 
   T runAtomic<T>(T Function() operation) {
     _db.execute('BEGIN IMMEDIATE');
@@ -688,6 +700,7 @@ final class LocalLedger {
     ''');
     _recategorizeAutomaticTransactions();
     _dedupeRankingVolatileNotificationDuplicates();
+    _dropStoredBackgroundNotices();
     _refreshStoredEvidence();
     _db.execute('PRAGMA user_version = 3');
   }
@@ -805,6 +818,37 @@ final class LocalLedger {
       "INSERT OR REPLACE INTO app_settings(key,value) VALUES ('refresh_stored_evidence_v11','done')",
     );
     if (refreshed > 0) _reconcile();
+  }
+
+  /// Clears out background-service notices captured before they were being
+  /// filtered. Without this the ones already on file keep asking their
+  /// non-question, and the user has no way to make them stop -- dismissing
+  /// them was exactly what did not work.
+  void _dropStoredBackgroundNotices() {
+    const key = 'drop_background_notices_v1';
+    if (_db.select('SELECT 1 FROM app_settings WHERE key = ?', [
+      key,
+    ]).isNotEmpty) {
+      return;
+    }
+    final rows = _db.select('''
+      SELECT r.id AS id, s.payload_json AS payload
+      FROM raw_observations r
+      JOIN raw_notification_snapshots s ON s.raw_observation_id = r.id
+      WHERE r.parse_status IN ('review', 'error', 'ignored')
+    ''');
+    var removed = 0;
+    for (final row in rows) {
+      final decoded = jsonDecode(row['payload'] as String);
+      if (decoded is! Map) continue;
+      if (!isBackgroundServiceNotice(decoded.cast<String, Object?>())) continue;
+      _db.execute('DELETE FROM raw_observations WHERE id = ?', [row['id']]);
+      removed++;
+    }
+    _db.execute('INSERT OR REPLACE INTO app_settings(key,value) VALUES (?,?)', [
+      key,
+      '$removed',
+    ]);
   }
 
   /// One-time cleanup for a fixed bug: the native capture path used to hash
@@ -2054,7 +2098,13 @@ final class LocalLedger {
   bool _ingestNotification(
     Map<String, Object?> envelope, {
     required bool reconcile,
+    bool filterNoise = true,
   }) {
+    // Dropped rather than stored: a foreground-service notice is furniture,
+    // and Android re-posts it, so anything short of discarding it produces
+    // the same non-question again tomorrow. Reported as handled, because it
+    // was -- there is nothing here to come back to.
+    if (filterNoise && isBackgroundServiceNotice(envelope)) return true;
     final stablePayload = Map<String, Object?>.from(envelope)
       ..remove('id')
       ..remove('capturedAt')
