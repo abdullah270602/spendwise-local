@@ -2650,6 +2650,10 @@ final class LocalLedger {
     if (demoDataEnabled) return;
     _db.execute('BEGIN IMMEDIATE');
     try {
+      // Six accounts, deliberately unequal. Accounts draws each one to
+      // scale, so a seed with two similar balances shows none of that -- the
+      // ladder from a salary account down to a nearly-empty wallet is the
+      // thing worth demonstrating, in both zones.
       final bank = addAccount(
         name: 'Demo Meezan Current',
         type: AccountType.bank,
@@ -2657,12 +2661,40 @@ final class LocalLedger {
         accountSuffix: '4821',
         openingBalanceMinor: 18500000,
       );
+      final salary = addAccount(
+        name: 'Demo UBL Salary',
+        type: AccountType.bank,
+        institutionName: 'UBL',
+        accountSuffix: '7719',
+        openingBalanceMinor: 12120000,
+      );
       final wallet = addAccount(
         name: 'Demo SadaPay Wallet',
         type: AccountType.wallet,
         institutionName: 'SadaPay',
         accountSuffix: '9012',
         openingBalanceMinor: 2450000,
+      );
+      final pocket = addAccount(
+        name: 'Demo JazzCash',
+        type: AccountType.wallet,
+        institutionName: 'JazzCash',
+        accountSuffix: '3388',
+        openingBalanceMinor: 400000,
+      );
+      final emergency = addAccount(
+        name: 'Demo Emergency Fund',
+        type: AccountType.savings,
+        institutionName: 'Meezan Bank',
+        accountSuffix: '5540',
+        openingBalanceMinor: 25000000,
+      );
+      final hajj = addAccount(
+        name: 'Demo Hajj Fund',
+        type: AccountType.savings,
+        institutionName: 'UBL',
+        accountSuffix: '6612',
+        openingBalanceMinor: 8650000,
       );
       final now = DateTime.now();
       final transactionIds = <String>[
@@ -2707,8 +2739,24 @@ final class LocalLedger {
           description: 'Demo electricity bill',
           categoryId: 'bills',
         ),
+        addManualTransaction(
+          kind: TransactionKind.expense,
+          amountMinor: 280000,
+          occurredAt: now.subtract(const Duration(days: 5)),
+          accountId: salary,
+          description: 'Demo grocery run',
+          categoryId: 'groceries',
+        ),
+        addManualTransaction(
+          kind: TransactionKind.expense,
+          amountMinor: 88000,
+          occurredAt: now.subtract(const Duration(days: 6)),
+          accountId: pocket,
+          description: 'Demo ride home',
+          categoryId: 'transport',
+        ),
       ];
-      for (final id in [bank, wallet]) {
+      for (final id in [bank, salary, wallet, pocket, emergency, hajj]) {
         _db.execute(
           "INSERT INTO demo_entities(entity_type,entity_id) VALUES ('account',?)",
           [id],

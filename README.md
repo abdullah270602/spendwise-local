@@ -62,7 +62,9 @@ something else entirely — and the direction comes from the verb, because most
 alerts carry no plus or minus at all.
 
 When it is unsure, it says so rather than guessing. Ten alerts uncertain for
-the same reason become **one** question in Review, not ten.
+the same reason become **one** question in Review, not ten — and an alert it
+cannot read at all is not a dead end: say which way the money went and it
+files the rest itself.
 
 <br>
 
@@ -84,6 +86,10 @@ pay cycle.
 
 **Knows lending from spending.** Money you lent is coming back, so it stops
 counting against your month.
+
+**Learns where things go.** File the same shop or person under the same
+category three times and SpendWise starts doing it for you. Disagree once and
+it stops.
 
 **Gives it all back.** A PDF report, or the whole ledger as CSV or JSON.
 Nothing here is locked in.

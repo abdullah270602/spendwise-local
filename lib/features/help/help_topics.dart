@@ -158,7 +158,11 @@ List<HelpTopic> helpTopics(SpendWiseViewModel viewModel) => [
         'for word. Alerts that are readable but have no account to land in — '
         'a bank you have not added, or digits matching nothing — sit at the '
         'top of Review; tell SpendWise which account they belong to and it '
-        'reads them again.',
+        'reads them again. Alerts it cannot read at all are usually still '
+        'real payments, so Review offers to file them: say which way the '
+        'money went and SpendWise supplies the rest, from the amount it did '
+        'read. Dropping them is there too, for the ones that were never '
+        'transactions.',
     body: () => [
       const HelpExample(
         framed: false,
@@ -175,6 +179,12 @@ List<HelpTopic> helpTopics(SpendWiseViewModel viewModel) => [
         'Readable, but with no account to land in. Say which account, and '
         'they are read again properly.',
       ),
+      const HelpHeading('Alerts it could not read'),
+      const HelpProse(
+        'Usually a real payment in wording SpendWise does not know yet. Say '
+        'whether the money went out or came in and it files them, using the '
+        'amount it did read.',
+      ),
     ],
   ),
 
@@ -190,9 +200,13 @@ List<HelpTopic> helpTopics(SpendWiseViewModel viewModel) => [
         'direction when money read as spending was actually income or the '
         'reverse, and the account it was filed against. Correcting one entry '
         'usually prompts Review to offer to fix every other entry of the same '
-        'shape. Cash spending leaves no alert at all, so add it by hand with '
-        'the + button on Ledger; it sits in the same register as everything '
-        'else.',
+        'shape. File the same person or shop under the same category three '
+        'times and SpendWise starts doing it for you; disagree once and it '
+        'stops immediately. Ledger shows one month at a time — the control '
+        'beside search opens the whole ledger when you are looking for '
+        'something older. Cash spending leaves no alert at all, so add it by '
+        'hand with the + button on Ledger; it sits in the same register as '
+        'everything else.',
     body: () => [
       const HelpStep(
         index: 1,
@@ -236,7 +250,10 @@ List<HelpTopic> helpTopics(SpendWiseViewModel viewModel) => [
         'it, and savings are drawn as a separate zone in Accounts, scaled on '
         'its own so a large balance does not squash everything else. An app '
         'that carries several banks, such as your messages app, is never tied '
-        'to one account: its alerts are filed by what each one says.',
+        'to one account: its alerts are filed by what each one says. When a '
+        'balance drifts from what the bank says, correcting it writes a '
+        'Balance adjustment entry for the difference rather than quietly '
+        'moving the number, so the ledger still explains itself.',
     body: () => [
       HelpExample(
         caption:
