@@ -139,3 +139,29 @@ int savedInWindow({
   }
   return net;
 }
+
+/// Money that left the spendable accounts over [from]..[to] for reasons that
+/// are not spending: lending it out, and handing back something borrowed.
+///
+/// Home's headline used to be `received - spent`, which quietly assumes
+/// spending is the only way money leaves. It is not, and when it is not the
+/// figure drifts from reality by exactly the amount ignored — far enough that
+/// Home and Accounts cannot be reconciled by hand.
+///
+/// Both directions are expenses carrying a debt: lending money out, and
+/// paying money back. Both leave the account, and neither is spending.
+int debtOutflowInWindow({
+  required Iterable<TransactionViewData> transactions,
+  required DateTime from,
+  required DateTime to,
+}) {
+  var total = 0;
+  for (final item in transactions) {
+    if (item.debtId == null) continue;
+    if (item.kind != TransactionKind.expense) continue;
+    final local = item.occurredAt.toLocal();
+    if (local.isBefore(from) || !local.isBefore(to)) continue;
+    total += item.amount.minorUnits.abs();
+  }
+  return total;
+}

@@ -31,7 +31,6 @@ class DashboardScreen extends StatelessWidget {
 
     final received = data.incomeThisMonth.minorUnits;
     final spent = data.spendingThisMonth.minorUnits;
-    final kept = received - spent;
     final anything = received != 0 || spent != 0;
     // A share of nothing is not a share. Before any income lands in the
     // window the ribbon would split |kept| against |spent| and draw a
@@ -46,6 +45,16 @@ class DashboardScreen extends StatelessWidget {
     );
 
     final (windowFrom, windowTo) = period.resolve(now);
+    // Everything that left, not just what was spent. Lending money out and
+    // handing back something borrowed both empty the account without being
+    // spending, and leaving them out made the headline drift from the
+    // balances by exactly the amount ignored.
+    final debtOutflow = debtOutflowInWindow(
+      transactions: viewModel.transactions,
+      from: windowFrom,
+      to: windowTo,
+    );
+    final kept = received - spent - debtOutflow;
     final savingsStyle = HomeSavingsStyle.fromId(
       viewModel.uiViewPreference('home_savings'),
       legacyOn: viewModel.uiShowSavingsOnHome,
