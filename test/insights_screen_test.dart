@@ -19,8 +19,10 @@ void main() {
     expect(find.text('Insights'), findsOneWidget);
     // Detail is the default view now: thirty days of all spending is the
     // question people arrive with.
-    expect(find.text('Total tracked'), findsOneWidget);
     expect(find.text('MONEY MOVING OVER TIME'), findsOneWidget);
+    // Balances are not repeated here. Insights is about what money did over
+    // a period; what is left in each account is what Accounts is for.
+    expect(find.text('Total tracked'), findsNothing);
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
     await tester.pumpAndSettle();
     expect(find.text('WHERE YOUR MONEY WENT'), findsOneWidget);

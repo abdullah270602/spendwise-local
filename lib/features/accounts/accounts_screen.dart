@@ -93,23 +93,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
                 children: [
                   Row(
                     children: [
-                      // No headline total here.
-                      //
-                      // It claimed to be the answer to a question this screen
-                      // is not answering. Home already says what happened to
-                      // your money over a period; Accounts says where the
-                      // money is now, per account, and the two are different
-                      // numbers by design. Printing a grand total at the top
-                      // of one of them invited the comparison and lost it --
-                      // the shares underneath did not even sum to 100%,
-                      // because money out on loan is in the total but in
-                      // neither share.
-                      Expanded(
-                        child: Eyebrow(
-                          'Where your money is · '
-                          '${viewModel.accounts.first.currency}',
-                        ),
-                      ),
+                      const Spacer(),
                       ViewToggle(
                         options: const ['Map', 'Plain'],
                         selected: asMap ? 0 : 1,
@@ -179,7 +163,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
                   ..._blocks(everyday),
                 ],
                 if (savings.isNotEmpty) ...[
-                  _zone('Held back · savings', savingsTotal),
+                  _zone('Savings', savingsTotal),
                   ..._blocks(savings),
                 ],
                 ..._loans(),

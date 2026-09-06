@@ -283,7 +283,7 @@ void main() {
     expect(find.text('Rainy day'), findsOneWidget);
     // Nothing spendable exists, so the map has no "available" zone at all.
     expect(find.text('AVAILABLE TO SPEND'), findsNothing);
-    expect(find.text('HELD BACK · SAVINGS'), findsOneWidget);
+    expect(find.text('SAVINGS'), findsOneWidget);
     expect(find.text('200,000'), findsWidgets);
   });
 
@@ -298,12 +298,12 @@ void main() {
       ),
     );
 
-    // No grand total here any more: it answered a question this screen is
-    // not asking, and invited a comparison with Home that it always lost.
-    expect(find.text('WHERE YOUR MONEY IS · PKR'), findsOneWidget);
+    // No grand total or headline here any more: it answered a question this
+    // screen is not asking, and invited a comparison with Home that it
+    // always lost. The zones say what they are on their own.
     expect(find.text('125,000'), findsNothing);
     expect(find.text('AVAILABLE TO SPEND'), findsOneWidget);
-    expect(find.text('HELD BACK · SAVINGS'), findsOneWidget);
+    expect(find.text('SAVINGS'), findsOneWidget);
     expect(find.text('25,000'), findsWidgets);
     expect(find.text('100,000'), findsWidgets);
     expect(find.text('Emergency fund'), findsOneWidget);
@@ -326,9 +326,12 @@ void main() {
     expect(find.text('PKR 125,000'), findsNothing);
   });
 
-  testWidgets('Insights combines everyday and savings balances', (
+  testWidgets('Insights does not restate what Accounts already says', (
     tester,
   ) async {
+    // The balances card used to sit at the top of Detail, repeating what
+    // Accounts shows. Two screens quoting the same figures is how they end
+    // up disagreeing in front of the user.
     await tester.pumpWidget(
       MaterialApp(
         theme: SpendWiseTheme.dark,
@@ -340,10 +343,9 @@ void main() {
     await tester.tap(find.text('DETAIL'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Total tracked'), findsOneWidget);
-    expect(find.text('PKR 125,000'), findsOneWidget);
-    expect(find.text('PKR 25,000'), findsOneWidget);
-    expect(find.text('PKR 100,000'), findsOneWidget);
+    expect(find.text('Total tracked'), findsNothing);
+    expect(find.text('Available to spend'), findsNothing);
+    expect(find.text('PKR 125,000'), findsNothing);
   });
 }
 

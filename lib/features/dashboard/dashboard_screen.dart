@@ -379,7 +379,7 @@ class _SavingsStrip extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Eyebrow(
-                'Held back · savings',
+                'Savings',
                 trailing: Text(
                   formatMinor(total, cents: false),
                   style: SpendWiseType.rowStrong.copyWith(fontSize: 14),

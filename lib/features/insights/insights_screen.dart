@@ -189,10 +189,11 @@ class _InsightsScreenState extends State<InsightsScreen> {
                             ),
                             sliver: SliverList.list(
                               children: [
-                                _BalanceSnapshot(
-                                  accounts: widget.viewModel.accounts,
-                                ),
-                                const SizedBox(height: 22),
+                                // No balances card here. Insights is about
+                                // what money did over a period; what is left
+                                // in each account is what Accounts is for,
+                                // and saying it in both places let the two
+                                // disagree in front of the user.
                                 _SummaryBand(analytics),
                                 const SizedBox(height: 22),
                                 Eyebrow(
@@ -418,76 +419,6 @@ class _Tick extends StatelessWidget {
       ),
     ),
   );
-}
-
-class _BalanceSnapshot extends StatelessWidget {
-  const _BalanceSnapshot({required this.accounts});
-
-  final List<AccountViewData> accounts;
-
-  @override
-  Widget build(BuildContext context) {
-    final currency = accounts.firstOrNull?.currency ?? 'PKR';
-    final available = accounts
-        .where((account) => account.isIncluded)
-        .fold<int>(0, (sum, account) => sum + account.balance.minorUnits);
-    final savings = accounts
-        .where((account) => !account.isIncluded)
-        .fold<int>(0, (sum, account) => sum + account.balance.minorUnits);
-    final total = available + savings;
-    final totalMoney = MoneyViewData(total, currency: currency);
-    final availableMoney = MoneyViewData(available, currency: currency);
-    final savingsMoney = MoneyViewData(savings, currency: currency);
-    return Semantics(
-      container: true,
-      label:
-          'Total tracked ${formatMoney(totalMoney)}. Available to spend ${formatMoney(availableMoney)}. Savings ${formatMoney(savingsMoney)}.',
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: ExcludeSemantics(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Total tracked',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  formatMoney(totalMoney),
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _BalancePart(
-                        label: 'Available to spend',
-                        value: availableMoney,
-                      ),
-                    ),
-                    Container(
-                      width: 1,
-                      height: 38,
-                      color: SpendWiseColors.border,
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _BalancePart(
-                        label: 'Savings',
-                        value: savingsMoney,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _BalancePart extends StatelessWidget {

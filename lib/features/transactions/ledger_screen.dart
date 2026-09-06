@@ -328,7 +328,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Eyebrow('Balance now · $_currency'),
+                  const Eyebrow('Balance now'),
                   const SizedBox(height: 3),
                   FittedBox(
                     fit: BoxFit.scaleDown,
