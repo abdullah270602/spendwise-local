@@ -515,6 +515,17 @@ final class LocalLedger {
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       );
+      -- How often the user has filed a given counterparty under a given
+      -- category. Filing something once is a decision about that payment;
+      -- doing it repeatedly is a habit, and only a habit earns the right to
+      -- answer for transactions the user has not seen yet.
+      CREATE TABLE IF NOT EXISTS category_confirmations (
+        normalized_match TEXT NOT NULL,
+        category_id TEXT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+        seen INTEGER NOT NULL DEFAULT 0,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY(normalized_match, category_id)
+      );
       CREATE TABLE IF NOT EXISTS parser_definitions (
         id TEXT PRIMARY KEY,
         version INTEGER NOT NULL,
@@ -2816,15 +2827,37 @@ final class LocalLedger {
     );
   }
 
+  /// How many times the same counterparty has to be filed under the same
+  /// category before SpendWise starts doing it unasked.
+  static const categoryRuleThreshold = 3;
+
   void categorizeTransactions(Iterable<String> ids, String? categoryId) {
     final list = ids.toList(growable: false);
     if (list.isEmpty) return;
     final holes = List.filled(list.length, '?').join(',');
     _db.execute(
-      'UPDATE transactions SET category = ?, needs_review = 0, locked = 1 '
-      'WHERE id IN ($holes)',
-      [categoryId, ...list],
+      'UPDATE transactions SET category = ?, category_id = ?, '
+      'needs_review = 0, locked = 1 WHERE id IN ($holes)',
+      [categoryId, categoryId, ...list],
     );
+    if (categoryId == null) return;
+    // Filing from Review is how most things get categorised, and it used to
+    // teach nothing at all -- so the same merchant could be filed by hand ten
+    // times over and still arrive uncategorised on the eleventh. Each one
+    // counts now, exactly as an edit does.
+    for (final id in list) {
+      final ruleId = _rememberUserCategoryRule(
+        transactionId: id,
+        categoryId: categoryId,
+        fallbackDescription: '',
+      );
+      if (ruleId != null) {
+        _db.execute('UPDATE transactions SET category_rule_id=? WHERE id=?', [
+          ruleId,
+          id,
+        ]);
+      }
+    }
   }
 
   /// Routes a batch of non-transfer transactions onto one account. Transfers
@@ -2981,6 +3014,47 @@ final class LocalLedger {
     final normalized = CategoryClassifier.normalize(merchant ?? '');
     if (normalized.length < 2 || normalized.length > 80) return null;
     final id = 'user-category:${sha256.convert(utf8.encode(normalized))}';
+
+    // Disagreeing with a standing rule retires it at once. Being wrong is the
+    // thing to stop doing immediately; earning the replacement can wait until
+    // it has been shown as often as the first one was.
+    final standing = _db.select(
+      'SELECT category_id FROM category_rules WHERE normalized_match = ? '
+      'LIMIT 1',
+      [normalized],
+    );
+    if (standing.isNotEmpty && standing.first['category_id'] != categoryId) {
+      _db.execute('DELETE FROM category_rules WHERE normalized_match = ?', [
+        normalized,
+      ]);
+      _db.execute(
+        'DELETE FROM category_confirmations WHERE normalized_match = ?',
+        [normalized],
+      );
+    }
+
+    _db.execute(
+      '''
+      INSERT INTO category_confirmations(
+        normalized_match,category_id,seen,updated_at
+      ) VALUES (?,?,1,?)
+      ON CONFLICT(normalized_match,category_id) DO UPDATE SET
+        seen=category_confirmations.seen+1, updated_at=excluded.updated_at
+      ''',
+      [normalized, categoryId, _now],
+    );
+    final counted = _db.select(
+      'SELECT seen FROM category_confirmations '
+      'WHERE normalized_match = ? AND category_id = ? LIMIT 1',
+      [normalized, categoryId],
+    );
+    final seen = counted.isEmpty ? 0 : counted.first['seen'] as int;
+    // One filing is a decision about one payment; a habit is what justifies
+    // acting on the next one unasked. Below the threshold the answer is still
+    // recorded -- it just does not yet speak for transactions the user has
+    // not seen.
+    if (seen < categoryRuleThreshold) return null;
+
     _db.execute(
       '''
       INSERT INTO category_rules(
