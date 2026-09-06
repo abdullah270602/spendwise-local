@@ -215,6 +215,10 @@ final class SpendWiseController extends ChangeNotifier
         .toList(growable: false);
   }
 
+  bool _isSavings(String? id) => _snapshot.accounts
+      .where((item) => item.id == id)
+      .any((item) => item.type == domain.AccountType.savings);
+
   String _accountName(String? id) =>
       _snapshot.accounts
           .where((item) => item.id == id)
@@ -246,7 +250,16 @@ final class SpendWiseController extends ChangeNotifier
                 : switch (item.kind) {
                     domain.TransactionKind.expense => 'Payment',
                     domain.TransactionKind.income => 'Money received',
-                    domain.TransactionKind.transfer => 'Account transfer',
+                    // Moving money to yourself is not one event. Putting it
+                    // into savings is a decision worth seeing in the register;
+                    // taking it back out is a different decision again, and
+                    // "Account transfer" hid both behind one word.
+                    domain.TransactionKind.transfer =>
+                      _isSavings(item.toAccountId)
+                          ? 'Moved into savings'
+                          : _isSavings(item.fromAccountId)
+                          ? 'Taken out of savings'
+                          : 'Account transfer',
                   },
             subtitle: accountLabel,
             amount: MoneyViewData(
