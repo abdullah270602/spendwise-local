@@ -298,8 +298,10 @@ void main() {
       ),
     );
 
-    expect(find.text('TOTAL TRACKED · PKR'), findsOneWidget);
-    expect(find.text('125,000'), findsOneWidget);
+    // No grand total here any more: it answered a question this screen is
+    // not asking, and invited a comparison with Home that it always lost.
+    expect(find.text('WHERE YOUR MONEY IS · PKR'), findsOneWidget);
+    expect(find.text('125,000'), findsNothing);
     expect(find.text('AVAILABLE TO SPEND'), findsOneWidget);
     expect(find.text('HELD BACK · SAVINGS'), findsOneWidget);
     expect(find.text('25,000'), findsWidgets);

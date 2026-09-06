@@ -56,10 +56,6 @@ class _AccountsScreenState extends State<AccountsScreen> {
         .toList(growable: false);
     final everydayTotal = _sum(everyday);
     final savingsTotal = _sum(savings);
-    final owedToYou = viewModel.uiDebts
-        .where((item) => !item.isSettled && item.lent)
-        .fold<int>(0, (sum, item) => sum + item.outstanding.minorUnits);
-    final total = everydayTotal + savingsTotal + owedToYou;
     final unconfigured = viewModel.accounts
         .where((account) => account.suffix.trim().isEmpty)
         .toList(growable: false);
@@ -97,9 +93,20 @@ class _AccountsScreenState extends State<AccountsScreen> {
                 children: [
                   Row(
                     children: [
+                      // No headline total here.
+                      //
+                      // It claimed to be the answer to a question this screen
+                      // is not answering. Home already says what happened to
+                      // your money over a period; Accounts says where the
+                      // money is now, per account, and the two are different
+                      // numbers by design. Printing a grand total at the top
+                      // of one of them invited the comparison and lost it --
+                      // the shares underneath did not even sum to 100%,
+                      // because money out on loan is in the total but in
+                      // neither share.
                       Expanded(
                         child: Eyebrow(
-                          'Total tracked · '
+                          'Where your money is · '
                           '${viewModel.accounts.first.currency}',
                         ),
                       ),
@@ -120,30 +127,12 @@ class _AccountsScreenState extends State<AccountsScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  Text(formatMinor(total), style: SpendWiseType.figure),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Container(
-                    padding: const EdgeInsets.only(bottom: 12),
                     decoration: const BoxDecoration(
                       border: Border(
                         bottom: BorderSide(color: SpendWiseColors.line),
                       ),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _Share(
-                            label: 'Available',
-                            value: _percent(everydayTotal, total),
-                          ),
-                        ),
-                        if (savings.isNotEmpty)
-                          _Share(
-                            label: 'Held back',
-                            value: _percent(savingsTotal, total),
-                          ),
-                      ],
                     ),
                   ),
                 ],
@@ -412,9 +401,6 @@ class _AccountsScreenState extends State<AccountsScreen> {
     0,
     (total, account) => total + account.balance.minorUnits,
   );
-
-  static String _percent(int part, int whole) =>
-      whole == 0 ? '0%' : '${((part / whole) * 100).round()}%';
 
   static IconData _accountIcon(String type) => switch (type.toLowerCase()) {
     String value when value.contains('saving') => Icons.savings_outlined,
@@ -1150,29 +1136,6 @@ class _SourceChoice extends StatelessWidget {
 }
 
 /// One half of the available / held-back split under the total.
-class _Share extends StatelessWidget {
-  const _Share({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) => Text.rich(
-    TextSpan(
-      children: [
-        TextSpan(
-          text: '$label ',
-          style: SpendWiseType.body.copyWith(fontSize: 12.5),
-        ),
-        TextSpan(
-          text: value,
-          style: SpendWiseType.rowStrong.copyWith(fontSize: 13),
-        ),
-      ],
-    ),
-  );
-}
-
 class _SavingsExplanation extends StatelessWidget {
   const _SavingsExplanation();
 

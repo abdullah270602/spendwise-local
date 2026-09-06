@@ -680,6 +680,7 @@ final class LocalLedger {
         ('fees','Fees','account_balance',4294198070,'expense',1),
         ('income','Income','trending_up',4283215696,'income',1),
         ('transfer','Transfer','swap_horiz',4280391411,'both',1),
+        ('balance-adjustment','Balance adjustment','tune',4286141768,'both',1),
         ('other','Other','category',4288585374,'both',1);
 
       INSERT OR IGNORE INTO sources(
@@ -2066,9 +2067,22 @@ final class LocalLedger {
     );
     if (account.isEmpty) throw StateError('Account was not found.');
     final difference = targetBalanceMinor - currentBalanceMinor;
-    _db.execute(
-      'UPDATE accounts SET opening_balance_minor = opening_balance_minor + ?, updated_at = ? WHERE id = ?',
-      [difference, _now, id],
+    if (difference == 0) return;
+    // Written as an entry rather than folded into the opening balance.
+    //
+    // Moving the baseline silently made the account read correctly while
+    // explaining nothing: the ledger showed no reason for the change, and
+    // Home -- which is a picture of what came in and what went out -- could
+    // not see it at all. Money that appeared or vanished is exactly the kind
+    // of thing Home exists to show. As a manual, locked entry it also
+    // survives reconcile, which rebuilds everything automatic.
+    addManualTransaction(
+      kind: difference < 0 ? TransactionKind.expense : TransactionKind.income,
+      amountMinor: difference.abs(),
+      occurredAt: DateTime.fromMillisecondsSinceEpoch(_now, isUtc: true),
+      accountId: id,
+      description: 'Balance adjustment',
+      categoryId: 'balance-adjustment',
     );
   }
 
