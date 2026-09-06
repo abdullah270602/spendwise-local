@@ -157,7 +157,18 @@ final class NotificationParser {
     return parseDetailed(observation).candidate;
   }
 
-  ParserResult parseDetailed(RawObservation observation) {
+  /// Reads [observation] into a candidate transaction.
+  ///
+  /// [assumeDirection] is the answer to the one question this parser cannot
+  /// settle on its own: which way the money went. It is used *only* where the
+  /// text gives no usable signal, never to override wording that is clear —
+  /// so a person answering "money out" in Review supplies the missing half
+  /// and the parser still contributes the amount, the counterparty and the
+  /// reference it did manage to read.
+  ParserResult parseDetailed(
+    RawObservation observation, {
+    EntryDirection? assumeDirection,
+  }) {
     if (observation.accountId == null) {
       return const ParserResult(
         status: ParseStatus.invalid,
@@ -239,16 +250,25 @@ final class NotificationParser {
     final hasCredit =
         _creditWords.hasMatch(text) ||
         amountMatches.single.group(0)!.trimLeft().startsWith('+');
-    if (hasDebit == hasCredit) {
-      return const ParserResult(
+    if (hasDebit == hasCredit && assumeDirection == null) {
+      return ParserResult(
         status: ParseStatus.ambiguous,
         parserId: 'pk.generic.fallback',
         parserVersion: 1,
         confidence: 0.3,
-        reasons: ['Direction is ambiguous.'],
+        // Which of the two it is matters to the person answering: a word we
+        // do not know is a gap the app should close, while two words that
+        // disagree is a message only they can settle.
+        reasons: [
+          hasDebit
+              ? 'This says money left and arrived at once.'
+              : 'Nothing here says which way the money went.',
+        ],
       );
     }
-    final direction = hasDebit ? EntryDirection.debit : EntryDirection.credit;
+    final direction = assumeDirection != null && hasDebit == hasCredit
+        ? assumeDirection
+        : (hasDebit ? EntryDirection.debit : EntryDirection.credit);
     final reference = _referencePattern
         .firstMatch(text)
         ?.group(1)

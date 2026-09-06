@@ -310,7 +310,7 @@ final class LocalLedger {
 
   @visibleForTesting
   void resetEvidenceRefreshForTests() => _db.execute(
-    "DELETE FROM app_settings WHERE key = 'refresh_stored_evidence_v11'",
+    "DELETE FROM app_settings WHERE key = 'refresh_stored_evidence_v12'",
   );
 
   @visibleForTesting
@@ -720,7 +720,7 @@ final class LocalLedger {
 
   void _refreshStoredEvidenceInner() {
     final done = _db.select(
-      "SELECT 1 FROM app_settings WHERE key = 'refresh_stored_evidence_v11'",
+      "SELECT 1 FROM app_settings WHERE key = 'refresh_stored_evidence_v12'",
     );
     if (done.isNotEmpty) return;
     var refreshed = 0;
@@ -815,7 +815,7 @@ final class LocalLedger {
     }
     debugPrint('SpendWisePerf: rerouted $rerouted observation(s) by content');
     _db.execute(
-      "INSERT OR REPLACE INTO app_settings(key,value) VALUES ('refresh_stored_evidence_v11','done')",
+      "INSERT OR REPLACE INTO app_settings(key,value) VALUES ('refresh_stored_evidence_v12','done')",
     );
     if (refreshed > 0) _reconcile();
   }
@@ -1075,6 +1075,58 @@ final class LocalLedger {
   /// Files a batch of raw alerts onto one account and re-reads them. This is
   /// the answer to a shared source that could not name its own institution:
   /// the text was always readable, it just had nowhere to go.
+  /// Files alerts the parser could read but could not place, once the user
+  /// has said which way the money went.
+  ///
+  /// Review used to offer only "not transactions — drop them". When the
+  /// alerts plainly *were* transactions there was nowhere to go, so the one
+  /// button on offer destroyed real money. This is the other answer.
+  ///
+  /// The direction is a hint, not an override: an alert whose wording is
+  /// already clear keeps the reading it had, and the parser still supplies
+  /// the amount, counterparty and reference. Returns how many became
+  /// transactions, which is not always all of them — an alert with no
+  /// readable amount cannot be rescued this way.
+  int fileAlerts(
+    Iterable<String> observationIds, {
+    required EntryDirection direction,
+    String? accountId,
+  }) {
+    final ids = observationIds.toList(growable: false);
+    if (ids.isEmpty) return 0;
+    final holes = List.filled(ids.length, '?').join(',');
+    final rows = _db.select(
+      'SELECT * FROM raw_observations WHERE id IN ($holes)',
+      ids,
+    );
+    var filed = 0;
+    for (final row in rows) {
+      final raw = _rawFromRow(row, accountOverride: accountId);
+      if (raw.accountId == null) continue;
+      final result = const NotificationParser().parseDetailed(
+        raw,
+        assumeDirection: direction,
+      );
+      final candidate = result.candidate;
+      _db.execute(
+        'UPDATE raw_observations SET account_id = ?, parse_status = ?, '
+        'parse_error = ? WHERE id = ?',
+        [
+          raw.accountId,
+          candidate == null ? _statusName(result.status) : 'parsed',
+          candidate == null ? result.reasons.join(' ') : null,
+          raw.id,
+        ],
+      );
+      if (candidate != null) {
+        _insertCandidate(candidate);
+        filed++;
+      }
+    }
+    if (filed > 0) _reconcile();
+    return filed;
+  }
+
   int routeAlerts(Iterable<String> observationIds, String accountId) {
     final ids = observationIds.toList(growable: false);
     if (ids.isEmpty) return 0;

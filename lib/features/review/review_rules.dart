@@ -20,6 +20,9 @@ class ReviewRule {
     this.alternative,
     this.needsAccount = false,
     this.needsCategory = false,
+    this.needsDirection = false,
+    this.secondary,
+    this.secondaryLabel,
     this.alertPackage,
     this.readableAlerts = 0,
   });
@@ -51,6 +54,18 @@ class ReviewRule {
   /// The action cannot run until the user picks a target.
   final bool needsAccount;
   final bool needsCategory;
+
+  /// The action cannot run until the user says which way the money went. The
+  /// parser read everything else; this is the half it could not.
+  final bool needsDirection;
+
+  /// The other real answer, when there is one.
+  ///
+  /// A rule that offers only a destructive action is not offering a choice.
+  /// Alerts SpendWise cannot read are the case that matters: they are usually
+  /// real transactions, and "drop them" was the only button on the screen.
+  final ReviewDecision? secondary;
+  final String? secondaryLabel;
 
   /// Set when the rule is about raw alerts rather than parsed transactions,
   /// so the screen can offer to open the alerts themselves. A rule the user
@@ -304,16 +319,27 @@ List<ReviewRule> buildReviewRules({
             ? 'Nothing here parsed as a transaction.'
             : 'Nothing from $app parsed as a transaction.',
         evidence: _reasonOnly(review.description),
+        // The constructive answer leads. These are usually real payments the
+        // parser could not read the direction of, and offering only "drop
+        // them" made the single button on screen a destructive one.
         actionLabel: count == 1
+            ? 'It is a transaction — file it'
+            : 'They are transactions — file all $count',
+        needsDirection: true,
+        decision: ReviewDecision(
+          kind: ReviewDecisionKind.fileAlerts,
+          packageName: package,
+        ),
+        secondaryLabel: count == 1
             ? 'Not a transaction — drop it'
             : 'Not transactions — drop all $count',
-        alternative: 'Read ${count == 1 ? 'it' : 'them'} first',
-        alertPackage: package.isEmpty ? null : package,
-        readableAlerts: count,
-        decision: ReviewDecision(
+        secondary: ReviewDecision(
           kind: ReviewDecisionKind.dismissSource,
           packageName: package,
         ),
+        alternative: 'Read ${count == 1 ? 'it' : 'them'} first',
+        alertPackage: package.isEmpty ? null : package,
+        readableAlerts: count,
       ),
     );
   }

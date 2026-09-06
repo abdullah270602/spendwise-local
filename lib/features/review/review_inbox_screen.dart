@@ -88,6 +88,7 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
                   locked: applying != null,
                   onApply: () => _apply(rules[index]),
                   onAlternative: () => _alternative(rules[index]),
+                  onSecondary: () => _applySecondary(rules[index]),
                 ),
               ),
             ),
@@ -121,10 +122,20 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
     );
   }
 
-  Future<void> _apply(ReviewRule rule) async {
-    var decision = rule.decision;
+  Future<void> _apply(ReviewRule rule, {ReviewDecision? override}) async {
+    var decision = override ?? rule.decision;
 
-    if (rule.needsAccount) {
+    if (override == null && rule.needsDirection) {
+      final expense = await _askDirection(rule);
+      if (expense == null) return;
+      decision = ReviewDecision(
+        kind: decision.kind,
+        transactionIds: decision.transactionIds,
+        alertIds: decision.alertIds,
+        packageName: decision.packageName,
+        expense: expense,
+      );
+    } else if (override == null && rule.needsAccount) {
       final accountId = await _pickAccount();
       if (accountId == null) return;
       decision = ReviewDecision(
@@ -133,7 +144,7 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
         alertIds: decision.alertIds,
         accountId: accountId,
       );
-    } else if (rule.needsCategory) {
+    } else if (override == null && rule.needsCategory) {
       final category = await _pickCategory();
       if (category == null) return;
       decision = ReviewDecision(
@@ -164,6 +175,14 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
     } finally {
       if (mounted) setState(() => applying = null);
     }
+  }
+
+  /// The other real answer, when a rule offers one. Runs its decision as-is:
+  /// nothing more to ask, because the user has already said what these are.
+  void _applySecondary(ReviewRule rule) {
+    final secondary = rule.secondary;
+    if (secondary == null) return;
+    _apply(rule, override: secondary);
   }
 
   /// The escape hatch. A rule about raw alerts opens the alerts themselves;
@@ -389,6 +408,45 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
     );
   }
 
+  /// The one thing the parser could not read. Everything else about these
+  /// alerts -- the amount, who it was with, the reference -- it already has.
+  Future<bool?> _askDirection(ReviewRule rule) => showModalBottomSheet<bool>(
+    context: context,
+    showDragHandle: true,
+    useSafeArea: true,
+    builder: (sheetContext) => SafeArea(
+      top: false,
+      minimum: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            rule.count == 1
+                ? 'Which way did the money go?'
+                : 'Which way did the money go, for all ${rule.count}?',
+            style: SpendWiseType.title,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'SpendWise read the amount but not the direction.',
+            style: SpendWiseType.body.copyWith(fontSize: 12.5),
+          ),
+          const SizedBox(height: 18),
+          PrimaryAction(
+            label: 'Money out',
+            onPressed: () => Navigator.pop(sheetContext, true),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton(
+            onPressed: () => Navigator.pop(sheetContext, false),
+            child: const Text('Money in'),
+          ),
+        ],
+      ),
+    ),
+  );
+
   Future<String?> _pickAccount() {
     final accounts = widget.viewModel.accounts;
     if (accounts.isEmpty) {
@@ -606,6 +664,7 @@ class _RuleBlock extends StatelessWidget {
     required this.locked,
     required this.onApply,
     required this.onAlternative,
+    required this.onSecondary,
   });
 
   final ReviewRule rule;
@@ -613,6 +672,7 @@ class _RuleBlock extends StatelessWidget {
   final bool locked;
   final VoidCallback onApply;
   final VoidCallback onAlternative;
+  final VoidCallback onSecondary;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -665,6 +725,13 @@ class _RuleBlock extends StatelessWidget {
           busy: busy,
           onPressed: locked && !busy ? null : onApply,
         ),
+        if (rule.secondaryLabel case final label?) ...[
+          const SizedBox(height: 9),
+          OutlinedButton(
+            onPressed: locked || busy ? null : onSecondary,
+            child: Text(label),
+          ),
+        ],
         if (rule.alternative case final alternative?) ...[
           const SizedBox(height: 9),
           InkWell(

@@ -837,6 +837,27 @@ final class SpendWiseController extends ChangeNotifier
               throw ArgumentError('Routing needs an account');
             }
             _ledger.routeAlerts(decision.alertIds, target);
+          case ReviewDecisionKind.fileAlerts:
+            // The rule names an app, not a list of ids -- the same way
+            // dismissing does, so both answers cover exactly the same alerts.
+            final source = decision.packageName;
+            final ids = decision.alertIds.isNotEmpty
+                ? decision.alertIds
+                : _ledger
+                      .alerts(
+                        packageName: source == null || source.isEmpty
+                            ? null
+                            : source,
+                      )
+                      .map((alert) => alert.id)
+                      .toList(growable: false);
+            _ledger.fileAlerts(
+              ids,
+              direction: decision.expense
+                  ? domain.EntryDirection.debit
+                  : domain.EntryDirection.credit,
+              accountId: decision.accountId,
+            );
           case ReviewDecisionKind.dismissSource:
             final package = decision.packageName;
             _ledger.dismissUnparsed(

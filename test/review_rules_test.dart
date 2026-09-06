@@ -223,7 +223,42 @@ void main() {
     );
 
     expect(result.single.count, 7);
-    expect(result.single.decision.kind, ReviewDecisionKind.dismissSource);
     expect(result.single.decision.packageName, 'com.whatsapp');
+    expect(result.single.secondary?.packageName, 'com.whatsapp');
+  });
+
+  test('an unreadable alert offers a way to keep it, not only to bin it', () {
+    // The reported dead end: the only button on the card destroyed the
+    // alerts, and the only other affordance was to read them. If they were
+    // real transactions -- which they usually are -- there was nowhere to go.
+    final result = rules(
+      const [],
+      reviews: const [
+        ReviewViewData(
+          id: 'unparsed:pk.wallet',
+          reason: ReviewReason.parseFailed,
+          title: '2 unread alerts from Wallet',
+          description: 'Nothing here says which way the money went.',
+          transactions: [],
+        ),
+      ],
+    );
+
+    final rule = result.single;
+    expect(
+      rule.decision.kind,
+      ReviewDecisionKind.fileAlerts,
+      reason: 'the constructive answer leads',
+    );
+    expect(rule.needsDirection, isTrue, reason: 'it asks before it files');
+    expect(rule.actionLabel, contains('file'));
+
+    // Dropping them is still offered -- it is just no longer the only answer.
+    expect(rule.secondary?.kind, ReviewDecisionKind.dismissSource);
+    expect(rule.secondaryLabel, contains('Not transactions'));
+
+    // And the evidence is still one tap away, so neither answer is blind.
+    expect(rule.alternative, contains('Read'));
+    expect(rule.opensAlertReader, isTrue);
   });
 }

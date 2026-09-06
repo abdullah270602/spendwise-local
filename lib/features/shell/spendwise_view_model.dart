@@ -217,6 +217,10 @@ enum ReviewDecisionKind {
   /// The alert was readable all along; it just had nowhere to go. File the
   /// raw alerts onto an account and read them again.
   routeAlerts,
+
+  /// These alerts are transactions; the parser just could not tell which way
+  /// the money went. Take the user's answer and file them.
+  fileAlerts,
 }
 
 @immutable
