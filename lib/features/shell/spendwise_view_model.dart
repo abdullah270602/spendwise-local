@@ -528,6 +528,12 @@ abstract class SpendWiseAdvancedViewModel implements SpendWiseViewModel {
     String? note,
   });
 
+  /// What a bulk dismissal is about to hide, captured so it can be undone.
+  Map<String, String> unresolvedAlertStatuses(String? packageName);
+
+  /// Puts dismissed alerts back exactly as they were.
+  Future<void> restoreAlerts(Map<String, String> statuses);
+
   /// Re-files an existing debt as a different story, for history recorded
   /// before the story it needed existed.
   Future<void> changeDebtKind({required String debtId, required DebtKind kind});
@@ -674,6 +680,10 @@ extension SpendWiseAdvancedAccess on SpendWiseViewModel {
         note: note,
       ) ??
       Future.error(UnsupportedError('Loans are not available'));
+  Map<String, String> uiUnresolvedAlertStatuses(String? packageName) =>
+      _advanced?.unresolvedAlertStatuses(packageName) ?? const {};
+  Future<void> uiRestoreAlerts(Map<String, String> statuses) =>
+      _advanced?.restoreAlerts(statuses) ?? Future.value();
   Future<void> uiChangeDebtKind({
     required String debtId,
     required DebtKind kind,

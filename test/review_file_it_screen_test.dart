@@ -122,10 +122,76 @@ void main() {
     expect(find.textContaining('Which way'), findsNothing);
     expect(viewModel.applied.single.kind, ReviewDecisionKind.dismissSource);
   });
+
+  testWidgets('dropping says so where the question was, and offers Undo', (
+    tester,
+  ) async {
+    // Dismissing is a soft flag in the ledger, so the alerts survive it --
+    // but nothing in the app shows an ignored alert, so without this the most
+    // destructive answer on the screen was the only one with no way back.
+    final viewModel = _Fake();
+    await openInbox(tester, viewModel);
+
+    await tester.tap(find.text('Drop all 2'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(find.text('2 alerts settled.'), findsOneWidget);
+    expect(find.text('Undo'), findsOneWidget);
+  });
+
+  testWidgets('and Undo puts back exactly what was hidden', (tester) async {
+    final viewModel = _Fake();
+    await openInbox(tester, viewModel);
+
+    await tester.tap(find.text('Drop all 2'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+
+    expect(viewModel.restored, {
+      'a1': 'review',
+      'a2': 'error',
+    }, reason: 'the prior state, not a uniform one');
+  });
+
+  testWidgets('an answer that is not destructive offers no Undo', (
+    tester,
+  ) async {
+    // Filing and attaching are undone by editing the entry they created,
+    // which the ledger already offers. Only dropping has no other way back.
+    final viewModel = _Fake();
+    await openInbox(tester, viewModel);
+
+    await tester.tap(find.text('File all 2'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Money out'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(find.textContaining('settled.'), findsOneWidget);
+    expect(find.text('Undo'), findsNothing);
+  });
 }
 
 class _Fake extends ChangeNotifier implements SpendWiseAdvancedViewModel {
   final applied = <ReviewDecision>[];
+  Map<String, String>? restored;
+
+  /// What a dismissal would hide, and what putting it back would restore.
+  /// Two rows with different prior states, because restoring them all as
+  /// "review" would quietly lose the ones that failed to parse.
+  @override
+  Map<String, String> unresolvedAlertStatuses(String? packageName) => const {
+    'a1': 'review',
+    'a2': 'error',
+  };
+
+  @override
+  Future<void> restoreAlerts(Map<String, String> statuses) async {
+    restored = statuses;
+  }
 
   @override
   List<TransactionViewData> get transactions => const [];

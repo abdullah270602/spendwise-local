@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
@@ -23,6 +25,25 @@ class ReviewInboxScreen extends StatefulWidget {
 class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
   String? applying;
 
+  /// Which answer is running, so its own button carries the spinner.
+  ReviewAction? applyingAction;
+
+  /// The rule that was just answered, held for a moment after the ledger has
+  /// stopped returning it.
+  ///
+  /// Without this the card simply vanished and the list jumped up a slot,
+  /// which reads as lag however fast the work was, and the only confirmation
+  /// was a toast at the bottom edge -- easy to miss entirely on a screen the
+  /// user has scrolled. The answer is now stated where the question was.
+  ReviewRule? settled;
+  String? settledId;
+  int settledCount = 0;
+
+  /// What "drop" hid, so it can be put back. Null for answers that are not
+  /// destructive: filing and attaching are undone by editing the entry they
+  /// created, which the ledger already offers.
+  Map<String, String>? undoStatuses;
+
   @override
   Widget build(BuildContext context) {
     final rules = buildReviewRules(
@@ -32,6 +53,15 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
       unroutedAlerts: widget.viewModel.uiUnroutedAlerts,
     );
     final alerts = rules.fold<int>(0, (sum, rule) => sum + rule.count);
+
+    // The answered rule is gone from the ledger's own list, so it is spliced
+    // back at its old position for as long as its answer is on screen. Its
+    // place in the order is part of the answer: it says which question was
+    // just settled.
+    final answered = settled;
+    final shown = answered == null || rules.any((r) => r.id == answered.id)
+        ? rules
+        : [...rules, answered];
 
     return SafeArea(
       bottom: false,
@@ -81,14 +111,24 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
                 horizontal: SpendWiseTheme.gutter,
               ),
               sliver: SliverList.builder(
-                itemCount: rules.length,
-                itemBuilder: (context, index) => _RuleBlock(
-                  rule: rules[index],
-                  busy: applying == rules[index].id,
-                  locked: applying != null,
-                  onApply: (action) => _apply(rules[index], action),
-                  onAlternative: () => _alternative(rules[index]),
-                ),
+                itemCount: shown.length,
+                itemBuilder: (context, index) {
+                  final rule = shown[index];
+                  if (rule.id == settledId) {
+                    return _SettledBlock(
+                      count: settledCount,
+                      onUndo: undoStatuses == null ? null : _undo,
+                      onDone: _clearSettled,
+                    );
+                  }
+                  return _RuleBlock(
+                    rule: rule,
+                    busyAction: applying == rule.id ? applyingAction : null,
+                    locked: applying != null,
+                    onApply: (action) => _apply(rule, action),
+                    onAlternative: () => _alternative(rule),
+                  );
+                },
               ),
             ),
             SliverToBoxAdapter(
@@ -156,26 +196,59 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
       );
     }
 
-    setState(() => applying = rule.id);
+    // Captured before the change, because afterwards there is no query that
+    // can tell which rows this particular answer touched.
+    final undo = decision.kind == ReviewDecisionKind.dismissSource
+        ? widget.viewModel.uiUnresolvedAlertStatuses(decision.packageName)
+        : null;
+
+    setState(() {
+      applying = rule.id;
+      applyingAction = action;
+    });
     try {
       await widget.viewModel.uiApplyReviewDecision(decision);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            rule.count == 1
-                ? '1 alert settled.'
-                : '${rule.count} alerts settled in one go.',
-          ),
-        ),
-      );
+      setState(() {
+        settled = rule;
+        settledId = rule.id;
+        settledCount = rule.count;
+        undoStatuses = undo != null && undo.isNotEmpty ? undo : null;
+      });
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Could not apply that: $error')));
     } finally {
-      if (mounted) setState(() => applying = null);
+      if (mounted) {
+        setState(() {
+          applying = null;
+          applyingAction = null;
+        });
+      }
+    }
+  }
+
+  void _clearSettled() {
+    if (!mounted) return;
+    setState(() {
+      settled = null;
+      settledId = null;
+      undoStatuses = null;
+    });
+  }
+
+  Future<void> _undo() async {
+    final statuses = undoStatuses;
+    if (statuses == null) return;
+    _clearSettled();
+    try {
+      await widget.viewModel.uiRestoreAlerts(statuses);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Could not undo that: $error')));
     }
   }
 
@@ -654,14 +727,20 @@ class _AlertCard extends StatelessWidget {
 class _RuleBlock extends StatelessWidget {
   const _RuleBlock({
     required this.rule,
-    required this.busy,
+    required this.busyAction,
     required this.locked,
     required this.onApply,
     required this.onAlternative,
   });
 
   final ReviewRule rule;
-  final bool busy;
+
+  /// The answer the user actually tapped, while it is running.
+  ///
+  /// Keyed to the action rather than the rule because a rule now offers
+  /// three: tapping "Drop it" used to spin the *primary* button, which the
+  /// user had not touched, while the button they did touch just went grey.
+  final ReviewAction? busyAction;
   final bool locked;
 
   /// Takes the answer the user tapped, since a rule can offer several.
@@ -716,8 +795,10 @@ class _RuleBlock extends StatelessWidget {
         const SizedBox(height: 13),
         PrimaryAction(
           label: rule.primary.label,
-          busy: busy,
-          onPressed: locked && !busy ? null : () => onApply(rule.primary),
+          busy: busyAction == rule.primary,
+          onPressed: locked && busyAction != rule.primary
+              ? null
+              : () => onApply(rule.primary),
         ),
         // The follow-up answers share one row at equal width. Stacked, the
         // wider button read as the more important one purely because its
@@ -732,7 +813,8 @@ class _RuleBlock extends StatelessWidget {
                 Expanded(
                   child: _SecondaryAction(
                     action: rule.actions[1],
-                    enabled: !locked && !busy,
+                    busy: busyAction == rule.actions[1],
+                    enabled: !locked,
                     onPressed: onApply,
                   ),
                 ),
@@ -740,7 +822,8 @@ class _RuleBlock extends StatelessWidget {
                 Expanded(
                   child: _SecondaryAction(
                     action: rule.actions[2],
-                    enabled: !locked && !busy,
+                    busy: busyAction == rule.actions[2],
+                    enabled: !locked,
                     onPressed: onApply,
                   ),
                 ),
@@ -750,7 +833,8 @@ class _RuleBlock extends StatelessWidget {
             for (final action in rule.actions.skip(1)) ...[
               _SecondaryAction(
                 action: action,
-                enabled: !locked && !busy,
+                busy: busyAction == action,
+                enabled: !locked,
                 onPressed: onApply,
               ),
               if (action != rule.actions.last) const SizedBox(height: 9),
@@ -791,30 +875,148 @@ class _RuleBlock extends StatelessWidget {
 ///
 /// Full-width by design: the row above decides how much space it gets, so two
 /// of these side by side are the same size whatever their labels say.
+/// The answer, stated where the question was.
+///
+/// Holds long enough to be read and to be taken back, then collapses out of
+/// the list. The undo lives here rather than in a toast at the bottom edge:
+/// dropping alerts is the one answer with no other way back, and a
+/// confirmation the user has to go looking for is not a confirmation.
+class _SettledBlock extends StatefulWidget {
+  const _SettledBlock({
+    required this.count,
+    required this.onUndo,
+    required this.onDone,
+  });
+
+  final int count;
+  final Future<void> Function()? onUndo;
+  final VoidCallback onDone;
+
+  @override
+  State<_SettledBlock> createState() => _SettledBlockState();
+}
+
+class _SettledBlockState extends State<_SettledBlock> {
+  static const _hold = Duration(seconds: 4);
+  static const _collapse = Duration(milliseconds: 260);
+
+  Timer? _timer;
+  bool _leaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // A shorter hold when there is nothing to take back: the line is then
+    // only a receipt, and a receipt does not need four seconds.
+    _timer = Timer(
+      widget.onUndo == null ? const Duration(milliseconds: 1200) : _hold,
+      _leave,
+    );
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _leave() {
+    if (!mounted) return;
+    setState(() => _leaving = true);
+    Future<void>.delayed(_collapse, () {
+      if (mounted) widget.onDone();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduce = MediaQuery.disableAnimationsOf(context);
+    final undo = widget.onUndo;
+    return AnimatedSize(
+      duration: reduce ? Duration.zero : _collapse,
+      curve: Curves.easeIn,
+      alignment: Alignment.topCenter,
+      child: _leaving
+          ? const SizedBox(width: double.infinity)
+          : Padding(
+              padding: const EdgeInsets.only(top: 26, bottom: 4),
+              child: Row(
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    margin: const EdgeInsets.only(right: 11),
+                    color: SpendWiseColors.keep,
+                  ),
+                  Expanded(
+                    child: Text(
+                      widget.count == 1
+                          ? '1 alert settled.'
+                          : '${widget.count} alerts settled.',
+                      style: SpendWiseType.body.copyWith(fontSize: 13.5),
+                    ),
+                  ),
+                  if (undo != null)
+                    TextButton(
+                      onPressed: () {
+                        _timer?.cancel();
+                        undo();
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: SpendWiseColors.fg,
+                        minimumSize: const Size(0, 36),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                      ),
+                      child: const Text('Undo'),
+                    ),
+                ],
+              ),
+            ),
+    );
+  }
+}
+
 class _SecondaryAction extends StatelessWidget {
   const _SecondaryAction({
     required this.action,
+    required this.busy,
     required this.enabled,
     required this.onPressed,
   });
 
   final ReviewAction action;
+
+  /// Shown on the button that was tapped. The primary carries its spinner on
+  /// a filled ground, so it draws in the background tone; this one is an
+  /// outline, so it draws in the foreground.
+  final bool busy;
   final bool enabled;
   final void Function(ReviewAction action) onPressed;
 
   @override
   Widget build(BuildContext context) => OutlinedButton(
-    onPressed: enabled ? () => onPressed(action) : null,
+    onPressed: enabled && !busy ? () => onPressed(action) : null,
     style: OutlinedButton.styleFrom(
       minimumSize: const Size.fromHeight(46),
       foregroundColor: action.destructive ? SpendWiseColors.spend : null,
     ),
-    child: Text(
-      action.label,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      textAlign: TextAlign.center,
-    ),
+    child: busy
+        ? SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.8,
+              color: action.destructive
+                  ? SpendWiseColors.spend
+                  : SpendWiseColors.fg,
+            ),
+          )
+        : Text(
+            action.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
   );
 }
 

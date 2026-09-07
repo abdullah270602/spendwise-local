@@ -511,6 +511,12 @@ class _BatchImportViewModel extends _FakeViewModel
   }) async {}
 
   @override
+  Map<String, String> unresolvedAlertStatuses(String? packageName) => const {};
+
+  @override
+  Future<void> restoreAlerts(Map<String, String> statuses) async {}
+
+  @override
   Future<void> settleDebt({
     required String debtId,
     required MoneyViewData amount,

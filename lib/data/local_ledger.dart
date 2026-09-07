@@ -3191,6 +3191,38 @@ final class LocalLedger {
   /// Dismisses unreadable captures. Scoped to one app when [packageName] is
   /// given, so clearing noise from one source never silently discards
   /// evidence from another.
+  /// The parse status of every alert a bulk dismissal is about to hide.
+  ///
+  /// Dismissing is a soft flag, so the alerts survive it -- but nothing in the
+  /// app shows an ignored alert, so without a record of which rows changed and
+  /// what they were before, "drop them" is unreachable afterwards. Captured
+  /// before the change so the exact prior state can be put back, including the
+  /// difference between an alert that needed review and one that failed to
+  /// parse.
+  Map<String, String> unresolvedAlertStatuses({String? packageName}) {
+    final rows = _db.select(
+      "SELECT id, parse_status FROM raw_observations "
+      "WHERE parse_status IN ('review','error') "
+      "AND (? IS NULL OR source_package = ?)",
+      [packageName, packageName],
+    );
+    return {
+      for (final row in rows)
+        row['id'] as String: row['parse_status'] as String,
+    };
+  }
+
+  /// Puts dismissed alerts back exactly as they were.
+  void restoreAlertStatuses(Map<String, String> statuses) {
+    for (final entry in statuses.entries) {
+      _db.execute(
+        "UPDATE raw_observations SET parse_status = ? "
+        "WHERE id = ? AND parse_status = 'ignored'",
+        [entry.value, entry.key],
+      );
+    }
+  }
+
   void dismissUnparsed({String? packageName}) {
     if (packageName == null) {
       _db.execute(

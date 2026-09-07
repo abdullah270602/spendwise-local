@@ -823,6 +823,18 @@ final class SpendWiseController extends ChangeNotifier
   /// reconciliation pass at the end. The old screen ran one round-trip per
   /// item, which is why clearing an inbox of six felt like work.
   @override
+  Map<String, String> unresolvedAlertStatuses(String? packageName) =>
+      _ledger.unresolvedAlertStatuses(
+        packageName: packageName == null || packageName.isEmpty
+            ? null
+            : packageName,
+      );
+
+  @override
+  Future<void> restoreAlerts(Map<String, String> statuses) =>
+      _runBusy(() async => _ledger.restoreAlertStatuses(statuses));
+
+  @override
   Future<void> applyReviewDecision(ReviewDecision decision) =>
       _runBusy(() async {
         switch (decision.kind) {

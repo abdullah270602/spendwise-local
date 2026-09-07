@@ -151,7 +151,12 @@ class AnimatedMinor extends StatelessWidget {
   @override
   Widget build(BuildContext context) => TweenAnimationBuilder<int>(
     tween: IntTween(end: minorUnits),
-    duration: duration,
+    // A raw TweenAnimationBuilder gets none of the help Flutter gives the
+    // Animated* widgets, so reduced motion has to be honoured by hand or it
+    // is not honoured at all.
+    duration: MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : duration,
     curve: Curves.easeOutCubic,
     builder: (context, value, _) =>
         Text(formatMinor(value, cents: cents), style: style),
@@ -187,6 +192,11 @@ class FlowShape extends StatelessWidget {
   /// takes two thirds of a second to answer feels broken, not considered.
   final Duration duration;
 
+  /// How long the ribbon takes to travel between two sets of proportions.
+  /// Deliberately the same as [AnimatedMinor]'s, so the shape and the figures
+  /// beside it read as one movement rather than two that happen to coincide.
+  static const _morphDuration = Duration(milliseconds: 460);
+
   @override
   Widget build(BuildContext context) {
     final total = math.max(1, keptMinor.abs() + spentMinor.abs());
@@ -201,19 +211,37 @@ class FlowShape extends StatelessWidget {
             1.0,
           );
     final treatment = savedMinor <= 0 ? SavedTreatment.none : saved;
+    final reduce = MediaQuery.disableAnimationsOf(context);
+    // Two motions, not one. `reveal` draws the ribbon in once and then stays
+    // at 1 forever. The proportions were passed to the painter raw, so when
+    // the real figures changed the shape jumped to its new split while the
+    // legend beneath it was still counting -- the two halves of one sentence
+    // disagreeing for half a second. They now travel together, on the same
+    // duration and curve the figures use.
+    final morph = reduce ? Duration.zero : _morphDuration;
     return TweenAnimationBuilder<double>(
-      tween: Tween(begin: animate ? 0 : 1, end: 1),
-      duration: duration,
+      tween: Tween(end: keptFraction),
+      duration: morph,
       curve: Curves.easeOutCubic,
-      builder: (context, t, _) => CustomPaint(
-        size: Size.infinite,
-        painter: _FlowShapePainter(
-          keptFraction: keptFraction,
-          savedOfKept: savedOfKept,
-          saved: treatment,
-          reveal: t,
+      builder: (context, kept, _) => TweenAnimationBuilder<double>(
+        tween: Tween(end: savedOfKept),
+        duration: morph,
+        curve: Curves.easeOutCubic,
+        builder: (context, savedShare, _) => TweenAnimationBuilder<double>(
+          tween: Tween(begin: animate && !reduce ? 0 : 1, end: 1),
+          duration: reduce ? Duration.zero : duration,
+          curve: Curves.easeOutCubic,
+          builder: (context, t, _) => CustomPaint(
+            size: Size.infinite,
+            painter: _FlowShapePainter(
+              keptFraction: kept,
+              savedOfKept: savedShare,
+              saved: treatment,
+              reveal: t,
+            ),
+            child: SizedBox(height: height, width: double.infinity),
+          ),
         ),
-        child: SizedBox(height: height, width: double.infinity),
       ),
     );
   }
@@ -350,6 +378,14 @@ class _FlowShapePainter extends CustomPainter {
       paint..color = SpendWiseColors.spend,
     );
   }
+
+  /// Carries the values it was built with, so the proportions the ribbon is
+  /// currently painting can be read back -- by a debugger, and by the test
+  /// that holds it to travelling between two splits rather than jumping.
+  @override
+  String toString() =>
+      '_FlowShapePainter(keptFraction: $keptFraction, '
+      'savedOfKept: $savedOfKept, reveal: $reveal, saved: ${saved.name})';
 
   @override
   bool shouldRepaint(_FlowShapePainter old) =>
