@@ -189,7 +189,7 @@ List<ReviewRule> buildReviewRules({
         count: unrouted.length,
         unit: _fromSource(unrouted),
         claim: accounts.isEmpty
-            ? 'No account matched — you have not set one up yet.'
+            ? 'No account matched. You have not set one up yet.'
             : 'No account matched. Nothing here has reached a balance.',
         evidence: _sampleBody(unrouted),
         alternative: accounts.isEmpty ? null : 'Handle them one by one',
@@ -220,7 +220,7 @@ List<ReviewRule> buildReviewRules({
         unit: ownMoves.length == 1
             ? 'suspected own transfer'
             : 'suspected own transfers',
-        claim: 'Money moved between accounts you own — not spending.',
+        claim: 'Money moved between accounts you own. Not spending.',
         evidence: _sampleTitles(ownMoves),
         alternative: 'Some went to someone else',
         actions: [
@@ -293,7 +293,7 @@ List<ReviewRule> buildReviewRules({
             ? 'Read as money out. The amounts and merchants look clean.'
             : out == 0
             ? 'Read as money in. The amounts and senders look clean.'
-            : 'Read cleanly — $out out, ${group.length - out} in.',
+            : 'Read cleanly. $out out, ${group.length - out} in.',
         evidence: _sampleTitles(group),
         alternative: 'Check them one by one',
         actions: [
@@ -366,9 +366,9 @@ List<ReviewRule> buildReviewRules({
             ),
           ),
           ReviewAction(
-            label: one
-                ? 'It is a transaction — file it'
-                : 'They are transactions — file all $count',
+            // Verb first, and the two follow-ups are the same shape so they
+            // can share a row without one looking like the important one.
+            label: one ? 'File it' : 'File all $count',
             needsDirection: true,
             decision: ReviewDecision(
               kind: ReviewDecisionKind.fileAlerts,
@@ -376,9 +376,7 @@ List<ReviewRule> buildReviewRules({
             ),
           ),
           ReviewAction(
-            label: one
-                ? 'Not a transaction — drop it'
-                : 'Not transactions — drop all $count',
+            label: one ? 'Drop it' : 'Drop all $count',
             destructive: true,
             decision: ReviewDecision(
               kind: ReviewDecisionKind.dismissSource,

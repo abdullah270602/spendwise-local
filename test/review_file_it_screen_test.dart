@@ -26,16 +26,52 @@ void main() {
     tester,
   ) async {
     await openInbox(tester, _Fake());
-    expect(find.textContaining('file all 2'), findsOneWidget);
-    expect(find.textContaining('Not transactions'), findsOneWidget);
+    expect(find.text('File all 2'), findsOneWidget);
+    expect(find.text('Drop all 2'), findsOneWidget);
     expect(find.textContaining('Read them first'), findsOneWidget);
+  });
+
+  testWidgets('the two follow-up answers are one row of equal halves', (
+    tester,
+  ) async {
+    // Stacked, the wider button read as the more important one purely because
+    // its label was longer. Neither the width nor the emphasis should depend
+    // on how many characters a label happens to have.
+    await openInbox(tester, _Fake());
+
+    final file = tester.getRect(
+      find.widgetWithText(OutlinedButton, 'File all 2'),
+    );
+    final drop = tester.getRect(
+      find.widgetWithText(OutlinedButton, 'Drop all 2'),
+    );
+
+    expect(
+      file.width,
+      closeTo(drop.width, 0.5),
+      reason: 'equal halves, whatever the labels say',
+    );
+    expect(file.top, closeTo(drop.top, 0.5), reason: 'one row, not two');
+    expect(file.right, lessThanOrEqualTo(drop.left), reason: 'side by side');
+    expect(
+      file.height,
+      closeTo(drop.height, 0.5),
+      reason: 'and the same height, so neither sits proud of the other',
+    );
+  });
+
+  testWidgets('no answer is written with an em dash', (tester) async {
+    await openInbox(tester, _Fake());
+    for (final text in tester.widgetList<Text>(find.byType(Text))) {
+      expect(text.data ?? '', isNot(contains('—')), reason: text.data);
+    }
   });
 
   testWidgets('answering the direction files them', (tester) async {
     final viewModel = _Fake();
     await openInbox(tester, viewModel);
 
-    await tester.tap(find.textContaining('file all 2'));
+    await tester.tap(find.text('File all 2'));
     await tester.pumpAndSettle();
 
     // It asks the one thing it could not read, rather than guessing.
@@ -55,7 +91,7 @@ void main() {
   ) async {
     final viewModel = _Fake();
     await openInbox(tester, viewModel);
-    await tester.tap(find.textContaining('file all 2'));
+    await tester.tap(find.text('File all 2'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Money in'));
     await tester.pumpAndSettle();
@@ -67,7 +103,7 @@ void main() {
     // A half-answered question must not become a decision.
     final viewModel = _Fake();
     await openInbox(tester, viewModel);
-    await tester.tap(find.textContaining('file all 2'));
+    await tester.tap(find.text('File all 2'));
     await tester.pumpAndSettle();
 
     await tester.tapAt(const Offset(20, 20));
@@ -80,7 +116,7 @@ void main() {
     final viewModel = _Fake();
     await openInbox(tester, viewModel);
 
-    await tester.tap(find.textContaining('Not transactions'));
+    await tester.tap(find.text('Drop all 2'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('Which way'), findsNothing);

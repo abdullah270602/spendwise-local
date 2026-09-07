@@ -163,6 +163,12 @@ class DashboardScreen extends StatelessWidget {
                             '${formatMinor(kept)} is still yours and '
                             '${formatMinor(spent)} was spent.',
                         child: FlowShape(
+                          // With no breakdown beneath it the ribbon is the
+                          // whole screen, so it takes the room rather than
+                          // leaving it blank.
+                          height: categoryStyle == HomeCategories.off
+                              ? 210
+                              : 168,
                           receivedMinor: received,
                           // Taking saving out of the headline takes it out
                           // of the ribbon too: the shape then divides what is
@@ -189,6 +195,7 @@ class DashboardScreen extends StatelessWidget {
                         savedMinor: savedMinor,
                         setsSavingAside: savingsStyle.setsSavingAside,
                         namesTheSaving: savingsStyle.namesTheSaving,
+                        large: categoryStyle == HomeCategories.off,
                       ),
                     ] else
                       _SpentOnly(spent: spent, period: month),
@@ -263,15 +270,12 @@ class DashboardScreen extends StatelessWidget {
                 ),
               ),
             SliverToBoxAdapter(
-              child: _LoansNote(
+              child: _AsideNotes(
                 viewModel: viewModel,
-                onOpenAccounts: onOpenAccounts,
+                moves: ownMoves,
+                onTap: onOpenAccounts,
               ),
             ),
-            if (ownMoves.isNotEmpty)
-              SliverToBoxAdapter(
-                child: _OwnMovesNote(moves: ownMoves, onTap: onOpenAccounts),
-              ),
             SliverToBoxAdapter(child: _TrayScan(viewModel: viewModel)),
           ],
           SliverToBoxAdapter(
@@ -305,6 +309,7 @@ class MonthLegend extends StatelessWidget {
     this.savedMinor = 0,
     this.setsSavingAside = false,
     this.namesTheSaving = true,
+    this.large = false,
   });
 
   final int received;
@@ -324,6 +329,10 @@ class MonthLegend extends StatelessWidget {
   /// one question, which is what is left to spend.
   final bool namesTheSaving;
 
+  /// Drawn larger when nothing follows it on Home. Scale here answers the
+  /// space that is actually free, rather than decorating a fixed layout.
+  final bool large;
+
   @override
   Widget build(BuildContext context) {
     final aside = setsSavingAside && savedMinor > 0 ? savedMinor : 0;
@@ -333,6 +342,7 @@ class MonthLegend extends StatelessWidget {
       children: [
         Expanded(
           child: _LegendEntry(
+            large: large,
             label: headline < 0
                 ? 'Overspent'
                 : aside > 0
@@ -350,6 +360,7 @@ class MonthLegend extends StatelessWidget {
             child: Align(
               alignment: Alignment.topCenter,
               child: _LegendEntry(
+                large: large,
                 label: 'Saved',
                 minor: aside,
                 note: DashboardScreen._percent(aside, received),
@@ -358,6 +369,7 @@ class MonthLegend extends StatelessWidget {
             ),
           ),
         _LegendEntry(
+          large: large,
           label: 'Gone',
           minor: spent,
           note: DashboardScreen._percent(spent, received),
@@ -376,6 +388,7 @@ class _LegendEntry extends StatelessWidget {
     required this.note,
     required this.color,
     this.alignRight = false,
+    this.large = false,
   });
 
   final String label;
@@ -383,6 +396,7 @@ class _LegendEntry extends StatelessWidget {
   final String note;
   final Color color;
   final bool alignRight;
+  final bool large;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -395,7 +409,10 @@ class _LegendEntry extends StatelessWidget {
       AnimatedMinor(
         minor,
         cents: false,
-        style: SpendWiseType.amount.copyWith(color: color),
+        style: SpendWiseType.amount.copyWith(
+          color: color,
+          fontSize: large ? 30 : null,
+        ),
       ),
       const SizedBox(height: 2),
       Text(note, style: SpendWiseType.body.copyWith(fontSize: 12.5)),
@@ -600,120 +617,65 @@ class _SavingsStrip extends StatelessWidget {
 
 /// Lending is the other reason the spend figure is smaller than a naive sum
 /// of outgoing alerts, so it gets the same one-line treatment.
-class _LoansNote extends StatelessWidget {
-  const _LoansNote({required this.viewModel, required this.onOpenAccounts});
-
-  final SpendWiseViewModel viewModel;
-  final VoidCallback onOpenAccounts;
-
-  @override
-  Widget build(BuildContext context) {
-    final open = viewModel.uiDebts.where((item) => !item.isSettled).toList();
-    if (open.isEmpty) return const SizedBox.shrink();
-    final lentOut = open
-        .where((item) => item.lent)
-        .fold<int>(0, (sum, item) => sum + item.outstanding.minorUnits);
-    final owed = open
-        .where((item) => !item.lent)
-        .fold<int>(0, (sum, item) => sum + item.outstanding.minorUnits);
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        SpendWiseTheme.gutter,
-        20,
-        SpendWiseTheme.gutter,
-        0,
-      ),
-      child: InkWell(
-        onTap: onOpenAccounts,
-        child: Container(
-          padding: const EdgeInsets.only(top: 13),
-          decoration: const BoxDecoration(
-            border: Border(top: BorderSide(color: SpendWiseColors.line)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (lentOut > 0)
-                _LoanLine(
-                  amount: lentOut,
-                  tail: 'is out on loan',
-                  tone: SpendWiseColors.keep,
-                ),
-              if (lentOut > 0 && owed > 0) const SizedBox(height: 7),
-              if (owed > 0)
-                _LoanLine(
-                  amount: owed,
-                  tail: 'you owe',
-                  tone: SpendWiseColors.spend,
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LoanLine extends StatelessWidget {
-  const _LoanLine({
-    required this.amount,
-    required this.tail,
-    required this.tone,
+/// Money that moved without being spending.
+///
+/// Lending, being owed, and shifting money between your own accounts are three
+/// statements of the same kind, so they sit in one block on one grid rather
+/// than in separate strips with a rule each. They used to be two widgets with
+/// two markers of different sizes, each nudged into place by hand -- which is
+/// why the lines did not start at the same x and did not share a baseline.
+class _AsideNotes extends StatelessWidget {
+  const _AsideNotes({
+    required this.viewModel,
+    required this.moves,
+    required this.onTap,
   });
 
-  final int amount;
-  final String tail;
-  final Color tone;
-
-  @override
-  Widget build(BuildContext context) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Container(
-        margin: const EdgeInsets.only(right: 9, top: 5),
-        width: 6,
-        height: 6,
-        color: tone,
-      ),
-      Expanded(
-        child: Text.rich(
-          TextSpan(
-            children: [
-              TextSpan(
-                text: '${formatMinor(amount, cents: false)} ',
-                style: SpendWiseType.row.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: tone,
-                ),
-              ),
-              TextSpan(
-                text: tail,
-                style: SpendWiseType.body.copyWith(fontSize: 13),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ],
-  );
-}
-
-/// The one place Home mentions own-account transfers: they are the reason the
-/// spend figure above is smaller than a naive sum of outgoing alerts, so the
-/// number is worth stating rather than hiding.
-class _OwnMovesNote extends StatelessWidget {
-  const _OwnMovesNote({required this.moves, required this.onTap});
-
+  final SpendWiseViewModel viewModel;
   final List<TransactionViewData> moves;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final total = moves.fold<int>(
+    final open = viewModel.uiDebts.where((item) => !item.isSettled).toList();
+    final lentOut = open
+        .where((item) => item.kind == DebtKind.lent)
+        .fold<int>(0, (sum, item) => sum + item.outstanding.minorUnits);
+    final owed = open
+        .where((item) => item.kind == DebtKind.borrowed)
+        .fold<int>(0, (sum, item) => sum + item.outstanding.minorUnits);
+    final held = open
+        .where((item) => item.isHeld)
+        .fold<int>(0, (sum, item) => sum + item.outstanding.minorUnits);
+    final moved = moves.fold<int>(
       0,
       (sum, item) => sum + item.amount.minorUnits.abs(),
     );
+
+    final lines = <Widget>[
+      if (lentOut > 0)
+        _AsideLine(
+          amount: lentOut,
+          tail: 'out on loan',
+          tone: SpendWiseColors.keep,
+        ),
+      if (owed > 0)
+        _AsideLine(amount: owed, tail: 'you owe', tone: SpendWiseColors.spend),
+      if (held > 0)
+        _AsideLine(
+          amount: held,
+          tail: 'held for someone else',
+          tone: SpendWiseColors.dim,
+        ),
+      if (moved > 0)
+        _AsideLine(
+          amount: moved,
+          tail: 'moved between your own accounts',
+          tone: SpendWiseColors.mine,
+        ),
+    ];
+    if (lines.isEmpty) return const SizedBox.shrink();
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         SpendWiseTheme.gutter,
@@ -728,45 +690,83 @@ class _OwnMovesNote extends StatelessWidget {
           decoration: const BoxDecoration(
             border: Border(top: BorderSide(color: SpendWiseColors.line)),
           ),
-          child: Row(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Padding(
-                padding: EdgeInsets.only(right: 8, top: 1),
-                child: Text(
-                  '⇄',
-                  style: TextStyle(fontSize: 14, color: SpendWiseColors.mine),
-                ),
-              ),
-              Expanded(
-                child: Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(
-                        text: '${formatMinor(total, cents: false)} ',
-                        style: SpendWiseType.row.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: SpendWiseColors.mine,
-                        ),
-                      ),
-                      TextSpan(
-                        text: moves.length == 1
-                            ? 'moved between your own accounts — not counted '
-                                  'as spending.'
-                            : 'moved between your own accounts — not counted '
-                                  'as spending.',
-                        style: SpendWiseType.body.copyWith(fontSize: 13),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              for (var i = 0; i < lines.length; i++) ...[
+                if (i > 0) const SizedBox(height: 9),
+                lines[i],
+              ],
             ],
           ),
         ),
       ),
     );
   }
+}
+
+/// One line of that block.
+///
+/// The marker sits in a fixed column the width of the gutter it shares with
+/// every other line, and is centred against the first line of text by a box
+/// of the text's own height -- not by a hand-tuned top margin, which is what
+/// let two of these drift apart in the first place.
+class _AsideLine extends StatelessWidget {
+  const _AsideLine({
+    required this.amount,
+    required this.tail,
+    required this.tone,
+  });
+
+  final int amount;
+  final String tail;
+  final Color tone;
+
+  static const _markerColumn = 6.0;
+  static const _gutter = 11.0;
+  static const _lineHeight = 20.0;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      SizedBox(
+        width: _markerColumn,
+        height: _lineHeight,
+        child: Center(
+          child: Container(
+            width: _markerColumn,
+            height: _markerColumn,
+            color: tone,
+          ),
+        ),
+      ),
+      const SizedBox(width: _gutter),
+      Expanded(
+        child: Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: '${formatMinor(amount, cents: false)} ',
+                style: SpendWiseType.row.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: tone,
+                  height: _lineHeight / 15,
+                ),
+              ),
+              TextSpan(
+                text: tail,
+                style: SpendWiseType.body.copyWith(
+                  fontSize: 13,
+                  height: _lineHeight / 13,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ],
+  );
 }
 
 /// Deliberately the quietest control on the screen. It exists because Android
@@ -837,7 +837,7 @@ class _TrayScanState extends State<_TrayScan> {
         NotificationTrayScanViewStatus.listenerUnavailable =>
           'The capture service is not running yet. Try again in a moment.',
         NotificationTrayScanViewStatus.completed when result.queuedCount == 0 =>
-          'Nothing new in the tray — everything there is already recorded.',
+          'Nothing new in the tray. Everything there is already recorded.',
         NotificationTrayScanViewStatus.completed =>
           'Picked up ${result.queuedCount} '
               '${result.queuedCount == 1 ? 'alert' : 'alerts'} from the tray.',

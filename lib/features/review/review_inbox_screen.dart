@@ -164,8 +164,8 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
         SnackBar(
           content: Text(
             rule.count == 1
-                ? 'Done — 1 alert settled.'
-                : 'Done — ${rule.count} alerts settled in one go.',
+                ? '1 alert settled.'
+                : '${rule.count} alerts settled in one go.',
           ),
         ),
       );
@@ -447,7 +447,7 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Add an account first — there is nowhere to file these.',
+            'Add an account first. There is nowhere to file these.',
           ),
         ),
       );
@@ -719,20 +719,42 @@ class _RuleBlock extends StatelessWidget {
           busy: busy,
           onPressed: locked && !busy ? null : () => onApply(rule.primary),
         ),
-        // Every other answer, in the order the rule offered them. A rule with
-        // one answer is unchanged; a rule with three now shows three, instead
-        // of hiding the ones the old primary/secondary pair had no room for.
-        for (final action in rule.actions.skip(1)) ...[
+        // The follow-up answers share one row at equal width. Stacked, the
+        // wider button read as the more important one purely because its
+        // label was longer, which is not a judgement the layout should be
+        // making. Beyond two they stack, since three across a phone leaves
+        // room for a word each.
+        if (rule.actions.length > 1) ...[
           const SizedBox(height: 9),
-          OutlinedButton(
-            onPressed: locked || busy ? null : () => onApply(action),
-            style: action.destructive
-                ? OutlinedButton.styleFrom(
-                    foregroundColor: SpendWiseColors.spend,
-                  )
-                : null,
-            child: Text(action.label),
-          ),
+          if (rule.actions.length == 3)
+            Row(
+              children: [
+                Expanded(
+                  child: _SecondaryAction(
+                    action: rule.actions[1],
+                    enabled: !locked && !busy,
+                    onPressed: onApply,
+                  ),
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: _SecondaryAction(
+                    action: rule.actions[2],
+                    enabled: !locked && !busy,
+                    onPressed: onApply,
+                  ),
+                ),
+              ],
+            )
+          else
+            for (final action in rule.actions.skip(1)) ...[
+              _SecondaryAction(
+                action: action,
+                enabled: !locked && !busy,
+                onPressed: onApply,
+              ),
+              if (action != rule.actions.last) const SizedBox(height: 9),
+            ],
         ],
         if (rule.alternative case final alternative?) ...[
           const SizedBox(height: 9),
@@ -765,6 +787,37 @@ class _RuleBlock extends StatelessWidget {
 
 /// Quotes the alert verbatim and marks the phrases the decision turned on, so
 /// the user can see why SpendWise thinks what it thinks rather than trust it.
+/// A follow-up answer.
+///
+/// Full-width by design: the row above decides how much space it gets, so two
+/// of these side by side are the same size whatever their labels say.
+class _SecondaryAction extends StatelessWidget {
+  const _SecondaryAction({
+    required this.action,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  final ReviewAction action;
+  final bool enabled;
+  final void Function(ReviewAction action) onPressed;
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton(
+    onPressed: enabled ? () => onPressed(action) : null,
+    style: OutlinedButton.styleFrom(
+      minimumSize: const Size.fromHeight(46),
+      foregroundColor: action.destructive ? SpendWiseColors.spend : null,
+    ),
+    child: Text(
+      action.label,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      textAlign: TextAlign.center,
+    ),
+  );
+}
+
 class _Evidence extends StatelessWidget {
   const _Evidence({required this.text, required this.highlights});
 

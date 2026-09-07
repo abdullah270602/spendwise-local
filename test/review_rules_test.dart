@@ -129,7 +129,7 @@ void main() {
 
     expect(result.first.id, 'transfer');
     expect(result.first.count, 2);
-    expect(result.first.claim, contains('not spending'));
+    expect(result.first.claim, contains('Not spending'));
     expect(result.map((rule) => rule.id), contains('confirm:Meezan'));
   });
 
@@ -305,7 +305,12 @@ void main() {
       isTrue,
       reason: 'there has to be a way to say this was never money',
     );
-    expect(rule.actions.last.label, contains('Not a transaction'));
+    expect(rule.actions.last.label, 'Drop it');
+    // Both follow-ups share a row, so neither may be long enough to force the
+    // other into an ellipsis on a 360dp phone.
+    for (final action in rule.actions.skip(1)) {
+      expect(action.label.length, lessThan(18), reason: action.label);
+    }
   });
 
   test('unreadable alerts stay a per-app decision', () {
@@ -362,7 +367,7 @@ void main() {
 
     // Dropping them is still offered -- it is just never the only answer.
     expect(rule.actions.last.decision.kind, ReviewDecisionKind.dismissSource);
-    expect(rule.actions.last.label, contains('Not transactions'));
+    expect(rule.actions.last.label, 'Drop all 2');
 
     // And the evidence is still one tap away, so neither answer is blind.
     expect(rule.alternative, contains('Read'));
