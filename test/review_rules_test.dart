@@ -49,8 +49,8 @@ void main() {
 
     expect(result, hasLength(1));
     expect(result.single.count, 10);
-    expect(result.single.actionLabel, 'Confirm all 10');
-    expect(result.single.decision.transactionIds, hasLength(10));
+    expect(result.single.primary.label, 'Confirm all 10');
+    expect(result.single.primary.decision.transactionIds, hasLength(10));
   });
 
   test('a reviewed transaction is not a decision', () {
@@ -81,8 +81,8 @@ void main() {
     ]);
 
     expect(result.first.id, 'redirect');
-    expect(result.first.decision.kind, ReviewDecisionKind.redirect);
-    expect(result.first.decision.expense, isTrue);
+    expect(result.first.primary.decision.kind, ReviewDecisionKind.redirect);
+    expect(result.first.primary.decision.expense, isTrue);
     expect(result.first.evidence, contains('credited to SAMPLE PERSON'));
     expect(result.first.highlights, contains('credited to'));
   });
@@ -103,7 +103,7 @@ void main() {
     final labelled = rules([
       pending(id: 'labelled', accountId: null, accountName: 'Meezan'),
     ]);
-    expect(labelled.single.needsAccount, isFalse);
+    expect(labelled.single.primary.needsAccount, isFalse);
 
     final orphan = rules(
       [pending(id: 'orphan', accountId: null, accountName: '')],
@@ -117,7 +117,7 @@ void main() {
       ],
     );
     expect(orphan.single.id, 'route');
-    expect(orphan.single.needsAccount, isTrue);
+    expect(orphan.single.primary.needsAccount, isTrue);
   });
 
   test('own-account moves get their own decision, ahead of the catch-all', () {
@@ -140,7 +140,7 @@ void main() {
     ]);
 
     expect(result.single.id, 'categorize');
-    expect(result.single.needsCategory, isTrue);
+    expect(result.single.primary.needsCategory, isTrue);
     expect(result.single.count, 2);
   });
 
@@ -160,7 +160,7 @@ void main() {
 
     final result = rules(transactions);
     final covered = [
-      for (final rule in result) ...rule.decision.transactionIds,
+      for (final rule in result) ...rule.primary.decision.transactionIds,
     ];
 
     expect(covered, hasLength(transactions.length));
@@ -193,19 +193,119 @@ void main() {
       ],
     );
 
-    final first = result.first;
-    expect(first.count, 4);
-    expect(first.unit, 'alerts from Messages');
-    expect(first.needsAccount, isTrue);
-    expect(first.decision.kind, ReviewDecisionKind.routeAlerts);
-    expect(first.decision.alertIds, hasLength(4));
+    // Alerts that reached no account no longer make a question of their own.
+    // They are a subset of the alerts an app failed to deliver -- the same
+    // parse_status, plus `account_id IS NULL` -- so asking separately put one
+    // alert on screen twice, under two claims, with two different answers.
     expect(
-      first.opensAlertReader,
-      isTrue,
-      reason: 'a claim about raw alerts must be checkable against them',
+      result.map((rule) => rule.id),
+      isNot(contains(startsWith('route-alerts:'))),
+      reason: 'the per-app rule owns these now',
     );
-    // The ordinary confirm rule is still there, just behind it.
-    expect(result, hasLength(2));
+    expect(
+      result,
+      hasLength(1),
+      reason: 'only the ordinary confirm rule, since no app reported a pile',
+    );
+  });
+
+  test('one app, one question, three answers', () {
+    final result = buildReviewRules(
+      transactions: const [],
+      reviews: const [
+        ReviewViewData(
+          id: 'unparsed:com.google.android.apps.messaging',
+          reason: ReviewReason.parseFailed,
+          title: '4 unread alerts from Messages',
+          description: 'SpendWise could not read these as transactions.',
+          transactions: [],
+        ),
+      ],
+      accounts: const [],
+      unroutedAlerts: [
+        AlertViewData(
+          id: 'alert-0',
+          observedAt: DateTime.utc(2026, 9, 6),
+          title: 'Unknown',
+          body: 'PKR 4,500.00 debited at EXAMPLE CLINIC',
+          sourceLabel: 'Messages',
+          packageName: 'com.google.android.apps.messaging',
+          status: 'review',
+        ),
+      ],
+    );
+
+    final rule = result.single;
+    expect(rule.count, 4, reason: 'the app total, counted once');
+    expect(rule.unit, 'alerts from Messages');
+    expect(rule.claim, contains('never reached your ledger'));
+    expect(
+      rule.evidence,
+      contains('EXAMPLE CLINIC'),
+      reason: 'a real body beats a description of why there is no body',
+    );
+
+    expect(rule.actions, hasLength(3));
+    final [attach, file, drop] = rule.actions;
+
+    expect(attach.decision.kind, ReviewDecisionKind.routeAlerts);
+    expect(attach.needsAccount, isTrue);
+    expect(attach.label, contains('account'));
+
+    expect(file.decision.kind, ReviewDecisionKind.fileAlerts);
+    expect(file.needsDirection, isTrue, reason: 'it asks before it files');
+
+    expect(drop.decision.kind, ReviewDecisionKind.dismissSource);
+    expect(drop.destructive, isTrue, reason: 'drawn last and quietest');
+
+    // Every answer settles the same alerts, so the count above the buttons is
+    // true whichever one is tapped.
+    for (final action in rule.actions) {
+      expect(
+        action.decision.packageName,
+        'com.google.android.apps.messaging',
+        reason: action.label,
+      );
+    }
+  });
+
+  test('promotional SMS can be dropped, not only filed', () {
+    // The reported dead end: a marketing message that parsed as nothing had
+    // exactly one button, and that button filed it into an account.
+    final result = buildReviewRules(
+      transactions: const [],
+      reviews: const [
+        ReviewViewData(
+          id: 'unparsed:com.google.android.apps.messaging',
+          reason: ReviewReason.parseFailed,
+          title: '1 unread alert from Messages',
+          description: 'SpendWise could not read this as a transaction.',
+          transactions: [],
+        ),
+      ],
+      accounts: const [],
+      unroutedAlerts: [
+        AlertViewData(
+          id: 'promo',
+          observedAt: DateTime.utc(2026, 9, 6),
+          title: 'Unknown',
+          body: 'APP UPDATE pe unlock karien! FREE GBs, Mins aur Bohat Kuch!',
+          sourceLabel: 'Messages',
+          packageName: 'com.google.android.apps.messaging',
+          status: 'review',
+        ),
+      ],
+    );
+
+    final rule = result.single;
+    expect(
+      rule.actions.any(
+        (a) => a.decision.kind == ReviewDecisionKind.dismissSource,
+      ),
+      isTrue,
+      reason: 'there has to be a way to say this was never money',
+    );
+    expect(rule.actions.last.label, contains('Not a transaction'));
   });
 
   test('unreadable alerts stay a per-app decision', () {
@@ -223,8 +323,9 @@ void main() {
     );
 
     expect(result.single.count, 7);
-    expect(result.single.decision.packageName, 'com.whatsapp');
-    expect(result.single.secondary?.packageName, 'com.whatsapp');
+    for (final action in result.single.actions) {
+      expect(action.decision.packageName, 'com.whatsapp', reason: action.label);
+    }
   });
 
   test('an unreadable alert offers a way to keep it, not only to bin it', () {
@@ -246,16 +347,22 @@ void main() {
 
     final rule = result.single;
     expect(
-      rule.decision.kind,
-      ReviewDecisionKind.fileAlerts,
-      reason: 'the constructive answer leads',
+      rule.primary.decision.kind,
+      ReviewDecisionKind.routeAlerts,
+      reason: 'attaching an account leads: it also fixes the next alert',
     );
-    expect(rule.needsDirection, isTrue, reason: 'it asks before it files');
-    expect(rule.actionLabel, contains('file'));
+    expect(
+      rule.actions.map((a) => a.decision.kind),
+      containsAll([
+        ReviewDecisionKind.routeAlerts,
+        ReviewDecisionKind.fileAlerts,
+        ReviewDecisionKind.dismissSource,
+      ]),
+    );
 
-    // Dropping them is still offered -- it is just no longer the only answer.
-    expect(rule.secondary?.kind, ReviewDecisionKind.dismissSource);
-    expect(rule.secondaryLabel, contains('Not transactions'));
+    // Dropping them is still offered -- it is just never the only answer.
+    expect(rule.actions.last.decision.kind, ReviewDecisionKind.dismissSource);
+    expect(rule.actions.last.label, contains('Not transactions'));
 
     // And the evidence is still one tap away, so neither answer is blind.
     expect(rule.alternative, contains('Read'));

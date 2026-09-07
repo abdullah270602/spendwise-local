@@ -1061,6 +1061,16 @@ final class LocalLedger {
     limit: limit,
   );
 
+  /// The `sources` row for an app, whether or not any account uses it.
+  String? _sourceIdForPackage(String packageName) {
+    final rows = _db.select(
+      'SELECT id FROM sources WHERE package_name = ? '
+      'ORDER BY sender_pattern IS NOT NULL, created_at LIMIT 1',
+      [packageName],
+    );
+    return rows.isEmpty ? null : rows.first['id'] as String;
+  }
+
   List<StoredAlert> _alertQuery({
     required String where,
     String? packageName,
@@ -2259,7 +2269,14 @@ final class LocalLedger {
     final sourceAccount = packageName == null
         ? null
         : _matchSourceAccount(packageName, text);
-    final sourceId = sourceAccount?['source_id'] as String?;
+    // An app the user configured but never attached to an account still has a
+    // row in `sources` carrying the name Android gave it. Without this the
+    // alert stores no source_id, the LEFT JOIN finds nothing, and Review ends
+    // up naming the app by its package id -- for exactly the alerts that most
+    // need answering, since an unattached app is why they are stuck.
+    final sourceId =
+        (sourceAccount?['source_id'] as String?) ??
+        (packageName == null ? null : _sourceIdForPackage(packageName));
     // A source configured with an explicit sender pattern is the user saying
     // exactly where these belong, so it is never second-guessed. Otherwise
     // the alert's own contents decide: one messaging app delivers every

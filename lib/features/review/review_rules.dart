@@ -7,25 +7,54 @@ import '../shell/spendwise_view_model.dart';
 /// are uncertain for the same reason, there is one question, not ten. A rule
 /// names the reason, quotes the evidence, and carries the decision that
 /// answers it for the whole group.
+/// One answer a rule offers.
+///
+/// The requirements live here rather than on the rule because a rule can offer
+/// several answers that need different things: attaching alerts to an account
+/// needs an account, filing them as transactions needs a direction, and
+/// dropping them needs nothing. Hanging those flags off the rule forced every
+/// answer to share one set, which is why the rule that most needed a second
+/// answer could not have one.
+class ReviewAction {
+  const ReviewAction({
+    required this.label,
+    required this.decision,
+    this.needsAccount = false,
+    this.needsCategory = false,
+    this.needsDirection = false,
+    this.destructive = false,
+  });
+
+  final String label;
+  final ReviewDecision decision;
+
+  /// The action cannot run until the user picks a target.
+  final bool needsAccount;
+  final bool needsCategory;
+
+  /// The action cannot run until the user says which way the money went. The
+  /// parser read everything else; this is the half it could not.
+  final bool needsDirection;
+
+  /// Throws evidence away, so it is drawn last and quietest. It is still a
+  /// real answer -- a rule that only offers destruction is not offering a
+  /// choice, and a rule that hides it forces the user to file spam.
+  final bool destructive;
+}
+
 class ReviewRule {
   const ReviewRule({
     required this.id,
     required this.count,
     required this.unit,
     required this.claim,
-    required this.decision,
-    required this.actionLabel,
+    required this.actions,
     this.evidence,
     this.highlights = const [],
     this.alternative,
-    this.needsAccount = false,
-    this.needsCategory = false,
-    this.needsDirection = false,
-    this.secondary,
-    this.secondaryLabel,
     this.alertPackage,
     this.readableAlerts = 0,
-  });
+  }) : assert(actions.length > 0, 'a question with no answer is a statement');
 
   /// Stable across rebuilds so a resolving row does not jump.
   final String id;
@@ -48,24 +77,11 @@ class ReviewRule {
   /// The escape hatch, when there is one.
   final String? alternative;
 
-  final ReviewDecision decision;
-  final String actionLabel;
+  /// Every answer on offer, the constructive one first. The screen draws the
+  /// first as the primary action and the rest beneath it, in order.
+  final List<ReviewAction> actions;
 
-  /// The action cannot run until the user picks a target.
-  final bool needsAccount;
-  final bool needsCategory;
-
-  /// The action cannot run until the user says which way the money went. The
-  /// parser read everything else; this is the half it could not.
-  final bool needsDirection;
-
-  /// The other real answer, when there is one.
-  ///
-  /// A rule that offers only a destructive action is not offering a choice.
-  /// Alerts SpendWise cannot read are the case that matters: they are usually
-  /// real transactions, and "drop them" was the only button on the screen.
-  final ReviewDecision? secondary;
-  final String? secondaryLabel;
+  ReviewAction get primary => actions.first;
 
   /// Set when the rule is about raw alerts rather than parsed transactions,
   /// so the screen can offer to open the alerts themselves. A rule the user
@@ -107,39 +123,17 @@ List<ReviewRule> buildReviewRules({
     return matched;
   }
 
-  // 0. A shared source delivered money it could not place. These never became
-  //    transactions, so they are invisible to every rule below -- and they are
-  //    the single most common way a real payment goes missing.
-  final byApp = <String, List<AlertViewData>>{};
+  // Alerts that look like money but reached no account are a *subset* of the
+  // alerts an app failed to deliver, not a separate pile: both queries filter
+  // on the same parse_status, and one adds `account_id IS NULL`. Asking about
+  // them separately counted the same alert twice and put the same alert on
+  // screen as two questions with two different answers. They are kept here
+  // only to quote a real body, and are answered by the per-app rule below.
+  final unroutedByPackage = <String, List<AlertViewData>>{};
   for (final alert in unroutedAlerts) {
-    byApp.putIfAbsent(alert.sourceLabel, () => []).add(alert);
-  }
-  final appNames = byApp.keys.toList()
-    ..sort((a, b) => byApp[b]!.length.compareTo(byApp[a]!.length));
-  for (final app in appNames) {
-    final group = byApp[app]!;
-    rules.add(
-      ReviewRule(
-        id: 'route-alerts:$app',
-        count: group.length,
-        unit: group.length == 1 ? 'alert from $app' : 'alerts from $app',
-        claim:
-            '$app carries more than one bank, and these did not name one '
-            'SpendWise recognises.',
-        evidence: _trim(group.first.body),
-        actionLabel: group.length == 1
-            ? 'File it under one account'
-            : 'File all ${group.length} under one account',
-        alternative: 'Read ${group.length == 1 ? 'it' : 'them'} first',
-        needsAccount: true,
-        alertPackage: group.first.packageName,
-        readableAlerts: group.length,
-        decision: ReviewDecision(
-          kind: ReviewDecisionKind.routeAlerts,
-          alertIds: [for (final alert in group) alert.id],
-        ),
-      ),
-    );
+    final package = alert.packageName;
+    if (package == null || package.isEmpty) continue;
+    unroutedByPackage.putIfAbsent(package, () => []).add(alert);
   }
 
   // 1. Direction is wrong. Highest value: it changes the numbers, not just the
@@ -161,14 +155,18 @@ List<ReviewRule> buildReviewRules({
         claim: 'Money "credited to" someone else, from your account.',
         evidence: _trim(sample.body),
         highlights: const ['credited to', 'from your account'],
-        actionLabel: misread.length == 1
-            ? 'Treat it as money out'
-            : 'Treat all ${misread.length} as money out',
         alternative: 'They really were money in',
-        decision: ReviewDecision(
-          kind: ReviewDecisionKind.redirect,
-          transactionIds: [for (final item in misread) item.id],
-        ),
+        actions: [
+          ReviewAction(
+            label: misread.length == 1
+                ? 'Treat it as money out'
+                : 'Treat all ${misread.length} as money out',
+            decision: ReviewDecision(
+              kind: ReviewDecisionKind.redirect,
+              transactionIds: [for (final item in misread) item.id],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -194,15 +192,19 @@ List<ReviewRule> buildReviewRules({
             ? 'No account matched — you have not set one up yet.'
             : 'No account matched. Nothing here has reached a balance.',
         evidence: _sampleBody(unrouted),
-        actionLabel: unrouted.length == 1
-            ? 'Choose its account'
-            : 'Send all ${unrouted.length} to one account',
         alternative: accounts.isEmpty ? null : 'Handle them one by one',
-        needsAccount: true,
-        decision: ReviewDecision(
-          kind: ReviewDecisionKind.route,
-          transactionIds: [for (final item in unrouted) item.id],
-        ),
+        actions: [
+          ReviewAction(
+            label: unrouted.length == 1
+                ? 'Choose its account'
+                : 'Send all ${unrouted.length} to one account',
+            needsAccount: true,
+            decision: ReviewDecision(
+              kind: ReviewDecisionKind.route,
+              transactionIds: [for (final item in unrouted) item.id],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -220,14 +222,18 @@ List<ReviewRule> buildReviewRules({
             : 'suspected own transfers',
         claim: 'Money moved between accounts you own — not spending.',
         evidence: _sampleTitles(ownMoves),
-        actionLabel: ownMoves.length == 1
-            ? 'Yes, that was my own move'
-            : 'Yes, all ${ownMoves.length} were my own moves',
         alternative: 'Some went to someone else',
-        decision: ReviewDecision(
-          kind: ReviewDecisionKind.confirm,
-          transactionIds: [for (final item in ownMoves) item.id],
-        ),
+        actions: [
+          ReviewAction(
+            label: ownMoves.length == 1
+                ? 'Yes, that was my own move'
+                : 'Yes, all ${ownMoves.length} were my own moves',
+            decision: ReviewDecision(
+              kind: ReviewDecisionKind.confirm,
+              transactionIds: [for (final item in ownMoves) item.id],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -247,15 +253,19 @@ List<ReviewRule> buildReviewRules({
         unit: _fromSource(uncategorised),
         claim: 'Read correctly, but not filed under anything yet.',
         evidence: _sampleTitles(uncategorised),
-        actionLabel: uncategorised.length == 1
-            ? 'File it'
-            : 'File all ${uncategorised.length} together',
         alternative: 'They belong in different categories',
-        needsCategory: true,
-        decision: ReviewDecision(
-          kind: ReviewDecisionKind.categorize,
-          transactionIds: [for (final item in uncategorised) item.id],
-        ),
+        actions: [
+          ReviewAction(
+            label: uncategorised.length == 1
+                ? 'File it'
+                : 'File all ${uncategorised.length} together',
+            needsCategory: true,
+            decision: ReviewDecision(
+              kind: ReviewDecisionKind.categorize,
+              transactionIds: [for (final item in uncategorised) item.id],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -285,20 +295,32 @@ List<ReviewRule> buildReviewRules({
             ? 'Read as money in. The amounts and senders look clean.'
             : 'Read cleanly — $out out, ${group.length - out} in.',
         evidence: _sampleTitles(group),
-        actionLabel: group.length == 1
-            ? 'Confirm it'
-            : 'Confirm all ${group.length}',
         alternative: 'Check them one by one',
-        decision: ReviewDecision(
-          kind: ReviewDecisionKind.confirm,
-          transactionIds: [for (final item in group) item.id],
-        ),
+        actions: [
+          ReviewAction(
+            label: group.length == 1
+                ? 'Confirm it'
+                : 'Confirm all ${group.length}',
+            decision: ReviewDecision(
+              kind: ReviewDecisionKind.confirm,
+              transactionIds: [for (final item in group) item.id],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  // 6. Raw alerts that never became transactions, already grouped per app by
-  //    the controller.
+  // 6. One question per app, covering every alert of its that never reached
+  //    the ledger -- whichever way it failed.
+  //
+  //    This used to be two rules. One asked about alerts that read as money
+  //    but named no account; the other about alerts that did not parse at
+  //    all. The first set is contained in the second, so a single alert
+  //    appeared twice, under two different claims, offering two different
+  //    answers -- and the "no account" version offered no way to say "this is
+  //    not a transaction", which left promotional SMS with nothing to do but
+  //    be filed into an account.
   for (final review in reviews) {
     if (review.reason != ReviewReason.parseFailed) continue;
     final package = review.id.startsWith('unparsed:')
@@ -306,40 +328,64 @@ List<ReviewRule> buildReviewRules({
         : '';
     final app = _appName(review.title);
     final count = _leadingCount(review.title) ?? 1;
+    final one = count == 1;
+    final them = one ? 'it' : 'them';
+    // A real body beats a description of why there is no body.
+    final stuck = unroutedByPackage[package] ?? const [];
     rules.add(
       ReviewRule(
         id: review.id,
         count: count,
         unit: app == null
-            ? (count == 1
-                  ? 'alert SpendWise cannot read'
-                  : 'alerts SpendWise cannot read')
-            : 'unread from $app',
+            ? (one ? 'alert' : 'alerts')
+            : (one ? 'alert from $app' : 'alerts from $app'),
         claim: app == null
-            ? 'Nothing here parsed as a transaction.'
-            : 'Nothing from $app parsed as a transaction.',
-        evidence: _reasonOnly(review.description),
-        // The constructive answer leads. These are usually real payments the
-        // parser could not read the direction of, and offering only "drop
-        // them" made the single button on screen a destructive one.
-        actionLabel: count == 1
-            ? 'It is a transaction — file it'
-            : 'They are transactions — file all $count',
-        needsDirection: true,
-        decision: ReviewDecision(
-          kind: ReviewDecisionKind.fileAlerts,
-          packageName: package,
-        ),
-        secondaryLabel: count == 1
-            ? 'Not a transaction — drop it'
-            : 'Not transactions — drop all $count',
-        secondary: ReviewDecision(
-          kind: ReviewDecisionKind.dismissSource,
-          packageName: package,
-        ),
-        alternative: 'Read ${count == 1 ? 'it' : 'them'} first',
+            ? 'Nothing here reached your ledger.'
+            : one
+            ? 'One alert from $app never reached your ledger.'
+            : '$count alerts from $app never reached your ledger.',
+        evidence: stuck.isNotEmpty
+            ? _trim(stuck.first.body)
+            : _reasonOnly(review.description),
+        alternative: 'Read $them first',
         alertPackage: package.isEmpty ? null : package,
         readableAlerts: count,
+        // Three answers, always the same three, in the order a person would
+        // try them. Attaching an account is first because it is the fix that
+        // also teaches SpendWise where the app's future alerts belong.
+        actions: [
+          ReviewAction(
+            label: one
+                ? 'Attach it to an account'
+                : 'Attach all $count to an account',
+            needsAccount: true,
+            decision: ReviewDecision(
+              kind: ReviewDecisionKind.routeAlerts,
+              alertIds: [for (final alert in stuck) alert.id],
+              packageName: package,
+            ),
+          ),
+          ReviewAction(
+            label: one
+                ? 'It is a transaction — file it'
+                : 'They are transactions — file all $count',
+            needsDirection: true,
+            decision: ReviewDecision(
+              kind: ReviewDecisionKind.fileAlerts,
+              packageName: package,
+            ),
+          ),
+          ReviewAction(
+            label: one
+                ? 'Not a transaction — drop it'
+                : 'Not transactions — drop all $count',
+            destructive: true,
+            decision: ReviewDecision(
+              kind: ReviewDecisionKind.dismissSource,
+              packageName: package,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -349,7 +395,6 @@ List<ReviewRule> buildReviewRules({
   // be the first thing offered -- a one-alert question above a ten-alert one
   // reads as busywork.
   bool isUrgent(ReviewRule rule) =>
-      rule.id.startsWith('route-alerts:') ||
       const {'redirect', 'route', 'transfer'}.contains(rule.id);
   final head = rules.where(isUrgent).toList();
   final tail = rules.where((rule) => !isUrgent(rule)).toList()

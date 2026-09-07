@@ -849,7 +849,23 @@ final class SpendWiseController extends ChangeNotifier
             if (target == null) {
               throw ArgumentError('Routing needs an account');
             }
-            _ledger.routeAlerts(decision.alertIds, target);
+            // The rule names an app, and only some of its stuck alerts are
+            // known by id here. Widening an empty list the way filing and
+            // dropping already do keeps all three answers covering exactly
+            // the same alerts -- otherwise "attach them" would quietly settle
+            // fewer than the count printed above the button.
+            final routing = decision.packageName;
+            final alertIds = decision.alertIds.isNotEmpty
+                ? decision.alertIds
+                : _ledger
+                      .alerts(
+                        packageName: routing == null || routing.isEmpty
+                            ? null
+                            : routing,
+                      )
+                      .map((alert) => alert.id)
+                      .toList(growable: false);
+            _ledger.routeAlerts(alertIds, target);
           case ReviewDecisionKind.fileAlerts:
             // The rule names an app, not a list of ids -- the same way
             // dismissing does, so both answers cover exactly the same alerts.
@@ -898,12 +914,16 @@ final class SpendWiseController extends ChangeNotifier
   bool isSharedSource(String packageName) =>
       _ledger.isSharedSource(packageName);
 
-  static AlertViewData _alertView(StoredAlert alert) => AlertViewData(
+  /// Not static: naming an app needs the live Android labels, and an alert
+  /// that skips that step reaches Review as "com.google.android.apps.messaging",
+  /// which reads as a question about somebody else's phone. The transaction
+  /// path has always normalised; this one quietly did not.
+  AlertViewData _alertView(StoredAlert alert) => AlertViewData(
     id: alert.id,
     observedAt: alert.observedAt.toLocal(),
     title: alert.title,
     body: alert.body,
-    sourceLabel: alert.sourceLabel,
+    sourceLabel: _appLabel(alert.packageName, alert.sourceLabel),
     packageName: alert.packageName,
     status: alert.status,
     reason: alert.reason,

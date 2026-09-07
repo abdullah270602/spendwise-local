@@ -86,9 +86,8 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
                   rule: rules[index],
                   busy: applying == rules[index].id,
                   locked: applying != null,
-                  onApply: () => _apply(rules[index]),
+                  onApply: (action) => _apply(rules[index], action),
                   onAlternative: () => _alternative(rules[index]),
-                  onSecondary: () => _applySecondary(rules[index]),
                 ),
               ),
             ),
@@ -122,10 +121,10 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
     );
   }
 
-  Future<void> _apply(ReviewRule rule, {ReviewDecision? override}) async {
-    var decision = override ?? rule.decision;
+  Future<void> _apply(ReviewRule rule, ReviewAction action) async {
+    var decision = action.decision;
 
-    if (override == null && rule.needsDirection) {
+    if (action.needsDirection) {
       final expense = await _askDirection(rule);
       if (expense == null) return;
       decision = ReviewDecision(
@@ -135,16 +134,19 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
         packageName: decision.packageName,
         expense: expense,
       );
-    } else if (override == null && rule.needsAccount) {
+    } else if (action.needsAccount) {
       final accountId = await _pickAccount();
       if (accountId == null) return;
       decision = ReviewDecision(
         kind: decision.kind,
         transactionIds: decision.transactionIds,
         alertIds: decision.alertIds,
+        // Carried through so the ledger can widen an empty id list to every
+        // stuck alert the app has, the way filing and dropping already do.
+        packageName: decision.packageName,
         accountId: accountId,
       );
-    } else if (override == null && rule.needsCategory) {
+    } else if (action.needsCategory) {
       final category = await _pickCategory();
       if (category == null) return;
       decision = ReviewDecision(
@@ -177,14 +179,6 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
     }
   }
 
-  /// The other real answer, when a rule offers one. Runs its decision as-is:
-  /// nothing more to ask, because the user has already said what these are.
-  void _applySecondary(ReviewRule rule) {
-    final secondary = rule.secondary;
-    if (secondary == null) return;
-    _apply(rule, override: secondary);
-  }
-
   /// The escape hatch. A rule about raw alerts opens the alerts themselves;
   /// a rule about parsed transactions opens them one at a time.
   void _alternative(ReviewRule rule) {
@@ -192,7 +186,7 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
       _showAlerts(rule);
       return;
     }
-    final ids = rule.decision.transactionIds.toSet();
+    final ids = rule.primary.decision.transactionIds.toSet();
     final items = widget.viewModel.transactions
         .where((item) => ids.contains(item.id))
         .toList();
@@ -664,15 +658,15 @@ class _RuleBlock extends StatelessWidget {
     required this.locked,
     required this.onApply,
     required this.onAlternative,
-    required this.onSecondary,
   });
 
   final ReviewRule rule;
   final bool busy;
   final bool locked;
-  final VoidCallback onApply;
+
+  /// Takes the answer the user tapped, since a rule can offer several.
+  final void Function(ReviewAction action) onApply;
   final VoidCallback onAlternative;
-  final VoidCallback onSecondary;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -721,15 +715,23 @@ class _RuleBlock extends StatelessWidget {
         ],
         const SizedBox(height: 13),
         PrimaryAction(
-          label: rule.actionLabel,
+          label: rule.primary.label,
           busy: busy,
-          onPressed: locked && !busy ? null : onApply,
+          onPressed: locked && !busy ? null : () => onApply(rule.primary),
         ),
-        if (rule.secondaryLabel case final label?) ...[
+        // Every other answer, in the order the rule offered them. A rule with
+        // one answer is unchanged; a rule with three now shows three, instead
+        // of hiding the ones the old primary/secondary pair had no room for.
+        for (final action in rule.actions.skip(1)) ...[
           const SizedBox(height: 9),
           OutlinedButton(
-            onPressed: locked || busy ? null : onSecondary,
-            child: Text(label),
+            onPressed: locked || busy ? null : () => onApply(action),
+            style: action.destructive
+                ? OutlinedButton.styleFrom(
+                    foregroundColor: SpendWiseColors.spend,
+                  )
+                : null,
+            child: Text(action.label),
           ),
         ],
         if (rule.alternative case final alternative?) ...[
