@@ -140,7 +140,11 @@ class AnimatedMinor extends StatelessWidget {
     super.key,
     this.style,
     this.cents = true,
-    this.duration = const Duration(milliseconds: 460),
+    // Deliberately the same duration and curve as FlowShape's morph -- this
+    // is the only place it is used unconditionally (MonthLegend), and that
+    // is exactly the figure the ribbon travels beside. Change one, change
+    // both, or the shape and the number arrive at different times.
+    this.duration = const Duration(milliseconds: 800),
   });
 
   final int minorUnits;
@@ -157,7 +161,7 @@ class AnimatedMinor extends StatelessWidget {
     duration: MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
         : duration,
-    curve: Curves.easeOutCubic,
+    curve: Curves.easeOutQuint,
     builder: (context, value, _) =>
         Text(formatMinor(value, cents: cents), style: style),
   );
@@ -173,7 +177,7 @@ class FlowShape extends StatefulWidget {
     this.saved = SavedTreatment.none,
     this.height = 168,
     this.animate = true,
-    this.duration = const Duration(milliseconds: 620),
+    this.duration = const Duration(milliseconds: 1300),
     this.wobble = false,
   });
 
@@ -190,7 +194,9 @@ class FlowShape extends StatefulWidget {
 
   /// How long the ribbon takes to draw itself in. Shorter where the drawing
   /// is a response to a tap rather than an arrival: a settings preview that
-  /// takes two thirds of a second to answer feels broken, not considered.
+  /// takes the better part of a second and a half to answer feels broken,
+  /// not considered -- Home gets the long, settled pour (see the default
+  /// above); the settings previews pass something quicker of their own.
   final Duration duration;
 
   /// Whether a tap disturbs the ribbon with a small, damped settle -- liquid
@@ -204,10 +210,12 @@ class FlowShape extends StatefulWidget {
   /// How long the ribbon takes to travel between two sets of proportions.
   /// Deliberately the same as [AnimatedMinor]'s, so the shape and the figures
   /// beside it read as one movement rather than two that happen to coincide.
-  static const _morphDuration = Duration(milliseconds: 460);
+  static const _morphDuration = Duration(milliseconds: 800);
 
-  /// How long a tap's wobble takes to settle back to rest.
-  static const _wobbleDuration = Duration(milliseconds: 380);
+  /// How long a tap's wobble takes to settle back to rest. Long enough to
+  /// read as a considered, physical settle rather than a flinch, short
+  /// enough that a second tap never has to wait it out.
+  static const _wobbleDuration = Duration(milliseconds: 760);
 
   @override
   State<FlowShape> createState() => _FlowShapeState();
@@ -220,17 +228,46 @@ class _FlowShapeState extends State<FlowShape>
     vsync: this,
   );
 
+  /// Which branch the most recent tap landed on -- null before any tap, and
+  /// null again whenever one misses every branch. The wobble ticker below
+  /// reads this, so only this one branch's paths are ever displaced.
+  _FlowBranch? _wobbleBranch;
+
+  // The geometry a tap needs to test itself against is the geometry that was
+  // actually last painted, not a fresh derivation from the raw money fields
+  // -- so each build caches the values the deepest builder below hands to
+  // the painter, and a later tap rebuilds the identical paths from them.
+  double _lastKeptFraction = 0;
+  double _lastSavedOfKept = 0;
+  SavedTreatment _lastSaved = SavedTreatment.none;
+  double _lastReveal = 1;
+
   @override
   void dispose() {
     _wobbleController.dispose();
     super.dispose();
   }
 
-  void _onTap() {
+  void _onTapUp(TapUpDetails details) {
     // A tap that lands while reduced motion is on gets no reply -- the whole
     // point of that setting is that nothing moves without being asked to
     // settle again, and a wobble is exactly that.
     if (MediaQuery.disableAnimationsOf(context)) return;
+    final size = context.size;
+    if (size == null) return;
+    final geometry = _buildFlowGeometry(
+      size: size,
+      keptFraction: _lastKeptFraction,
+      savedOfKept: _lastSavedOfKept,
+      saved: _lastSaved,
+      reveal: _lastReveal,
+    );
+    final branch = geometry.branchAt(details.localPosition);
+    // A tap that lands between the branches, or out in the margin beside
+    // them, is not a poke at anything -- it gets no reply, rather than
+    // nudging whichever branch happened to be nearest.
+    if (branch == null) return;
+    setState(() => _wobbleBranch = branch);
     _wobbleController.forward(from: 0);
   }
 
@@ -260,25 +297,59 @@ class _FlowShapeState extends State<FlowShape>
     final shape = TweenAnimationBuilder<double>(
       tween: Tween(end: keptFraction),
       duration: morph,
-      curve: Curves.easeOutCubic,
+      curve: Curves.easeOutQuint,
       builder: (context, kept, _) => TweenAnimationBuilder<double>(
         tween: Tween(end: savedOfKept),
         duration: morph,
-        curve: Curves.easeOutCubic,
+        curve: Curves.easeOutQuint,
         builder: (context, savedShare, _) => TweenAnimationBuilder<double>(
           tween: Tween(begin: widget.animate && !reduce ? 0 : 1, end: 1),
           duration: reduce ? Duration.zero : widget.duration,
-          curve: Curves.easeOutCubic,
-          builder: (context, t, _) => CustomPaint(
-            size: Size.infinite,
-            painter: _FlowShapePainter(
-              keptFraction: kept,
-              savedOfKept: savedShare,
-              saved: treatment,
-              reveal: t,
-            ),
-            child: SizedBox(height: widget.height, width: double.infinity),
-          ),
+          // Liquid filling a shape does not bounce past full -- the pour
+          // gets a long, soft-tailed curve with no overshoot, never a
+          // springy one.
+          curve: Curves.easeOutQuint,
+          builder: (context, t, _) {
+            // Cached so `_onTapUp`, which runs outside of build, can rebuild
+            // exactly this frame's geometry later.
+            _lastKeptFraction = kept;
+            _lastSavedOfKept = savedShare;
+            _lastSaved = treatment;
+            _lastReveal = t;
+
+            Widget paintAt(double wobbleOffset) => CustomPaint(
+              size: Size.infinite,
+              painter: _FlowShapePainter(
+                keptFraction: kept,
+                savedOfKept: savedShare,
+                saved: treatment,
+                reveal: t,
+                wobbleBranch: _wobbleBranch,
+                wobbleOffset: wobbleOffset,
+              ),
+              child: SizedBox(height: widget.height, width: double.infinity),
+            );
+
+            if (!widget.wobble) return paintAt(0);
+
+            return AnimatedBuilder(
+              animation: _wobbleController,
+              builder: (context, _) {
+                final wt = _wobbleController.value;
+                // A decaying sine: it starts at rest, is nudged, and rings
+                // itself out within the one pass -- liquid settling, not a
+                // spring bounce. Three-ish cycles land back on (near) zero
+                // exactly at t = 1, so there is no visible snap when the
+                // controller stops ticking.
+                final settle = math.exp(-3.5 * wt) * math.sin(wt * math.pi * 6);
+                // 2 logical pixels at the peak -- enough to read as
+                // disturbed, never enough to blur a figure or misplace a
+                // tap target. Applied to one branch's paths only, inside the
+                // painter -- the trunk above it never moves.
+                return paintAt(settle * 2.0);
+              },
+            );
+          },
         ),
       ),
     );
@@ -291,27 +362,221 @@ class _FlowShapeState extends State<FlowShape>
       // tree rather than making the ribbon read as a button.
       excludeFromSemantics: true,
       behavior: HitTestBehavior.opaque,
-      onTap: _onTap,
-      child: AnimatedBuilder(
-        animation: _wobbleController,
-        builder: (context, child) {
-          final t = _wobbleController.value;
-          // A decaying sine: it starts at rest, is nudged, and rings itself
-          // out within the one pass -- liquid settling, not a spring bounce.
-          // Three-ish cycles land back on (near) zero exactly at t = 1, so
-          // there is no visible snap when the controller stops ticking.
-          final settle = math.exp(-3.5 * t) * math.sin(t * math.pi * 6);
-          return Transform.translate(
-            // 2 logical pixels at the peak -- enough to read as disturbed,
-            // never enough to blur a figure or misplace a tap target.
-            offset: Offset(0, settle * 2.0),
-            child: child,
-          );
-        },
-        child: shape,
+      onTapUp: _onTapUp,
+      child: shape,
+    );
+  }
+}
+
+/// Which of the ribbon's branches a tap landed on, and which one a wobble is
+/// currently allowed to move. The top bar is deliberately not one of these --
+/// it is the trunk they hang from, and never moves.
+enum _FlowBranch { kept, spend, saved }
+
+/// One filled shape and the colour it is painted in. A branch is one or more
+/// of these -- a curved body, sometimes a flat footing beneath it -- that
+/// always move together.
+class _FlowPiece {
+  const _FlowPiece(this.path, this.color);
+  final Path path;
+  final Color color;
+}
+
+/// Every path the ribbon is made of, grouped by which branch it belongs to.
+/// Built once from the same numbers the painter would otherwise recompute
+/// inline, so painting and hit-testing can never quietly disagree about
+/// where a branch actually is.
+class _FlowGeometry {
+  const _FlowGeometry({
+    required this.trunk,
+    required this.kept,
+    required this.spend,
+    required this.saved,
+  });
+
+  final _FlowPiece trunk;
+  final List<_FlowPiece> kept;
+  final List<_FlowPiece> spend;
+  final List<_FlowPiece> saved;
+
+  /// Which branch, if any, contains [point]. Checked against the real curved
+  /// paths -- not their bounding boxes -- so a tap near the waist of a curve
+  /// lands on the branch it actually touches. Saved is checked first because,
+  /// where it is drawn at all, it sits visually on top of (or carved out of)
+  /// kept.
+  _FlowBranch? branchAt(Offset point) {
+    if (saved.any((piece) => piece.path.contains(point))) {
+      return _FlowBranch.saved;
+    }
+    if (kept.any((piece) => piece.path.contains(point))) {
+      return _FlowBranch.kept;
+    }
+    if (spend.any((piece) => piece.path.contains(point))) {
+      return _FlowBranch.spend;
+    }
+    return null;
+  }
+}
+
+/// Builds every path and colour the ribbon is made of, at the given size and
+/// proportions. Used both to paint the ribbon and, given the same values, to
+/// test a tap against the shapes actually on screen.
+_FlowGeometry _buildFlowGeometry({
+  required Size size,
+  required double keptFraction,
+  required double savedOfKept,
+  required SavedTreatment saved,
+  required double reveal,
+}) {
+  final w = size.width;
+  final h = size.height;
+  const barH = 10.0;
+
+  // The source bar is deliberately narrower than the canvas so the ribbon has
+  // room to fan outward -- the widening is what reads as "this became these".
+  final topW = w * .46;
+  final topX = (w - topW) / 2;
+  const topY = 6.0;
+  final botY = h - barH - 2;
+  final margin = w * .075;
+
+  final keptW = topW * keptFraction;
+  final spentW = topW - keptW;
+
+  // Bottom bars grow toward the two edges as the reveal runs.
+  final keptBotX = topX - (topX - margin) * reveal;
+  final spentBotRight = topX + topW + (w - margin - topX - topW) * reveal;
+  final spentBotX = spentBotRight - spentW;
+
+  final splitX = topX + keptW;
+  final c1 = topY + barH + (botY - topY - barH) * .42;
+  final c2 = topY + barH + (botY - topY - barH) * .60;
+  final yTop = topY + barH;
+
+  Path ribbon(double aTop, double bTop, double aBot, double bBot) => Path()
+    ..moveTo(aTop, yTop)
+    ..cubicTo(aTop, c1, aBot, c2, aBot, botY)
+    ..lineTo(bBot, botY)
+    ..cubicTo(bBot, c2, bTop, c1, bTop, yTop)
+    ..close();
+
+  // A branch of its own comes out of the kept side, because that is where
+  // the money actually came from -- so kept narrows by exactly the saved
+  // slice and the two still add up to what was kept before.
+  final asBranch = saved == SavedTreatment.branch;
+  final savedTopW = asBranch ? keptW * savedOfKept : 0.0;
+  final liveKeptW = keptW - savedTopW;
+  final savedBotW = asBranch ? keptW * savedOfKept : 0.0;
+  final gap = (asBranch && savedBotW > 0) ? 6.0 * reveal : 0.0;
+
+  final kept = <_FlowPiece>[
+    _FlowPiece(
+      ribbon(topX, topX + liveKeptW, keptBotX, keptBotX + liveKeptW),
+      SpendWiseColors.keep.withValues(alpha: .30),
+    ),
+  ];
+  final savedPieces = <_FlowPiece>[];
+  if (asBranch) {
+    savedPieces.add(
+      _FlowPiece(
+        ribbon(
+          topX + liveKeptW,
+          splitX,
+          keptBotX + liveKeptW + gap,
+          keptBotX + liveKeptW + gap + savedBotW,
+        ),
+        SpendWiseColors.mine.withValues(alpha: .34),
       ),
     );
   }
+  final spend = <_FlowPiece>[
+    _FlowPiece(
+      ribbon(splitX, topX + topW, spentBotX, spentBotX + spentW),
+      SpendWiseColors.spend.withValues(alpha: .48),
+    ),
+  ];
+
+  // A seam shades the inner edge of the kept ribbon rather than dividing it,
+  // so "still yours" is still one shape and still one number -- but it is
+  // its own path, drawn on top, and so its own branch to tap.
+  if (saved == SavedTreatment.seam) {
+    final seamW = keptW * savedOfKept;
+    savedPieces.add(
+      _FlowPiece(
+        ribbon(
+          topX + keptW - seamW,
+          splitX,
+          keptBotX + keptW - seamW,
+          keptBotX + keptW,
+        ),
+        SpendWiseColors.mine.withValues(alpha: .30),
+      ),
+    );
+  }
+
+  final trunk = _FlowPiece(
+    Path()..addRect(Rect.fromLTWH(topX, topY, topW, barH)),
+    SpendWiseColors.fg,
+  );
+
+  if (asBranch) {
+    kept.add(
+      _FlowPiece(
+        Path()..addRect(Rect.fromLTWH(keptBotX, botY, liveKeptW, barH)),
+        SpendWiseColors.keep,
+      ),
+    );
+    savedPieces.add(
+      _FlowPiece(
+        Path()..addRect(
+          Rect.fromLTWH(keptBotX + liveKeptW + gap, botY, savedBotW, barH),
+        ),
+        SpendWiseColors.mine,
+      ),
+    );
+  } else {
+    kept.add(
+      _FlowPiece(
+        Path()..addRect(Rect.fromLTWH(keptBotX, botY, keptW, barH)),
+        SpendWiseColors.keep,
+      ),
+    );
+    // The inset marks the saved part of the footing itself: same bar, same
+    // total, a shaded portion and a tick where it divides -- a real, separate
+    // rectangle, so a real, separate branch to tap.
+    if (saved == SavedTreatment.inset) {
+      final insetW = keptW * savedOfKept;
+      savedPieces.add(
+        _FlowPiece(
+          Path()..addRect(
+            Rect.fromLTWH(keptBotX + keptW - insetW, botY, insetW, barH),
+          ),
+          SpendWiseColors.mine,
+        ),
+      );
+      savedPieces.add(
+        _FlowPiece(
+          Path()..addRect(
+            Rect.fromLTWH(keptBotX + keptW - insetW - 1, botY, 1, barH),
+          ),
+          SpendWiseColors.background,
+        ),
+      );
+    }
+  }
+  spend.add(
+    _FlowPiece(
+      Path()..addRect(Rect.fromLTWH(spentBotX, botY, spentW, barH)),
+      SpendWiseColors.spend,
+    ),
+  );
+
+  return _FlowGeometry(
+    trunk: trunk,
+    kept: kept,
+    spend: spend,
+    saved: savedPieces,
+  );
 }
 
 class _FlowShapePainter extends CustomPainter {
@@ -320,6 +585,8 @@ class _FlowShapePainter extends CustomPainter {
     required this.savedOfKept,
     required this.saved,
     required this.reveal,
+    this.wobbleBranch,
+    this.wobbleOffset = 0,
   });
 
   final double keptFraction;
@@ -327,19 +594,19 @@ class _FlowShapePainter extends CustomPainter {
   final SavedTreatment saved;
   final double reveal;
 
+  /// Which branch a tap has set wobbling, if any.
+  final _FlowBranch? wobbleBranch;
+
+  /// How far [wobbleBranch] is displaced right now, in logical pixels. Every
+  /// other branch, and the trunk, always draw at zero.
+  final double wobbleOffset;
+
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
     const barH = 10.0;
-
-    // The source bar is deliberately narrower than the canvas so the ribbon has
-    // room to fan outward -- the widening is what reads as "this became these".
-    final topW = w * .46;
-    final topX = (w - topW) / 2;
     const topY = 6.0;
-    final botY = h - barH - 2;
-    final margin = w * .075;
 
     // `reveal` already widens the bottom bars out from the top one; clipping
     // to a window that grows downward over the same value turns that widen
@@ -351,126 +618,54 @@ class _FlowShapePainter extends CustomPainter {
     canvas.save();
     canvas.clipRect(Rect.fromLTWH(0, 0, w, pourTo));
 
-    final keptW = topW * keptFraction;
-    final spentW = topW - keptW;
-
-    // Bottom bars grow toward the two edges as the reveal runs.
-    final keptBotX = topX - (topX - margin) * reveal;
-    final spentBotRight = topX + topW + (w - margin - topX - topW) * reveal;
-    final spentBotX = spentBotRight - spentW;
-
-    final splitX = topX + keptW;
-    final c1 = topY + barH + (botY - topY - barH) * .42;
-    final c2 = topY + barH + (botY - topY - barH) * .60;
-    final yTop = topY + barH;
-
-    Path ribbon(double aTop, double bTop, double aBot, double bBot) => Path()
-      ..moveTo(aTop, yTop)
-      ..cubicTo(aTop, c1, aBot, c2, aBot, botY)
-      ..lineTo(bBot, botY)
-      ..cubicTo(bBot, c2, bTop, c1, bTop, yTop)
-      ..close();
+    final geometry = _buildFlowGeometry(
+      size: size,
+      keptFraction: keptFraction,
+      savedOfKept: savedOfKept,
+      saved: saved,
+      reveal: reveal,
+    );
 
     final paint = Paint()..style = PaintingStyle.fill;
-
-    // A branch of its own comes out of the kept side, because that is where
-    // the money actually came from -- so kept narrows by exactly the saved
-    // slice and the two still add up to what was kept before.
-    final asBranch = saved == SavedTreatment.branch;
-    final savedTopW = asBranch ? keptW * savedOfKept : 0.0;
-    final liveKeptW = keptW - savedTopW;
-    final savedBotW = asBranch ? keptW * savedOfKept : 0.0;
-
-    canvas.drawPath(
-      ribbon(topX, topX + liveKeptW, keptBotX, keptBotX + liveKeptW),
-      paint..color = SpendWiseColors.keep.withValues(alpha: .30),
-    );
-    if (asBranch) {
-      final gap = savedBotW > 0 ? 6.0 * reveal : 0.0;
-      canvas.drawPath(
-        ribbon(
-          topX + liveKeptW,
-          splitX,
-          keptBotX + liveKeptW + gap,
-          keptBotX + liveKeptW + gap + savedBotW,
-        ),
-        paint..color = SpendWiseColors.mine.withValues(alpha: .34),
-      );
-    }
-    canvas.drawPath(
-      ribbon(splitX, topX + topW, spentBotX, spentBotX + spentW),
-      paint..color = SpendWiseColors.spend.withValues(alpha: .48),
-    );
-
-    // A seam shades the inner edge of the kept ribbon rather than dividing it,
-    // so "still yours" is still one shape and still one number.
-    if (saved == SavedTreatment.seam) {
-      final seamW = keptW * savedOfKept;
-      canvas.drawPath(
-        ribbon(
-          topX + keptW - seamW,
-          splitX,
-          keptBotX + keptW - seamW,
-          keptBotX + keptW,
-        ),
-        paint..color = SpendWiseColors.mine.withValues(alpha: .30),
-      );
-    }
-
-    canvas.drawRect(
-      Rect.fromLTWH(topX, topY, topW, barH),
-      paint..color = SpendWiseColors.fg,
-    );
-    if (asBranch) {
-      final gap = savedBotW > 0 ? 6.0 * reveal : 0.0;
-      canvas.drawRect(
-        Rect.fromLTWH(keptBotX, botY, liveKeptW, barH),
-        paint..color = SpendWiseColors.keep,
-      );
-      canvas.drawRect(
-        Rect.fromLTWH(keptBotX + liveKeptW + gap, botY, savedBotW, barH),
-        paint..color = SpendWiseColors.mine,
-      );
-    } else {
-      canvas.drawRect(
-        Rect.fromLTWH(keptBotX, botY, keptW, barH),
-        paint..color = SpendWiseColors.keep,
-      );
-      // The inset marks the saved part of the footing itself: same bar, same
-      // total, a shaded portion and a tick where it divides.
-      if (saved == SavedTreatment.inset) {
-        final insetW = keptW * savedOfKept;
-        canvas.drawRect(
-          Rect.fromLTWH(keptBotX + keptW - insetW, botY, insetW, barH),
-          paint..color = SpendWiseColors.mine,
-        );
-        canvas.drawRect(
-          Rect.fromLTWH(keptBotX + keptW - insetW - 1, botY, 1, barH),
-          paint..color = SpendWiseColors.background,
+    void drawBranch(List<_FlowPiece> pieces, _FlowBranch branch) {
+      final offset = branch == wobbleBranch
+          ? Offset(0, wobbleOffset)
+          : Offset.zero;
+      for (final piece in pieces) {
+        canvas.drawPath(
+          offset == Offset.zero ? piece.path : piece.path.shift(offset),
+          paint..color = piece.color,
         );
       }
     }
-    canvas.drawRect(
-      Rect.fromLTWH(spentBotX, botY, spentW, barH),
-      paint..color = SpendWiseColors.spend,
-    );
+
+    drawBranch(geometry.kept, _FlowBranch.kept);
+    drawBranch(geometry.saved, _FlowBranch.saved);
+    drawBranch(geometry.spend, _FlowBranch.spend);
+    // The trunk they all hang from -- it never wobbles, so it is drawn
+    // straight from the geometry with no offset applied.
+    canvas.drawPath(geometry.trunk.path, paint..color = geometry.trunk.color);
     canvas.restore();
   }
 
   /// Carries the values it was built with, so the proportions the ribbon is
-  /// currently painting can be read back -- by a debugger, and by the test
-  /// that holds it to travelling between two splits rather than jumping.
+  /// currently painting can be read back -- by a debugger, and by the tests
+  /// that hold it to travelling between two splits rather than jumping, and
+  /// to wobbling one branch at a time.
   @override
   String toString() =>
       '_FlowShapePainter(keptFraction: $keptFraction, '
-      'savedOfKept: $savedOfKept, reveal: $reveal, saved: ${saved.name})';
+      'savedOfKept: $savedOfKept, reveal: $reveal, saved: ${saved.name}, '
+      'wobbleBranch: ${wobbleBranch?.name}, wobbleOffset: $wobbleOffset)';
 
   @override
   bool shouldRepaint(_FlowShapePainter old) =>
       old.keptFraction != keptFraction ||
       old.savedOfKept != savedOfKept ||
       old.saved != saved ||
-      old.reveal != reveal;
+      old.reveal != reveal ||
+      old.wobbleBranch != wobbleBranch ||
+      old.wobbleOffset != wobbleOffset;
 }
 
 /// A month of running balance, drawn as steps: money does not drift, it lands

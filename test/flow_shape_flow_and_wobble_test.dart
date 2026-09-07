@@ -13,12 +13,67 @@ import 'package:spendwise/widgets/shape_kit.dart';
 ///
 /// The developer asked for the denominator to look like it is flowing when
 /// the app opens or the user comes back to Home, and to wobble very subtly
-/// when tapped. Home's State is never recreated when the tabs switch away
-/// and back, so the first of those needs an explicit signal -- the shell has
-/// exactly one hook for "the user just came back to Home", and this is the
-/// only place that hook is meant to matter. The wobble is Home's alone: a
-/// settings preview that already replays its own draw-in on every choice
-/// does not need a second reason to move.
+/// when tapped -- and, on the wobble, for it to move only the branch that
+/// was actually touched: tap Gone and only Gone moves, tap Available (or
+/// Saved, where it is drawn) and only that one does. Home's State is never
+/// recreated when the tabs switch away and back, so the first of those needs
+/// an explicit signal -- the shell has exactly one hook for "the user just
+/// came back to Home", and this is the only place that hook is meant to
+/// matter. The wobble is Home's alone: a settings preview that already
+/// replays its own draw-in on every choice does not need a second reason to
+/// move.
+///
+/// Mirrors the geometry `_buildFlowGeometry` builds inside shape_kit.dart, so
+/// a tap in the wobble tests below can be aimed at a point that is actually,
+/// provably inside one branch's curve -- never a guess at a rectangle that
+/// happens to sit near it.
+class _Geometry {
+  _Geometry(
+    this.width,
+    this.height,
+    this.keptFraction, {
+    this.savedOfKept = 0,
+    this.asBranch = false,
+  });
+
+  final double width;
+  final double height;
+  final double keptFraction;
+  final double savedOfKept;
+  final bool asBranch;
+
+  static const _barH = 10.0;
+
+  double get _topW => width * .46;
+  double get _margin => width * .075;
+  double get _botY => height - _barH - 2;
+  double get _keptW => _topW * keptFraction;
+  double get _spentW => _topW - _keptW;
+  // `reveal` is always 1 in the tests this is used from -- every widget
+  // there passes `animate: false` -- so the bottom bars sit at their final,
+  // fully-poured position: kept's left edge at the margin, spent's right
+  // edge at width minus the margin.
+  double get _keptBotX => _margin;
+  double get _spentBotX => (width - _margin) - _spentW;
+  double get _liveKeptW => asBranch ? _keptW * (1 - savedOfKept) : _keptW;
+  double get _savedBotW => asBranch ? _keptW * savedOfKept : 0.0;
+  double get _gap => asBranch && _savedBotW > 0 ? 6.0 : 0.0;
+
+  /// A point near the bottom of each branch's curve, well clear of its
+  /// edges -- the curve's control points share an x-coordinate with the
+  /// endpoint on their own side, so the curve never bows past the straight
+  /// bottom edge's own width, and this stays inside regardless of exactly
+  /// how the middle of it bows.
+  Offset get kept => Offset(_keptBotX + _liveKeptW / 2, _botY - 8);
+  Offset get spend => Offset(_spentBotX + _spentW / 2, _botY - 8);
+  Offset get saved =>
+      Offset(_keptBotX + _liveKeptW + _gap + _savedBotW / 2, _botY - 8);
+
+  /// Left of the margin every branch's bottom edge stays inside of --
+  /// nothing is ever drawn there.
+  Offset get miss => Offset(4, height / 2);
+}
+
 void main() {
   double revealOn(WidgetTester tester) {
     final paint = tester.widget<CustomPaint>(
@@ -135,7 +190,36 @@ void main() {
       matching: find.byType(CustomPaint),
     );
 
-    Widget wobbly({bool reduceMotion = false}) => MediaQuery(
+    // The painter's `wobbleBranch` and `wobbleOffset` fields are private;
+    // its toString carries them, the same way the tests above read `reveal`
+    // and `keptFraction` back.
+    String? wobbleBranchOn(WidgetTester tester) {
+      final paint = tester.widget<CustomPaint>(ribbonPaint());
+      final name = RegExp(r'wobbleBranch: (\w+)')
+          .firstMatch('${paint.painter}')
+          ?.group(1);
+      return name == 'null' ? null : name;
+    }
+
+    double wobbleOffsetOn(WidgetTester tester) {
+      final paint = tester.widget<CustomPaint>(ribbonPaint());
+      // Matched up to the closing paren rather than a digit class alone --
+      // a settled value this close to zero often prints in exponential
+      // notation (e.g. "-4.44e-16"), which a `[-0-9.]+` class would truncate
+      // at the "e" and misread as a value nowhere near zero.
+      return double.parse(
+        RegExp(r'wobbleOffset: ([^)]+)\)')
+                .firstMatch('${paint.painter}')
+                ?.group(1) ??
+            '0',
+      );
+    }
+
+    Widget wobbly({
+      bool reduceMotion = false,
+      int savedMinor = 0,
+      SavedTreatment saved = SavedTreatment.none,
+    }) => MediaQuery(
       data: MediaQueryData(disableAnimations: reduceMotion),
       child: MaterialApp(
         theme: SpendWiseTheme.dark,
@@ -146,6 +230,8 @@ void main() {
               receivedMinor: 10000,
               keptMinor: 8000,
               spentMinor: 2000,
+              savedMinor: savedMinor,
+              saved: saved,
               animate: false,
               wobble: true,
             ),
@@ -154,42 +240,119 @@ void main() {
       ),
     );
 
-    testWidgets('a tap disturbs it very slightly and it settles back', (
-      tester,
-    ) async {
+    // Every widget in this group passes `animate: false` and a fixed 8000 of
+    // a 10000 total, so `keptFraction` is always 0.8 from the first frame.
+    _Geometry geometryOf(WidgetTester tester) {
+      final size = tester.getSize(ribbonPaint());
+      return _Geometry(size.width, size.height, 0.8);
+    }
+
+    testWidgets('tapping Available wobbles only Available', (tester) async {
       await tester.pumpWidget(wobbly());
       await tester.pumpAndSettle();
-      final rest = tester.getTopLeft(ribbonPaint());
+      final geometry = geometryOf(tester);
+      final origin = tester.getTopLeft(ribbonPaint());
 
-      await tester.tap(find.byType(FlowShape));
+      await tester.tapAt(origin + geometry.kept);
       // One frame at zero elapsed time for the controller's ticker to record
       // its own start; only the frame after that shows any progress.
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 40));
-      final displacement = (tester.getTopLeft(ribbonPaint()).dy - rest.dy)
-          .abs();
+
+      expect(wobbleBranchOn(tester), 'kept');
       expect(
-        displacement,
+        wobbleOffsetOn(tester).abs(),
         inExclusiveRange(0.0, 3.0),
         reason: 'a nudge, not a bounce -- at most a couple of logical pixels',
       );
 
       // No spring, no loop: it rings down within the one pass and stops.
       await tester.pumpAndSettle();
-      expect(tester.getTopLeft(ribbonPaint()).dy, closeTo(rest.dy, 0.01));
+      expect(wobbleOffsetOn(tester), closeTo(0, 0.01));
+    });
+
+    testWidgets('tapping Gone wobbles only Gone', (tester) async {
+      await tester.pumpWidget(wobbly());
+      await tester.pumpAndSettle();
+      final geometry = geometryOf(tester);
+      final origin = tester.getTopLeft(ribbonPaint());
+
+      await tester.tapAt(origin + geometry.spend);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 40));
+
+      expect(wobbleBranchOn(tester), 'spend');
+      expect(wobbleOffsetOn(tester).abs(), inExclusiveRange(0.0, 3.0));
+
+      await tester.pumpAndSettle();
+      expect(wobbleOffsetOn(tester), closeTo(0, 0.01));
+    });
+
+    testWidgets('tapping the saved branch wobbles only that branch', (
+      tester,
+    ) async {
+      final widget = wobbly(savedMinor: 3000, saved: SavedTreatment.branch);
+      await tester.pumpWidget(widget);
+      await tester.pumpAndSettle();
+      final size = tester.getSize(ribbonPaint());
+      final geometry = _Geometry(
+        size.width,
+        size.height,
+        0.8,
+        savedOfKept: 3000 / 8000,
+        asBranch: true,
+      );
+      final origin = tester.getTopLeft(ribbonPaint());
+
+      await tester.tapAt(origin + geometry.saved);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 40));
+
+      expect(wobbleBranchOn(tester), 'saved');
+      expect(wobbleOffsetOn(tester).abs(), inExclusiveRange(0.0, 3.0));
+
+      await tester.pumpAndSettle();
+      expect(wobbleOffsetOn(tester), closeTo(0, 0.01));
+    });
+
+    testWidgets('a tap that misses every branch does nothing at all', (
+      tester,
+    ) async {
+      await tester.pumpWidget(wobbly());
+      await tester.pumpAndSettle();
+      final geometry = geometryOf(tester);
+      final origin = tester.getTopLeft(ribbonPaint());
+
+      await tester.tapAt(origin + geometry.miss);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 40));
+
+      expect(
+        wobbleBranchOn(tester),
+        isNull,
+        reason: 'the gap beside the branches is not a fourth branch',
+      );
+      expect(wobbleOffsetOn(tester), closeTo(0, 0.01));
+
+      await tester.pumpAndSettle();
+      expect(wobbleBranchOn(tester), isNull);
+      expect(wobbleOffsetOn(tester), closeTo(0, 0.01));
     });
 
     testWidgets('does nothing under reduced motion', (tester) async {
       await tester.pumpWidget(wobbly(reduceMotion: true));
       await tester.pumpAndSettle();
-      final rest = tester.getTopLeft(ribbonPaint());
+      final geometry = geometryOf(tester);
+      final origin = tester.getTopLeft(ribbonPaint());
 
-      await tester.tap(find.byType(FlowShape));
+      await tester.tapAt(origin + geometry.kept);
       await tester.pump(const Duration(milliseconds: 40));
-      expect(tester.getTopLeft(ribbonPaint()).dy, closeTo(rest.dy, 0.01));
+      expect(wobbleBranchOn(tester), isNull);
+      expect(wobbleOffsetOn(tester), closeTo(0, 0.01));
 
       await tester.pumpAndSettle();
-      expect(tester.getTopLeft(ribbonPaint()).dy, closeTo(rest.dy, 0.01));
+      expect(wobbleBranchOn(tester), isNull);
+      expect(wobbleOffsetOn(tester), closeTo(0, 0.01));
     });
 
     testWidgets('stays off where it is not opted into', (tester) async {

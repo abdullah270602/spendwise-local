@@ -58,7 +58,10 @@ class HomePreview extends StatelessWidget {
           // answer then feel like one gesture.
           key: ValueKey('${style.id}|${extra.id}'),
           height: 132,
-          duration: const Duration(milliseconds: 460),
+          // Quicker than Home's own pour on purpose -- this replays on every
+          // option tap, and a preview that took Home's full 1300ms to answer
+          // each choice would feel sluggish rather than considered.
+          duration: const Duration(milliseconds: 560),
           receivedMinor: figures.received,
           keptMinor: kept - asideFromShape,
           spentMinor: figures.spent,
