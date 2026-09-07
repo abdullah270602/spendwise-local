@@ -103,6 +103,12 @@ is not borrowing: borrowed money is yours to spend until you give it back, and
 held money never is — so it comes off the top of *available to spend* and stays
 out of Home entirely.
 
+**Asks once, not ten times.** When SpendWise is unsure, ten alerts uncertain
+for the same reason are one question, not ten. Everything a single app failed
+to deliver becomes one decision with the same three answers: attach them to an
+account, file them as transactions, or drop them. Dropping is the only answer
+with no other way back, so it is the one that offers Undo.
+
 **Learns where things go.** File the same shop or person under the same
 category three times and SpendWise starts doing it for you. Disagree once and
 it stops.

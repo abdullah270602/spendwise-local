@@ -170,25 +170,31 @@ List<HelpTopic> helpTopics(SpendWiseViewModel viewModel) => [
 
   HelpTopic(
     title: 'Review',
-    summary: 'One tap that settles ten things',
+    summary: 'One question that settles ten things',
     glyph: Icons.help_center_outlined,
     brief:
         'When SpendWise is unsure it does not queue every uncertain line for '
         'you to confirm one at a time. If ten alerts are uncertain for the '
         'same reason, that is one question, not ten. Each item in Review '
         'names the reason, quotes a real alert so you can check the claim, '
-        'and carries the single action that answers it for the whole group. '
-        'The number on the Review tab counts decisions, not alerts. Opening a '
+        'and carries the answers that settle it for the whole group. The '
+        'number on the Review tab counts decisions, not alerts. Opening a '
         'group shows the individual entries, where swiping right confirms, '
         'swiping left deletes, and tapping opens the alert it came from, word '
-        'for word. Alerts that are readable but have no account to land in — '
-        'a bank you have not added, or digits matching nothing — sit at the '
-        'top of Review; tell SpendWise which account they belong to and it '
-        'reads them again. Alerts it cannot read at all are usually still '
-        'real payments, so Review offers to file them: say which way the '
-        'money went and SpendWise supplies the rest, from the amount it did '
-        'read. Dropping them is there too, for the ones that were never '
-        'transactions.',
+        'for word.\n\n'
+        'Everything one app failed to deliver is a single question, whichever '
+        'way it failed, and it always offers the same three answers. Attach '
+        'them to an account, for alerts that read as money but named a bank '
+        'SpendWise does not know. File them as transactions, saying which way '
+        'the money went, for alerts it could not read at all — usually real '
+        'payments it read the amount of but not the direction. Or drop them, '
+        'for the ones that were never transactions: a promotion, a balance '
+        'notice, a delivery text.\n\n'
+        'Dropping is the only answer with no other way back, so it is the one '
+        'that offers Undo. The answer appears where the question was and '
+        'waits a few seconds before clearing, which is your chance to take it '
+        'back. Nothing is erased either way — a dropped alert is set aside, '
+        'not deleted.',
     body: () => [
       const HelpExample(
         framed: false,

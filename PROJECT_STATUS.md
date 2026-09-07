@@ -4,17 +4,17 @@ Last updated: 2026-09-07
 
 ## Current release
 
-- Version: `0.9.11+26`
+- Version: `0.9.12+27`
 - Android package: `com.spendwise.app` — keep this stable so upgrades retain data.
 - Public repository: <https://github.com/abdullah270602/spendwise-local>
-- Latest release: <https://github.com/abdullah270602/spendwise-local/releases/tag/v0.9.11>
+- Latest release: <https://github.com/abdullah270602/spendwise-local/releases/tag/v0.9.12>
 - Shipped APK is the optimized split-per-ABI release build, not a Flutter debug
   build. Build with `flutter build apk --release --split-per-abi`; a plain
   `--release` writes only the universal APK and leaves the per-ABI files from
   the *previous* build sitting in the output directory, which is an easy way to
   install a stale binary and believe it is current. Check the APK's mtime
   against the commit before installing.
-- Split-per-ABI adds 2000 to the version code for arm64: `26` becomes `2026`.
+- Split-per-ABI adds 2000 to the version code for arm64: `27` becomes `2027`.
 - Installed on the connected Pixel 9 at this version, with `adb install -r`.
 
 ## Known reliability issues
@@ -131,6 +131,18 @@ in `AGENTS.md`. In particular:
   underneath), and colour.
 - Deleted transactions stay deleted: `deleted_transactions` tombstones survive
   the reconciler's rebuild of automatic entries.
+- Review asks one question per app, covering everything that app failed to
+  deliver whichever way it failed, with the same three answers each time:
+  attach to an account, file as transactions, or drop. Dropping is a soft flag
+  and is the only answer that offers Undo, restoring each alert's exact prior
+  parse status. The answer is stated where the question was rather than in a
+  toast, and clears itself.
+- The category breakdown on Home is a choice: every category, the five biggest
+  with the rest folded into one line, or none at all. The fold keeps the
+  remainder because the bar is drawn to true proportion.
+- Motion: the ribbon pours downward on open and on returning to Home, travels
+  between proportions rather than jumping when figures change, and answers a
+  tap with a two-pixel damped wobble. Reduced motion turns all of it off.
 - `Adjust balance` changes only an account's baseline by the difference; it keeps
   existing transactions and avoids fake income/spending.
 - CSV/XLS/XLSX statement import with preview, multi-file/multi-sheet selection,
@@ -160,7 +172,7 @@ invalidation behavior when changing the shell/controller.
 
 ## Verification baseline
 
-At `0.9.11`, the analyzer is clean and all 364 tests pass. Before shipping:
+At `0.9.12`, the analyzer is clean and all 413 tests pass. Before shipping:
 
 1. Run `dart format` on changed Dart files.
 2. Run `flutter analyze --no-pub`.
@@ -177,6 +189,19 @@ At `0.9.11`, the analyzer is clean and all 364 tests pass. Before shipping:
 The local toolchain previously used Flutter 3.47.1 / Dart 3.13.1, Android SDK at
 `C:\Android\Sdk`, and Android Studio's bundled JDK. Agents should discover the
 current configured paths rather than assume another user's home directory.
+
+## Working rules learned the hard way
+
+- **A stored setting must notify.** `setViewPreference` wrote to the ledger and
+  told nobody, so screens already built kept the previous choice and the whole
+  setting looked broken. Every earlier setting had masked this by also calling
+  something that notified.
+- **Test the screen, not just the helper.** The category fold was unit-tested
+  and its preview was widget-tested, and both passed while the feature did
+  nothing on Home. A setting is only real if the screen it configures obeys it.
+- **Reduced motion is not automatic.** A raw `TweenAnimationBuilder` gets none
+  of the help Flutter gives the `Animated*` widgets; it has to be honoured by
+  hand or it is not honoured at all.
 
 ## Open work
 
