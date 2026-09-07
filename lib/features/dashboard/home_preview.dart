@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
 import '../../widgets/shape_kit.dart';
+import '../shell/spendwise_view_model.dart';
 import 'dashboard_screen.dart';
+import 'home_categories.dart';
 import 'home_savings.dart';
 
 /// Home, at Home's size, drawn by Home's own widgets.
@@ -132,6 +134,90 @@ class _Underneath extends StatelessWidget {
         ),
         HomeSavingsExtra.none => const SizedBox.shrink(),
       },
+    );
+  }
+}
+
+/// The spending breakdown, at Home's size, drawn by Home's own widgets.
+///
+/// The bar is the part worth previewing: it is drawn to true proportion, so
+/// it is where the difference between showing five categories and showing all
+/// of them is actually visible.
+class CategoryPreview extends StatelessWidget {
+  const CategoryPreview({
+    super.key,
+    required this.spending,
+    required this.style,
+  });
+
+  final List<CategorySpendViewData> spending;
+  final HomeCategories style;
+
+  /// A pinned preview cannot grow with the list, and a preview that silently
+  /// stops after four rows would be making the same claim the fold exists to
+  /// avoid. So it says how many it did not draw.
+  static const _visibleRows = 4;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = categoriesForHome(spending, style);
+    final total = items.fold<int>(0, (sum, i) => sum + i.amount.minorUnits);
+
+    if (items.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Eyebrow('On Home'),
+          const SizedBox(height: 12),
+          Text(
+            style == HomeCategories.off
+                ? 'Home ends after the figures above. Nothing else is drawn.'
+                : 'Nothing has been spent in this period yet.',
+            style: SpendWiseType.body.copyWith(fontSize: 13),
+          ),
+        ],
+      );
+    }
+
+    final shown = items.take(_visibleRows).toList();
+    final hidden = items.length - shown.length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Eyebrow(
+          'On Home',
+          trailing: Text(
+            items.length == 1 ? '1 line' : '${items.length} lines',
+            style: SpendWiseType.eyebrow,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SegmentBar(
+          weights: [
+            for (final item in items)
+              total == 0 ? 1 : item.amount.minorUnits / total,
+          ],
+          colors: [
+            for (var i = 0; i < items.length; i++) categoryColor(items[i], i),
+          ],
+        ),
+        const SizedBox(height: 4),
+        for (var i = 0; i < shown.length; i++)
+          CategoryRow(
+            item: shown[i],
+            color: categoryColor(shown[i], i),
+            onTap: () {},
+          ),
+        if (hidden > 0)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              hidden == 1 ? '+1 more line' : '+$hidden more lines',
+              style: SpendWiseType.metaTight,
+            ),
+          ),
+      ],
     );
   }
 }

@@ -11,8 +11,10 @@ import '../shell/spendwise_view_model.dart';
 import 'app_lock_screen.dart';
 import 'source_selection_screen.dart';
 import '../reports/report_screen.dart';
+import '../dashboard/home_categories.dart';
 import '../dashboard/home_savings.dart';
 import 'home_period_screen.dart';
+import 'home_categories_screen.dart';
 import 'home_savings_screen.dart';
 import 'palette_screen.dart';
 import 'export_screen.dart';
@@ -237,6 +239,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     context,
                     MaterialPageRoute<void>(
                       builder: (_) => HomeSavingsScreen(viewModel: viewModel),
+                    ),
+                  );
+                  if (mounted) setState(() {});
+                },
+              ),
+              const Divider(height: 1, indent: 56),
+              ListTile(
+                leading: const Icon(Icons.donut_small_outlined),
+                title: const Text('Categories on Home'),
+                subtitle: Text(
+                  HomeCategories.fromId(
+                    viewModel.uiViewPreference('home_categories'),
+                  ).title,
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          HomeCategoriesScreen(viewModel: viewModel),
                     ),
                   );
                   if (mounted) setState(() {});

@@ -83,6 +83,12 @@ pay cycle. *Left* means everything that left, not only what was spent: a loan
 made, a borrowing handed back and money moved into savings all empty the
 account without being spending, and Home counts them.
 
+**Or says less, if you want.** The breakdown under the figures can run in
+full, show the five biggest with the rest grouped into one line, or not appear
+at all — for a calmer Home that stops at the headline. The grouped option keeps
+a line for what it does not name, because the bar is drawn to true proportion
+and dropping the tail would stretch the rest to fill it.
+
 **Separates savings from spendable.** Savings stay visible and stay out of
 *available to spend*. How they appear on Home is two choices, not one —
 whether saving comes out of the figure, and whether a line sits beneath the

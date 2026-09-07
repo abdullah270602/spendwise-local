@@ -5,6 +5,7 @@ import '../../widgets/shape_kit.dart';
 import '../settings/settings_screen.dart';
 import '../tour/spotlight.dart';
 import '../shell/spendwise_view_model.dart';
+import 'home_categories.dart';
 import 'home_savings.dart';
 
 /// Home is one idea: of everything that arrived this month, this much is still
@@ -45,8 +46,12 @@ class DashboardScreen extends StatelessWidget {
     // confident 50/50 that means nothing at all, with "0%" beside it.
     final hasShare = received > 0;
 
-    final categories = [...data.categorySpending]
-      ..sort((a, b) => b.amount.minorUnits.compareTo(a.amount.minorUnits));
+    final categoryStyle = HomeCategories.fromId(
+      viewModel.uiViewPreference('home_categories'),
+    );
+    // One fold, read by both the bar and the rows, so the picture and the
+    // list can never disagree about what is on screen.
+    final categories = categoriesForHome(data.categorySpending, categoryStyle);
     final categoryTotal = categories.fold<int>(
       0,
       (sum, item) => sum + item.amount.minorUnits,
@@ -219,7 +224,7 @@ class DashboardScreen extends StatelessWidget {
                         ],
                         colors: [
                           for (var i = 0; i < categories.length; i++)
-                            SpendWiseColors.category(i),
+                            categoryColor(categories[i], i),
                         ],
                       ),
                       const SizedBox(height: 6),
@@ -233,9 +238,9 @@ class DashboardScreen extends StatelessWidget {
               ),
               sliver: SliverList.builder(
                 itemCount: categories.length,
-                itemBuilder: (context, index) => _CategoryRow(
+                itemBuilder: (context, index) => CategoryRow(
                   item: categories[index],
-                  color: SpendWiseColors.category(index),
+                  color: categoryColor(categories[index], index),
                   onTap: onSeeLedger,
                 ),
               ),
@@ -398,8 +403,18 @@ class _LegendEntry extends StatelessWidget {
   );
 }
 
-class _CategoryRow extends StatelessWidget {
-  const _CategoryRow({
+/// The tone a category is drawn in.
+///
+/// The folded remainder is deliberately not given the next colour in the ramp:
+/// it is not a sixth category, it is the absence of a list of them, and
+/// colouring it like one invites the reader to look for its name in the list.
+Color categoryColor(CategorySpendViewData item, int index) =>
+    isRemainder(item) ? SpendWiseColors.dim : SpendWiseColors.category(index);
+
+/// Public so the settings preview draws the real row rather than an imitation.
+class CategoryRow extends StatelessWidget {
+  const CategoryRow({
+    super.key,
     required this.item,
     required this.color,
     required this.onTap,
