@@ -163,7 +163,7 @@ class AnimatedMinor extends StatelessWidget {
   );
 }
 
-class FlowShape extends StatelessWidget {
+class FlowShape extends StatefulWidget {
   const FlowShape({
     super.key,
     required this.receivedMinor,
@@ -174,6 +174,7 @@ class FlowShape extends StatelessWidget {
     this.height = 168,
     this.animate = true,
     this.duration = const Duration(milliseconds: 620),
+    this.wobble = false,
   });
 
   final int receivedMinor;
@@ -192,25 +193,62 @@ class FlowShape extends StatelessWidget {
   /// takes two thirds of a second to answer feels broken, not considered.
   final Duration duration;
 
+  /// Whether a tap disturbs the ribbon with a small, damped settle -- liquid
+  /// nudged, not a button pressed. Off by default: the settings previews
+  /// already replay their own draw-in on every choice, and a wobble on top of
+  /// that would be a second reason to touch a figure someone is trying to
+  /// read carefully, which is exactly the gimmick to avoid there. Home turns
+  /// it on.
+  final bool wobble;
+
   /// How long the ribbon takes to travel between two sets of proportions.
   /// Deliberately the same as [AnimatedMinor]'s, so the shape and the figures
   /// beside it read as one movement rather than two that happen to coincide.
   static const _morphDuration = Duration(milliseconds: 460);
 
+  /// How long a tap's wobble takes to settle back to rest.
+  static const _wobbleDuration = Duration(milliseconds: 380);
+
+  @override
+  State<FlowShape> createState() => _FlowShapeState();
+}
+
+class _FlowShapeState extends State<FlowShape>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _wobbleController = AnimationController(
+    duration: FlowShape._wobbleDuration,
+    vsync: this,
+  );
+
+  @override
+  void dispose() {
+    _wobbleController.dispose();
+    super.dispose();
+  }
+
+  void _onTap() {
+    // A tap that lands while reduced motion is on gets no reply -- the whole
+    // point of that setting is that nothing moves without being asked to
+    // settle again, and a wobble is exactly that.
+    if (MediaQuery.disableAnimationsOf(context)) return;
+    _wobbleController.forward(from: 0);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final total = math.max(1, keptMinor.abs() + spentMinor.abs());
-    final keptFraction = (keptMinor.abs() / total).clamp(0.0, 1.0);
+    final total = math.max(1, widget.keptMinor.abs() + widget.spentMinor.abs());
+    final keptFraction = (widget.keptMinor.abs() / total).clamp(0.0, 1.0);
     // Saving is a slice of what was kept, so it is measured against that and
     // can never exceed it -- a shape where the part is bigger than the whole
     // is worse than one that omits the part.
-    final savedOfKept = keptMinor.abs() == 0
+    final savedOfKept = widget.keptMinor.abs() == 0
         ? 0.0
-        : (savedMinor.clamp(0, keptMinor.abs()) / keptMinor.abs()).clamp(
-            0.0,
-            1.0,
-          );
-    final treatment = savedMinor <= 0 ? SavedTreatment.none : saved;
+        : (widget.savedMinor.clamp(0, widget.keptMinor.abs()) /
+                  widget.keptMinor.abs())
+              .clamp(0.0, 1.0);
+    final treatment = widget.savedMinor <= 0
+        ? SavedTreatment.none
+        : widget.saved;
     final reduce = MediaQuery.disableAnimationsOf(context);
     // Two motions, not one. `reveal` draws the ribbon in once and then stays
     // at 1 forever. The proportions were passed to the painter raw, so when
@@ -218,8 +256,8 @@ class FlowShape extends StatelessWidget {
     // legend beneath it was still counting -- the two halves of one sentence
     // disagreeing for half a second. They now travel together, on the same
     // duration and curve the figures use.
-    final morph = reduce ? Duration.zero : _morphDuration;
-    return TweenAnimationBuilder<double>(
+    final morph = reduce ? Duration.zero : FlowShape._morphDuration;
+    final shape = TweenAnimationBuilder<double>(
       tween: Tween(end: keptFraction),
       duration: morph,
       curve: Curves.easeOutCubic,
@@ -228,8 +266,8 @@ class FlowShape extends StatelessWidget {
         duration: morph,
         curve: Curves.easeOutCubic,
         builder: (context, savedShare, _) => TweenAnimationBuilder<double>(
-          tween: Tween(begin: animate && !reduce ? 0 : 1, end: 1),
-          duration: reduce ? Duration.zero : duration,
+          tween: Tween(begin: widget.animate && !reduce ? 0 : 1, end: 1),
+          duration: reduce ? Duration.zero : widget.duration,
           curve: Curves.easeOutCubic,
           builder: (context, t, _) => CustomPaint(
             size: Size.infinite,
@@ -239,9 +277,38 @@ class FlowShape extends StatelessWidget {
               saved: treatment,
               reveal: t,
             ),
-            child: SizedBox(height: height, width: double.infinity),
+            child: SizedBox(height: widget.height, width: double.infinity),
           ),
         ),
+      ),
+    );
+
+    if (!widget.wobble) return shape;
+
+    return GestureDetector(
+      // The wobble is a reply to a poke, not a control -- it does nothing a
+      // screen reader user needs announced, so it stays out of the semantics
+      // tree rather than making the ribbon read as a button.
+      excludeFromSemantics: true,
+      behavior: HitTestBehavior.opaque,
+      onTap: _onTap,
+      child: AnimatedBuilder(
+        animation: _wobbleController,
+        builder: (context, child) {
+          final t = _wobbleController.value;
+          // A decaying sine: it starts at rest, is nudged, and rings itself
+          // out within the one pass -- liquid settling, not a spring bounce.
+          // Three-ish cycles land back on (near) zero exactly at t = 1, so
+          // there is no visible snap when the controller stops ticking.
+          final settle = math.exp(-3.5 * t) * math.sin(t * math.pi * 6);
+          return Transform.translate(
+            // 2 logical pixels at the peak -- enough to read as disturbed,
+            // never enough to blur a figure or misplace a tap target.
+            offset: Offset(0, settle * 2.0),
+            child: child,
+          );
+        },
+        child: shape,
       ),
     );
   }
@@ -273,6 +340,16 @@ class _FlowShapePainter extends CustomPainter {
     const topY = 6.0;
     final botY = h - barH - 2;
     final margin = w * .075;
+
+    // `reveal` already widens the bottom bars out from the top one; clipping
+    // to a window that grows downward over the same value turns that widen
+    // into a pour -- the fill visibly travels from the received bar into its
+    // branches, rather than the branches simply arriving at full width. The
+    // window's top edge never rises above the bottom of the top bar, so the
+    // bar itself is never clipped, only what is still below it.
+    final pourTo = (topY + barH) + (h - (topY + barH)) * reveal;
+    canvas.save();
+    canvas.clipRect(Rect.fromLTWH(0, 0, w, pourTo));
 
     final keptW = topW * keptFraction;
     final spentW = topW - keptW;
@@ -377,6 +454,7 @@ class _FlowShapePainter extends CustomPainter {
       Rect.fromLTWH(spentBotX, botY, spentW, barH),
       paint..color = SpendWiseColors.spend,
     );
+    canvas.restore();
   }
 
   /// Carries the values it was built with, so the proportions the ribbon is

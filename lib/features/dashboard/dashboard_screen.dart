@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
+import '../../main.dart';
 import '../../widgets/shape_kit.dart';
 import '../settings/settings_screen.dart';
 import '../tour/spotlight.dart';
@@ -175,24 +176,40 @@ class DashboardScreen extends StatelessWidget {
                             'Of ${formatMinor(received)} received, '
                             '${formatMinor(kept)} is still yours and '
                             '${formatMinor(spent)} was spent.',
-                        child: FlowShape(
-                          height: ribbonHeight,
-                          receivedMinor: received,
-                          // Taking saving out of the headline takes it out
-                          // of the ribbon too: the shape then divides what is
-                          // available against what went, and never shows a
-                          // slice the figures do not mention.
-                          keptMinor: savingsStyle == HomeSavingsStyle.available
-                              ? kept - savedMinor.clamp(0, kept < 0 ? 0 : kept)
-                              : kept,
-                          spentMinor: spent,
-                          savedMinor: savedMinor,
-                          saved: switch (savingsStyle) {
-                            HomeSavingsStyle.siblings => SavedTreatment.branch,
-                            HomeSavingsStyle.divided => SavedTreatment.inset,
-                            HomeSavingsStyle.seam => SavedTreatment.seam,
-                            _ => SavedTreatment.none,
-                          },
+                        // Home's own State is never recreated when the tabs
+                        // switch away and back, so nothing here would replay
+                        // its draw-in on return without this. A fresh key
+                        // rebuilds the ribbon from a fresh State each time the
+                        // shell sends the user back to this tab.
+                        child: ValueListenableBuilder<int>(
+                          valueListenable: homeReturnRevision,
+                          builder: (context, revision, _) => FlowShape(
+                            key: ValueKey(revision),
+                            height: ribbonHeight,
+                            receivedMinor: received,
+                            // Taking saving out of the headline takes it out
+                            // of the ribbon too: the shape then divides what
+                            // is available against what went, and never shows
+                            // a slice the figures do not mention.
+                            keptMinor:
+                                savingsStyle == HomeSavingsStyle.available
+                                ? kept -
+                                      savedMinor.clamp(0, kept < 0 ? 0 : kept)
+                                : kept,
+                            spentMinor: spent,
+                            savedMinor: savedMinor,
+                            saved: switch (savingsStyle) {
+                              HomeSavingsStyle.siblings =>
+                                SavedTreatment.branch,
+                              HomeSavingsStyle.divided => SavedTreatment.inset,
+                              HomeSavingsStyle.seam => SavedTreatment.seam,
+                              _ => SavedTreatment.none,
+                            },
+                            // The wobble is a Home-only reply to a tap; the
+                            // settings previews already replay their draw-in
+                            // on every choice and do not opt in.
+                            wobble: true,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 14),

@@ -40,6 +40,15 @@ Future<void> main() async {
 /// beats making every screen palette-aware for a setting changed once a year.
 final paletteRevision = ValueNotifier<int>(0);
 
+/// Bumped when the tab bar sends the user back to Home.
+///
+/// The shell builds every tab once in `initState` and switches between them
+/// with a `PageController`, so Home's State is never recreated and nothing on
+/// it replays just because the tab regained focus. This is the explicit
+/// signal that lets the ribbon play its draw-in again on return, the same way
+/// [paletteRevision] is the explicit signal for a re-themed root.
+final homeReturnRevision = ValueNotifier<int>(0);
+
 class SpendWiseApp extends StatelessWidget {
   const SpendWiseApp({super.key, required this.controller, required this.lock});
 

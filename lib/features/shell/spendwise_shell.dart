@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
+import '../../main.dart';
 import '../accounts/accounts_screen.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../insights/insights_screen.dart';
@@ -272,6 +273,9 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
 
   void _selectPage(int value) {
     if (value == index) return;
+    // Home's own State persists underneath -- this is the one hook that
+    // fires exactly when the user has come back to it from somewhere else.
+    if (value == 0) homeReturnRevision.value++;
     setState(() => index = value);
     _pageController.jumpToPage(value);
   }
