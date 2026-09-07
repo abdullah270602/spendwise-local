@@ -49,6 +49,19 @@ class DashboardScreen extends StatelessWidget {
     final categoryStyle = HomeCategories.fromId(
       viewModel.uiViewPreference('home_categories'),
     );
+    // With no breakdown beneath it the ribbon is the whole of Home, so it
+    // takes a share of the screen rather than a fixed number of pixels: a
+    // figure that fills a tall phone and still fits a short one. Bounded at
+    // both ends -- below 200 the curve stops reading as a shape, and above
+    // 380 it pushes the tray scan past the fold, which is the opposite of
+    // where that control belongs.
+    final usableHeight =
+        MediaQuery.sizeOf(context).height -
+        MediaQuery.viewPaddingOf(context).vertical -
+        96;
+    final ribbonHeight = categoryStyle == HomeCategories.off
+        ? (usableHeight * 0.36).clamp(190.0, 300.0)
+        : 168.0;
     // One fold, read by both the bar and the rows, so the picture and the
     // list can never disagree about what is on screen.
     final categories = categoriesForHome(data.categorySpending, categoryStyle);
@@ -163,12 +176,7 @@ class DashboardScreen extends StatelessWidget {
                             '${formatMinor(kept)} is still yours and '
                             '${formatMinor(spent)} was spent.',
                         child: FlowShape(
-                          // With no breakdown beneath it the ribbon is the
-                          // whole screen, so it takes the room rather than
-                          // leaving it blank.
-                          height: categoryStyle == HomeCategories.off
-                              ? 210
-                              : 168,
+                          height: ribbonHeight,
                           receivedMinor: received,
                           // Taking saving out of the headline takes it out
                           // of the ribbon too: the shape then divides what is

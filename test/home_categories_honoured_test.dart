@@ -9,6 +9,13 @@ import 'package:spendwise/widgets/shape_kit.dart';
 /// The fold was unit-tested and the preview was widget-tested, and the setting
 /// still did nothing on Home. Neither test asked the only question that
 /// mattered: does the screen it configures actually obey it.
+/// Exposed so a sizing probe can build the same Home this file tests.
+Widget buildHome(String? choice) => DashboardScreen(
+  viewModel: _Fake(choice),
+  onSeeLedger: () {},
+  onOpenAccounts: () {},
+);
+
 void main() {
   Future<void> pumpHome(WidgetTester tester, String? choice) async {
     tester.view.physicalSize = const Size(1080, 2400);
