@@ -276,11 +276,22 @@ class DashboardScreen extends StatelessWidget {
                 onTap: onOpenAccounts,
               ),
             ),
-            SliverToBoxAdapter(child: _TrayScan(viewModel: viewModel)),
           ],
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 96 + MediaQuery.viewPaddingOf(context).bottom,
+          // The tray scan falls to the bottom of the screen when there is room
+          // and simply follows the content when there is not. It is the one
+          // control on Home a person reaches for repeatedly, and it used to
+          // sit wherever the content happened to end -- high on a quiet month,
+          // far down a busy one, never twice in the same place.
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: 96 + MediaQuery.viewPaddingOf(context).bottom,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [if (anything) _TrayScan(viewModel: viewModel)],
+              ),
             ),
           ),
         ],
@@ -786,15 +797,22 @@ class _TrayScanState extends State<_TrayScan> {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(SpendWiseTheme.gutter, 24, 0, 0),
+    padding: const EdgeInsets.fromLTRB(
+      SpendWiseTheme.gutter,
+      28,
+      SpendWiseTheme.gutter,
+      0,
+    ),
     child: Align(
-      alignment: Alignment.centerLeft,
+      // Centred, because at the bottom of the screen it is a destination
+      // rather than a footnote to the line above it.
+      alignment: Alignment.bottomCenter,
       // A hairline box, so it reads as something you can press without
       // becoming another thing competing for attention on the screen.
       child: InkWell(
         onTap: running ? null : _scan,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           decoration: BoxDecoration(
             border: Border.all(color: SpendWiseColors.line),
           ),

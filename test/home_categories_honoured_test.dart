@@ -34,6 +34,60 @@ void main() {
   int rowsOn(WidgetTester tester) =>
       tester.widgetList<CategoryRow>(find.byType(CategoryRow)).length;
 
+  testWidgets('the tray scan sits low and centred when Home is quiet', (
+    tester,
+  ) async {
+    // It is the one control on Home a person reaches for repeatedly, and it
+    // used to sit wherever the content happened to end: high on a quiet
+    // month, far down a busy one, never twice in the same place.
+    await pumpHome(tester, 'off');
+
+    // The button, not its label: the icon sits left of the text, so the
+    // text's own centre is not the control's centre.
+    final button = tester.getRect(
+      find.ancestor(
+        of: find.textContaining('SCAN THE TRAY'),
+        matching: find.byType(InkWell),
+      ),
+    );
+    final screen = tester.getRect(find.byType(DashboardScreen));
+
+    expect(
+      button.center.dx,
+      closeTo(screen.center.dx, 1.0),
+      reason: 'centred, not hanging off the left gutter',
+    );
+    expect(
+      button.center.dy,
+      greaterThan(screen.height * 0.55),
+      reason: 'within thumb reach, not floating under the last line of text',
+    );
+  });
+
+  testWidgets('and stays below the content, never among it', (tester) async {
+    // With the breakdown drawn the button comes after every row of it. It is
+    // the last thing on Home either way; what changes is only how much space
+    // there was to fall through.
+    await pumpHome(tester, 'all');
+
+    final button = tester.getRect(
+      find.ancestor(
+        of: find.textContaining('SCAN THE TRAY'),
+        matching: find.byType(InkWell),
+      ),
+    );
+    final lastRow = tester
+        .widgetList<CategoryRow>(find.byType(CategoryRow))
+        .last;
+    final lastRowRect = tester.getRect(find.byWidget(lastRow));
+
+    expect(
+      button.top,
+      greaterThan(lastRowRect.bottom),
+      reason: 'after the breakdown, not tangled in it',
+    );
+  });
+
   testWidgets('every category means every category', (tester) async {
     await pumpHome(tester, 'all');
     expect(rowsOn(tester), 8);
