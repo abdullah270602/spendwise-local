@@ -1047,8 +1047,20 @@ final class SpendWiseController extends ChangeNotifier
   String? viewPreference(String key) => _ledger.viewPreference(key);
 
   @override
-  void setViewPreference(String key, String value) =>
-      _ledger.setViewPreference(key, value);
+  /// Stored, then announced.
+  ///
+  /// Every other setter that changes what a screen draws notifies --
+  /// [setHomePeriod] explicitly, [setShowSavingsOnHome] through `_runBusy`.
+  /// This one only wrote, so a screen already built kept whatever it had
+  /// computed and the setting looked like it did nothing at all. The savings
+  /// chooser hid the fault by also calling [setShowSavingsOnHome], and the
+  /// palette by bumping its own repaint counter; the first setting to rely on
+  /// this alone was the first one that visibly failed.
+  void setViewPreference(String key, String value) {
+    if (_ledger.viewPreference(key) == value) return;
+    _ledger.setViewPreference(key, value);
+    notifyListeners();
+  }
 
   @override
   Future<void> exportData() async {
