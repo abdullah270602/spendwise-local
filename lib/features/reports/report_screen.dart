@@ -23,10 +23,26 @@ class ReportScreen extends StatefulWidget {
 }
 
 class _ReportScreenState extends State<ReportScreen> {
+  static const _templateKey = 'report_template';
+
   ReportRange range = ReportRange.thisMonth;
   ReportTemplate template = ReportTemplate.shape;
   DateTimeRange? custom;
   bool working = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Remembered like the palette is: the shape of report someone wants
+    // rarely changes month to month, so asking again every time would just
+    // be the same tap repeated forever.
+    final saved = widget.viewModel.uiViewPreference(_templateKey);
+    if (saved != null) {
+      for (final option in ReportTemplate.values) {
+        if (option.name == saved) template = option;
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -77,7 +93,7 @@ class _ReportScreenState extends State<ReportScreen> {
             _TemplateTile(
               template: option,
               selected: template == option,
-              onTap: () => setState(() => template = option),
+              onTap: () => _chooseTemplate(option),
             ),
           const SizedBox(height: 26),
           _Preview(data: data),
@@ -111,6 +127,11 @@ class _ReportScreenState extends State<ReportScreen> {
               .map((item) => item.occurredAt.toLocal())
               .reduce((a, b) => a.isBefore(b) ? a : b),
   );
+
+  void _chooseTemplate(ReportTemplate option) {
+    widget.viewModel.uiSetViewPreference(_templateKey, option.name);
+    setState(() => template = option);
+  }
 
   Future<void> _chooseRange(ReportRange option) async {
     if (option != ReportRange.custom) {
@@ -230,6 +251,8 @@ class _TemplateThumb extends StatelessWidget {
 
   final ReportTemplate template;
 
+  static const _rule = Color(0xFFDFDDD6);
+
   @override
   Widget build(BuildContext context) => Container(
     width: 40,
@@ -241,51 +264,133 @@ class _TemplateThumb extends StatelessWidget {
       children: [
         Container(width: 22, height: 3, color: const Color(0xFF17191A)),
         const SizedBox(height: 4),
-        if (template == ReportTemplate.shape) ...[
-          Expanded(
+        Expanded(child: _body),
+      ],
+    ),
+  );
+
+  Widget get _body => switch (template) {
+    // The shape: one wide "kept" bar against a short "spent" one.
+    ReportTemplate.shape => Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(flex: 7, child: Container(color: SpendWiseColors.keep)),
+        const SizedBox(width: 2),
+        Expanded(
+          flex: 3,
+          child: FractionallySizedBox(
+            heightFactor: .5,
+            alignment: Alignment.bottomCenter,
+            child: Container(color: SpendWiseColors.spend),
+          ),
+        ),
+      ],
+    ),
+    // The statement: a plain register of rows, oldest idea in the book.
+    ReportTemplate.statement => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < 7; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 3),
+            child: Container(
+              width: i.isEven ? 28 : 22,
+              height: 1.6,
+              color: i == 0 ? SpendWiseColors.spend : _rule,
+            ),
+          ),
+      ],
+    ),
+    // The change: paired bars, this period against the last, per row.
+    ReportTemplate.change => Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final row in const [(5.0, 8.0), (9.0, 4.0), (4.0, 7.0)])
+          Padding(
+            padding: const EdgeInsets.only(bottom: 3),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Expanded(
-                  flex: 7,
-                  child: Container(color: SpendWiseColors.keep),
+                SizedBox(
+                  height: row.$1,
+                  width: 6,
+                  child: Container(color: _rule),
                 ),
                 const SizedBox(width: 2),
-                Expanded(
-                  flex: 3,
-                  child: FractionallySizedBox(
-                    heightFactor: .5,
-                    alignment: Alignment.bottomCenter,
-                    child: Container(color: SpendWiseColors.spend),
+                SizedBox(
+                  height: row.$2,
+                  width: 6,
+                  child: Container(
+                    color: row.$2 > row.$1
+                        ? SpendWiseColors.spend
+                        : SpendWiseColors.keep,
                   ),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 4),
-          Container(width: 26, height: 2, color: const Color(0xFFDFDDD6)),
-        ] else
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (var i = 0; i < 7; i++)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 3),
-                    child: Container(
-                      width: i.isEven ? 28 : 22,
-                      height: 1.6,
-                      color: i == 0
-                          ? SpendWiseColors.spend
-                          : const Color(0xFFDFDDD6),
-                    ),
-                  ),
               ],
             ),
           ),
       ],
     ),
-  );
+    // The docket: a bold group line, its items, and a ruled subtotal.
+    ReportTemplate.docket => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(width: 26, height: 2, color: SpendWiseColors.spend),
+        const SizedBox(height: 3),
+        Container(width: 20, height: 1.4, color: _rule),
+        const SizedBox(height: 2),
+        Container(width: 24, height: 1.4, color: _rule),
+        const SizedBox(height: 4),
+        Container(width: 28, height: 2, color: const Color(0xFF17191A)),
+        const SizedBox(height: 5),
+        Container(width: 22, height: 1.4, color: _rule),
+        const SizedBox(height: 2),
+        Container(width: 18, height: 1.4, color: _rule),
+      ],
+    ),
+    // The almanac: a small grid of tiles, one per month.
+    ReportTemplate.almanac => Column(
+      children: [
+        Expanded(
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  margin: const EdgeInsets.all(1.5),
+                  color: _rule,
+                ),
+              ),
+              Expanded(
+                child: Container(
+                  margin: const EdgeInsets.all(1.5),
+                  color: SpendWiseColors.keep,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  margin: const EdgeInsets.all(1.5),
+                  color: SpendWiseColors.spend,
+                ),
+              ),
+              Expanded(
+                child: Container(
+                  margin: const EdgeInsets.all(1.5),
+                  color: _rule,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  };
 }
 
 /// What the report will say, before committing to a file.
