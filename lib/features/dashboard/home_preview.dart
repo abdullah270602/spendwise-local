@@ -211,10 +211,12 @@ class CategoryPreview extends StatelessWidget {
               total == 0 ? 1 : item.amount.minorUnits / total,
           ],
           colors: [for (final item in items) categoryColor(item, palette)],
+          ids: [for (final item in items) item.category],
         ),
         const SizedBox(height: 4),
         for (var i = 0; i < shown.length; i++)
           CategoryRow(
+            key: ValueKey(shown[i].category),
             item: shown[i],
             color: categoryColor(shown[i], palette),
             onTap: () {},

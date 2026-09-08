@@ -815,6 +815,7 @@ class SegmentBar extends StatelessWidget {
     required this.colors,
     this.height = 34,
     this.gap = 2,
+    this.ids,
   });
 
   final List<double> weights;
@@ -822,24 +823,57 @@ class SegmentBar extends StatelessWidget {
   final double height;
   final double gap;
 
+  /// Identifies each segment across rebuilds, so a category's own slice
+  /// travels to its new width when the figures change rather than whichever
+  /// segment now happens to sit at the same position -- two categories
+  /// swapping rank would otherwise read as a segment's colour snapping
+  /// mid-animation while its width kept sliding toward the wrong target.
+  /// Left null by callers whose segments never change rank against
+  /// each other.
+  final List<Object>? ids;
+
   @override
   Widget build(BuildContext context) {
     if (weights.isEmpty) return SizedBox(height: height);
+    // The same travel FlowShape gives its own kept/spent split, so a category
+    // taking a bigger bite of the month reads as the same kind of movement as
+    // the ribbon above it, not an unrelated jump cut beneath it.
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : FlowShape._morphDuration;
+    final total = weights.fold<double>(0, (sum, w) => sum + math.max(0.0, w));
     return SizedBox(
       height: height,
-      // Stretch is load-bearing: an Expanded child only gets a tight width,
-      // so a bare ColoredBox would size to zero height and draw nothing.
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (var i = 0; i < weights.length; i++) ...[
-            if (i > 0) SizedBox(width: gap),
-            Expanded(
-              flex: math.max(1, (weights[i] * 10000).round()),
-              child: ColoredBox(color: colors[i % colors.length]),
-            ),
-          ],
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final usable = math.max(
+            0.0,
+            constraints.maxWidth - gap * (weights.length - 1),
+          );
+          double widthFor(int i) => total <= 0
+              ? usable / weights.length
+              : usable * (math.max(0.0, weights[i]) / total);
+          // Stretch is load-bearing: a bare ColoredBox sized only by width
+          // would collapse to zero height and draw nothing.
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < weights.length; i++) ...[
+                if (i > 0) SizedBox(width: gap),
+                TweenAnimationBuilder<double>(
+                  key: ids == null ? null : ValueKey(ids![i]),
+                  tween: Tween(end: widthFor(i)),
+                  duration: duration,
+                  curve: Curves.easeOutQuint,
+                  builder: (context, width, _) => SizedBox(
+                    width: width,
+                    child: ColoredBox(color: colors[i % colors.length]),
+                  ),
+                ),
+              ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -1105,11 +1139,20 @@ class ProportionBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final fg = filled ? SpendWiseColors.bg : SpendWiseColors.fg;
     final compact = height < 44;
+    // The map's whole idea is that a bigger balance is a bigger block, so a
+    // balance that actually changes has to be seen changing size -- snapping
+    // straight to a new height said the same thing a bar chart with no axis
+    // does: a number moved, with no sense of how much.
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 220);
     return Padding(
       padding: const EdgeInsets.only(bottom: 5),
       child: InkWell(
         onTap: onTap,
-        child: Container(
+        child: AnimatedContainer(
+          duration: duration,
+          curve: Curves.easeOutQuint,
           height: height,
           padding: const EdgeInsets.symmetric(horizontal: 13),
           decoration: BoxDecoration(

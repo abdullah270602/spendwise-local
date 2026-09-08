@@ -4,17 +4,17 @@ Last updated: 2026-09-08
 
 ## Current release
 
-- Version: `0.9.18+33`
+- Version: `0.9.21+36`
 - Android package: `com.spendwise.app` — keep this stable so upgrades retain data.
 - Public repository: <https://github.com/abdullah270602/spendwise-local>
-- Latest release: <https://github.com/abdullah270602/spendwise-local/releases/tag/v0.9.18>
+- Latest release: <https://github.com/abdullah270602/spendwise-local/releases/tag/v0.9.21>
 - Shipped APK is the optimized split-per-ABI release build, not a Flutter debug
   build. Build with `flutter build apk --release --split-per-abi`; a plain
   `--release` writes only the universal APK and leaves the per-ABI files from
   the *previous* build sitting in the output directory, which is an easy way to
   install a stale binary and believe it is current. Check the APK's mtime
   against the commit before installing.
-- Split-per-ABI adds 2000 to the version code for arm64: `33` becomes `2033`.
+- Split-per-ABI adds 2000 to the version code for arm64: `36` becomes `2036`.
 - Installed on the connected Pixel 9 at this version, with `adb install -r`.
 
 ## Known reliability issues
@@ -201,10 +201,11 @@ in `AGENTS.md`. In particular:
   curation, and a plain `Page` does not clip -- a busy month could push content
   past the physical edge, invisible rather than ugly, on a document whose whole
   job is to be a record.
-- Settings, Appearance, Export and Notification sources are drawn in the app's
-  own flat hairline vocabulary rather than stock Material `Card`/`ListTile`
-  rows. `SettingsRow` in `lib/widgets/spendwise_components.dart` is the shared
-  row; there is no second surface colour and no rounded block anywhere.
+- Settings, Appearance, Export and Notification sources keep the Material
+  `Card`/`ListTile` look, deliberately, while every other screen is flat
+  hairlines. They were redrawn flat in one pass and the owner asked for the
+  boxy version back after seeing it on the device. `AGENTS.md` says not to
+  redo it; a review will keep proposing it.
 - The transaction details screen and the debt sheets follow the same rule, and
   all three debt stories are offered where the record is made. Deleting from a
   transaction's own screen offers the same Undo the Review inbox does, and
@@ -217,6 +218,12 @@ in `AGENTS.md`. In particular:
 - A register row prints a sign and carries one merged `Semantics` label, so a
   screen reader hears whether money came in or went out. It had encoded that
   in colour alone.
+- Erasing all local data is four gates rather than a dialog: the PIN if one is
+  set (PIN only -- a fingerprint can be used on somebody asleep or unwilling),
+  a full screen rather than a dismissable dialog, the word ERASE typed out,
+  and a thirty-second countdown that leaving the screen or closing the app
+  cancels. A pending erase is never resumed on next launch: that would take
+  the data of somebody who had already changed their mind.
 - Local export, insights, notification-source health, demo-data controls, and
   Settings version/build display with a user-invoked GitHub link.
 
@@ -238,7 +245,7 @@ invalidation behavior when changing the shell/controller.
 
 ## Verification baseline
 
-At `0.9.18`, the analyzer is clean and all 654 tests pass. Before shipping:
+At `0.9.21`, the analyzer is clean and all 668 tests pass. Before shipping:
 
 1. Run `dart format` on changed Dart files.
 2. Run `flutter analyze --no-pub`.
@@ -304,6 +311,11 @@ current configured paths rather than assume another user's home directory.
   owner reverted it on the device. The test now pins it *compact* and says
   why, because a test asserting a guideline the product has deliberately
   declined is a test that lies.
+- **A consistency finding is not automatically a defect.** Four screens using
+  a different vocabulary from the rest of the app reads as an oversight and
+  was reported as one; unified, it turned out the owner preferred the
+  original. Taste questions go to the person whose app it is before a sweep,
+  not after.
 - **Percentages rank the wrong things.** A category that went from 350 to 900
   has risen further in percent than one that rose by 6,500 rupees, and only
   one of those belongs at the top of a list. Order by money moved, and gate

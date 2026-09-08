@@ -42,6 +42,17 @@ actually invalidated. Say which ones you checked and which needed nothing;
   text. Both blind spots have shipped visible breakage — a header that
   overflowed by 108px, and 43 overflows at twice the default font size.
 
+**Two looks, on purpose.** Settings, Appearance, Export and Notification
+sources are drawn with Material `Card` and `ListTile` rows and their leading
+and trailing icons. Every other screen is flat hairlines with square corners
+and no icons inside rows. A review will read that as "two design languages
+stacked" and want to unify it — one did, and the whole settings family was
+redrawn flat. The owner looked at it on the device and asked for the boxy
+version back: he prefers it there, and a list of destinations to tap reads
+differently from a screen of figures. Do not redraw these four again. The
+`↗` and `›` text glyphs that replaced the Material icons went with it; those
+rows use real icons.
+
 **Commits.** Do not add a `Co-Authored-By` trailer for Claude or any other
 assistant. This is a repository the user publishes as their own work, and the
 trailer is noise in a history they read back. Subject and body only.

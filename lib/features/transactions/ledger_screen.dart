@@ -318,12 +318,26 @@ class _LedgerScreenState extends State<LedgerScreen> {
                   // Flexible so a long month name yields to the controls
                   // beside it rather than pushing them off the edge.
                   Flexible(
-                    child: Text(
-                      DateFormat(_sameYear ? 'MMMM' : 'MMMM yyyy')
-                          .format(month),
-                      style: SpendWiseType.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    // A step is the one action this header exists for, and it
+                    // used to replace the whole word outright -- "August"
+                    // gone, "September" there, in the same frame the balance
+                    // and every row beneath it also changed. A fade is enough
+                    // to say a step happened without racing the heavier
+                    // redraw underneath it.
+                    child: AnimatedSwitcher(
+                      duration: MediaQuery.disableAnimationsOf(context)
+                          ? Duration.zero
+                          : const Duration(milliseconds: 220),
+                      switchInCurve: Curves.easeOutQuint,
+                      switchOutCurve: Curves.easeOutQuint,
+                      child: Text(
+                        DateFormat(_sameYear ? 'MMMM' : 'MMMM yyyy')
+                            .format(month),
+                        key: ValueKey(month),
+                        style: SpendWiseType.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ),
                   _Step(
@@ -407,10 +421,24 @@ class _LedgerScreenState extends State<LedgerScreen> {
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerRight,
-                  child: Text(
-                    formatMinor(_currentBalance),
-                    style: SpendWiseType.rowStrong.copyWith(fontSize: 19),
-                    maxLines: 1,
+                  // Not `AnimatedMinor` itself -- that widget has no
+                  // `maxLines`, and the single line this figure is forced
+                  // onto is what lets the `FittedBox` above shrink it rather
+                  // than let it wrap to two. Same duration and curve, so a
+                  // balance that moves while this screen is open still reads
+                  // as the same kind of event as every other figure that
+                  // travels rather than jumps.
+                  child: TweenAnimationBuilder<int>(
+                    tween: IntTween(end: _currentBalance),
+                    duration: MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : const Duration(milliseconds: 800),
+                    curve: Curves.easeOutQuint,
+                    builder: (context, value, _) => Text(
+                      formatMinor(value),
+                      style: SpendWiseType.rowStrong.copyWith(fontSize: 19),
+                      maxLines: 1,
+                    ),
                   ),
                 ),
               ],

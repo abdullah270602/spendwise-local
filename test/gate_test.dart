@@ -286,6 +286,115 @@ void main() {
       },
     );
 
+    testWidgets(
+      'the corridor wall glides to its new position instead of snapping',
+      (tester) async {
+        // +30% does not clear a ±40% corridor but does clear a ±15% one, so
+        // this row is quiet in the first reading and loud in the second --
+        // deliberately a real crossing, not just a wall moving under a row
+        // that stays put. It is exactly this shape of change that used to
+        // reset the wall (and the mark below) to their final positions
+        // outright: the crossing rebuilt the row's own highlight wrapper as
+        // a different widget, and Flutter discards a subtree it cannot
+        // match rather than carrying its in-flight animations forward.
+        final categories = [
+          change(category: 'Shifter', now: 130000, prev: 100000), // +30%
+        ];
+        const total = 200000;
+
+        double wallLeft(WidgetTester tester) =>
+            tester.getTopLeft(find.byKey(const ValueKey('Shifter-wall-hi'))).dx;
+
+        await pumpGate(
+          tester,
+          changes: categories,
+          sensitivity: GateSensitivity.bigMovesOnly, // ±40%
+          totalSpendingMinor: total,
+        );
+        await tester.pumpAndSettle();
+        final wideWall = wallLeft(tester);
+
+        await pumpGate(
+          tester,
+          changes: categories,
+          sensitivity: GateSensitivity.everything, // ±15%
+          totalSpendingMinor: total,
+        );
+        await tester.pump(const Duration(milliseconds: 50));
+        final midWall = wallLeft(tester);
+        expect(
+          midWall,
+          isNot(closeTo(wideWall, 0.5)),
+          reason:
+              'the wall should already be travelling toward the narrower '
+              'corridor, not waiting to jump once the animation ends',
+        );
+
+        await tester.pumpAndSettle();
+        final narrowWall = wallLeft(tester);
+        expect(
+          narrowWall,
+          lessThan(wideWall),
+          reason:
+              'a narrower corridor (±15%) sits closer to the centre line '
+              'than a wider one (±40%)',
+        );
+        expect(
+          midWall,
+          allOf(greaterThan(narrowWall), lessThan(wideWall)),
+          reason: 'a mid-flight frame should sit strictly between the two',
+        );
+      },
+    );
+
+    testWidgets(
+      "a row's own mark travels across a crossing instead of resetting to "
+      'its new shape outright',
+      (tester) async {
+        // The same crossing as the wall test above: this is the row-level
+        // counterpart of that fix. The row's position across bands already
+        // glided before that fix (it lives in a different widget, one level
+        // up); the mark drawn on the row's own corridor track is the piece
+        // that used to reset outright the instant the crossing began.
+        final categories = [
+          change(category: 'Shifter', now: 130000, prev: 100000), // +30%
+        ];
+        const total = 200000;
+
+        double markLeft(WidgetTester tester) =>
+            tester.getTopLeft(find.byKey(const ValueKey('Shifter-mark'))).dx;
+
+        await pumpGate(
+          tester,
+          changes: categories,
+          sensitivity: GateSensitivity.bigMovesOnly, // ±40%, quiet: a tick
+          totalSpendingMinor: total,
+        );
+        await tester.pumpAndSettle();
+        final quietLeft = markLeft(tester);
+
+        await pumpGate(
+          tester,
+          changes: categories,
+          sensitivity: GateSensitivity.everything, // ±15%, loud: a bar
+          totalSpendingMinor: total,
+        );
+        await tester.pump(const Duration(milliseconds: 50));
+        final midLeft = markLeft(tester);
+
+        await tester.pumpAndSettle();
+        final loudLeft = markLeft(tester);
+
+        expect(
+          midLeft,
+          allOf(greaterThan(loudLeft), lessThan(quietLeft)),
+          reason:
+              'a mid-flight frame should sit strictly between the tick '
+              "position and the bar's, not already at either one",
+        );
+      },
+    );
+
     test('an unrecognised or missing id falls back to balanced', () {
       expect(GateSensitivity.fromId(null), GateSensitivity.balanced);
       expect(GateSensitivity.fromId('nonsense'), GateSensitivity.balanced);

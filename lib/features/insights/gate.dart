@@ -507,11 +507,33 @@ class _GateRowState extends State<_GateRow> with TickerProviderStateMixin {
   // more than one ticker. `SingleTickerProviderStateMixin` throws the moment
   // a second is requested while the first is still alive, which the entrance
   // controller always is for a row's entire lifetime.
-  /// Non-null only for the ~760ms it takes the crossing flash to decay, then
-  /// dropped -- there is nothing left for it to do once its animation has run
-  /// to completion, and keeping it alive would be a controller ticking
-  /// forever for no visible effect.
-  AnimationController? _crossFlash;
+  /// The crossing flash. Idle at 1 (fully decayed, so the highlight it drives
+  /// paints at zero alpha) and reset to 0 to bloom again the moment this
+  /// row's own `loud` classification changes.
+  ///
+  /// Used to be minted fresh on every crossing and dropped once it finished,
+  /// on the reasoning that a completed controller left alive was a ticker
+  /// running for no visible effect -- true, but it is not what a finished
+  /// `AnimationController` does: it stops ticking on its own once its status
+  /// is `completed`, exactly like `_enter` below already sits idle for the
+  /// rest of a row's life. The dropping was the actual fault. Wrapping
+  /// `content` in the highlight only while a flash controller existed meant
+  /// the wrapper's own widget subtree changed shape the instant a crossing
+  /// began -- from a bare `Semantics` tree to an `AnimatedBuilder` wrapping
+  /// that same tree -- and Flutter answers a changed subtree by discarding
+  /// the old one and mounting a fresh one. Everything living inside that
+  /// subtree lost whatever it was mid-flight through on exactly that frame:
+  /// the corridor walls reset to their new positions outright, and so did
+  /// this row's own mark, which is the one thing a crossing is actually
+  /// supposed to show travelling. The row's *position* across bands still
+  /// glided -- that animation lives one level up, in `_GateBoardState`,
+  /// untouched by this -- which is what let the fault hide behind a passing
+  /// "the row glides" reading for as long as it did.
+  late final AnimationController _crossFlash = AnimationController(
+    vsync: this,
+    duration: gateFlashDuration, // FlowShape's own wobble duration
+    value: 1,
+  );
 
   /// A one-shot entrance: a row that has just appeared -- a category with no
   /// spending last time it was drawn -- fades in rather than popping onto the
@@ -532,22 +554,13 @@ class _GateRowState extends State<_GateRow> with TickerProviderStateMixin {
   void didUpdateWidget(_GateRow old) {
     super.didUpdateWidget(old);
     if (old.loud != widget.loud && !widget.reduce) {
-      _crossFlash?.dispose();
-      final flash = AnimationController(
-        vsync: this,
-        duration: gateFlashDuration, // FlowShape's own wobble duration
-      );
-      _crossFlash = flash;
-      flash.forward().whenComplete(() {
-        if (!mounted) return;
-        setState(() => _crossFlash = null);
-      });
+      _crossFlash.forward(from: 0);
     }
   }
 
   @override
   void dispose() {
-    _crossFlash?.dispose();
+    _crossFlash.dispose();
     _enter.dispose();
     super.dispose();
   }
@@ -575,6 +588,12 @@ class _GateRowState extends State<_GateRow> with TickerProviderStateMixin {
           ? SpendWiseColors.spend
           : (realPercent < 0 ? SpendWiseColors.keep : SpendWiseColors.dim);
       mark = AnimatedPositioned(
+        // Keyed by category, not left implicit -- the tick this replaces
+        // when a row first crosses into "what moved" carries the same key,
+        // so a test (and Flutter's own reconciliation) can hold this one
+        // element to account across that exact frame rather than treating it
+        // as a fresh mark with nothing to travel from.
+        key: ValueKey('${category.category}-mark'),
         duration: widget.duration,
         curve: Curves.easeOutQuint,
         left: left,
@@ -590,6 +609,7 @@ class _GateRowState extends State<_GateRow> with TickerProviderStateMixin {
     } else {
       markColor = SpendWiseColors.dim;
       mark = AnimatedPositioned(
+        key: ValueKey('${category.category}-mark'),
         duration: widget.duration,
         curve: Curves.easeOutQuint,
         left: x - gateTickWidth / 2,
@@ -684,14 +704,25 @@ class _GateRowState extends State<_GateRow> with TickerProviderStateMixin {
                       width: 1,
                       child: ColoredBox(color: SpendWiseColors.line),
                     ),
-                    Positioned(
+                    // The corridor itself, not just the row inside it -- a
+                    // sensitivity change moves these two walls, and a wall
+                    // that jumps while the row and its own mark glide is the
+                    // one part of "the corridor just widened" a reader would
+                    // see happen without being shown it happening.
+                    AnimatedPositioned(
+                      key: ValueKey('${category.category}-wall-lo'),
+                      duration: widget.duration,
+                      curve: Curves.easeOutQuint,
                       left: _gateMid - widget.wall,
                       top: 3,
                       bottom: 3,
                       width: 1,
                       child: ColoredBox(color: SpendWiseColors.edge),
                     ),
-                    Positioned(
+                    AnimatedPositioned(
+                      key: ValueKey('${category.category}-wall-hi'),
+                      duration: widget.duration,
+                      curve: Curves.easeOutQuint,
                       left: _gateMid + widget.wall,
                       top: 3,
                       bottom: 3,
@@ -722,20 +753,21 @@ class _GateRowState extends State<_GateRow> with TickerProviderStateMixin {
       ),
     );
 
-    final flash = _crossFlash;
-    if (flash != null) {
-      content = AnimatedBuilder(
-        animation: flash,
-        // The flash a row gets the moment it crosses the corridor: a soft
-        // highlight that blooms and decays, on FlowShape's own wobble
-        // duration rather than a number invented for this one purpose.
-        builder: (context, child) => ColoredBox(
-          color: SpendWiseColors.fg.withValues(alpha: .10 * (1 - flash.value)),
-          child: child,
+    // Always wrapped, at zero alpha when idle -- see `_crossFlash`'s own
+    // comment for why this cannot be conditional on a flash actually being in
+    // progress. The flash a row gets the moment it crosses the corridor is a
+    // soft highlight that blooms and decays, on FlowShape's own wobble
+    // duration rather than a number invented for this one purpose.
+    content = AnimatedBuilder(
+      animation: _crossFlash,
+      builder: (context, child) => ColoredBox(
+        color: SpendWiseColors.fg.withValues(
+          alpha: .10 * (1 - _crossFlash.value),
         ),
-        child: content,
-      );
-    }
+        child: child,
+      ),
+      child: content,
+    );
 
     return FadeTransition(
       opacity: _enter,

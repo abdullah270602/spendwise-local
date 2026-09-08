@@ -279,6 +279,10 @@ class DashboardScreen extends StatelessWidget {
                           for (final item in categories)
                             categoryColor(item, tones),
                         ],
+                        // A category's rank can move between two periods, so
+                        // its name -- not its position -- has to say which
+                        // segment is still which while the widths travel.
+                        ids: [for (final item in categories) item.category],
                       ),
                       const SizedBox(height: 6),
                     ],
@@ -292,6 +296,11 @@ class DashboardScreen extends StatelessWidget {
               sliver: SliverList.builder(
                 itemCount: categories.length,
                 itemBuilder: (context, index) => CategoryRow(
+                  // Keyed by name, not position: a category's rank can move
+                  // between two periods, and without this its row would keep
+                  // the Element at its old position and animate its figure
+                  // toward a different category's total.
+                  key: ValueKey(categories[index].category),
                   item: categories[index],
                   color: categoryColor(categories[index], tones),
                   onTap: onSeeLedger,
@@ -536,8 +545,13 @@ class CategoryRow extends StatelessWidget {
                 style: SpendWiseType.row,
               ),
             ),
-            Text(
-              formatAmount(item.amount, cents: false),
+            // A category's total is the same statement the bar above it is
+            // making, so the two have to move together -- a bar that grows
+            // beside a figure that snaps reads as two unrelated things
+            // happening to agree by coincidence.
+            AnimatedMinor(
+              item.amount.minorUnits,
+              cents: false,
               style: SpendWiseType.rowStrong,
             ),
           ],

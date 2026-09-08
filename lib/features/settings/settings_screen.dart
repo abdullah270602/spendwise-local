@@ -12,6 +12,7 @@ import 'app_lock_screen.dart';
 import 'source_selection_screen.dart';
 import '../reports/report_screen.dart';
 import 'appearance_screen.dart';
+import 'erase_screen.dart';
 import 'export_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -48,40 +49,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SizedBox(height: 22),
         // First, above everything a person might come here to change: the
         // place that explains what any of it does.
-        SettingsRow(
-          title: 'How SpendWise works',
-          subtitle: 'Worked examples, step by step, and what it never does',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute<void>(
-              builder: (_) => HelpScreen(viewModel: viewModel),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.menu_book_outlined),
+            title: const Text('How SpendWise works'),
+            subtitle: const Text(
+              'Worked examples, step by step, and what it never does',
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => HelpScreen(viewModel: viewModel),
+              ),
             ),
           ),
         ),
         const SizedBox(height: 22),
         const SectionHeading('Capture'),
         const SizedBox(height: 8),
-        SettingsRow(
-          title: 'Notification access',
-          subtitle: viewModel.notificationAccessGranted
-              ? 'Enabled'
-              : 'Required for automatic capture',
-          trailing: TextButton(
-            onPressed: viewModel.requestNotificationAccess,
-            child: Text(
-              viewModel.notificationAccessGranted ? 'Manage' : 'Enable',
-            ),
-          ),
-        ),
-        SettingsRow(
-          title: 'Notification sources',
-          subtitle:
-              '${viewModel.sources.where((s) => s.enabled).length} enabled',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => SourceSelectionScreen(viewModel: viewModel),
-            ),
+        Card(
+          child: Column(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.notifications_outlined),
+                title: const Text('Notification access'),
+                subtitle: Text(
+                  viewModel.notificationAccessGranted
+                      ? 'Enabled'
+                      : 'Required for automatic capture',
+                ),
+                trailing: TextButton(
+                  onPressed: viewModel.requestNotificationAccess,
+                  child: Text(
+                    viewModel.notificationAccessGranted ? 'Manage' : 'Enable',
+                  ),
+                ),
+              ),
+              const Divider(height: 1, indent: 56),
+              ListTile(
+                leading: const Icon(Icons.apps_rounded),
+                title: const Text('Notification sources'),
+                subtitle: Text(
+                  '${viewModel.sources.where((s) => s.enabled).length} enabled',
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => SourceSelectionScreen(viewModel: viewModel),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 22),
@@ -90,129 +110,190 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Builder(
           builder: (context) {
             final lock = AppLockScope.maybeOf(context);
-            return SettingsRow(
-              title: 'App lock',
-              subtitle: lock == null
-                  ? 'Unavailable'
-                  : lock.enabled
-                  ? '${lock.biometricsEnabled ? 'PIN and fingerprint' : 'PIN'}'
-                        ', ${lock.delay.title.toLowerCase()}'
-                  : 'Off',
-              onTap: lock == null
-                  ? null
-                  : () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) => AppLockScreen(lock: lock),
-                        ),
-                      );
-                      if (mounted) setState(() {});
-                    },
+            return Card(
+              child: ListTile(
+                leading: const Icon(Icons.lock_outline_rounded),
+                title: const Text('App lock'),
+                subtitle: Text(
+                  lock == null
+                      ? 'Unavailable'
+                      : lock.enabled
+                      ? '${lock.biometricsEnabled ? 'PIN and fingerprint' : 'PIN'}'
+                            ', ${lock.delay.title.toLowerCase()}'
+                      : 'Off',
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: lock == null
+                    ? null
+                    : () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) => AppLockScreen(lock: lock),
+                          ),
+                        );
+                        if (mounted) setState(() {});
+                      },
+              ),
             );
           },
         ),
         const SizedBox(height: 22),
         const SectionHeading('Your identity'),
         const SizedBox(height: 8),
-        SettingsRow(
-          title: 'Your name(s)',
-          subtitle: viewModel.uiOwnNames.isEmpty
-              ? 'Recognizes transfers between your own accounts'
-              : viewModel.uiOwnNames.join(', '),
-          onTap: _editOwnNames,
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.badge_outlined),
+            title: const Text('Your name(s)'),
+            subtitle: Text(
+              viewModel.uiOwnNames.isEmpty
+                  ? 'Recognizes transfers between your own accounts'
+                  : viewModel.uiOwnNames.join(', '),
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: _editOwnNames,
+          ),
         ),
         const SizedBox(height: 22),
         const SectionHeading('Your data'),
         const SizedBox(height: 8),
-        SettingsRow(
-          title: 'Spending report',
-          subtitle: 'A PDF of a month, a quarter, a year',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute<void>(
-              builder: (_) => ReportScreen(viewModel: viewModel),
-            ),
-          ),
-        ),
-        SettingsRow(
-          title: 'Export data',
-          subtitle: 'CSV or JSON with precise filters',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ExportScreen(viewModel: viewModel),
-            ),
+        Card(
+          child: Column(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.picture_as_pdf_outlined),
+                title: const Text('Spending report'),
+                subtitle: const Text('A PDF of a month, a quarter, a year'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => ReportScreen(viewModel: viewModel),
+                  ),
+                ),
+              ),
+              const Divider(height: 1, indent: 56),
+              ListTile(
+                leading: const Icon(Icons.download_outlined),
+                title: const Text('Export data'),
+                subtitle: const Text('CSV or JSON with precise filters'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ExportScreen(viewModel: viewModel),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 22),
         const SectionHeading('Appearance'),
         const SizedBox(height: 8),
-        SettingsRow(
-          title: 'How the app is drawn',
-          subtitle: 'Home, Insights and the colour of everything',
-          onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute<void>(
-                builder: (_) => AppearanceScreen(viewModel: viewModel),
-              ),
-            );
-            if (mounted) setState(() {});
-          },
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.tune_rounded),
+            title: const Text('How the app is drawn'),
+            subtitle: const Text('Home, Insights and the colour of everything'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => AppearanceScreen(viewModel: viewModel),
+                ),
+              );
+              if (mounted) setState(() {});
+            },
+          ),
         ),
         const SizedBox(height: 22),
         const SectionHeading('Sample data'),
         const SizedBox(height: 8),
-        SettingsRow(
-          title: 'Demo transactions',
-          subtitle: 'Use clearly labelled sample transactions for previews',
-          trailing: Switch(
+        Card(
+          child: SwitchListTile(
+            secondary: const Icon(Icons.science_outlined),
+            title: const Text('Demo transactions'),
+            subtitle: const Text(
+              'Use clearly labelled sample transactions for previews',
+            ),
             value: viewModel.uiDemoDataEnabled,
             onChanged: changingDemoData ? null : _setDemoDataEnabled,
           ),
-          onTap: changingDemoData
-              ? null
-              : () => _setDemoDataEnabled(!viewModel.uiDemoDataEnabled),
         ),
         const SizedBox(height: 22),
         const SectionHeading('About SpendWise'),
         const SizedBox(height: 8),
-        FutureBuilder<PackageInfo>(
-          future: packageInfo,
-          builder: (context, snapshot) {
-            final info = snapshot.data;
-            return SettingsRow(
-              title: 'App version',
-              subtitle: info == null
-                  ? 'Loading version…'
-                  : 'v${info.version} (${info.buildNumber})',
-            );
-          },
-        ),
-        SettingsRow(
-          title: 'GitHub repository',
-          subtitle: 'github.com/abdullah270602/spendwise-local',
-          // A character, not a Material icon -- the same vocabulary as the
-          // ⇄ transfer glyph on a ledger row, standing in for "leaves the app".
-          trailing: const Text(
-            '↗',
-            style: TextStyle(fontSize: 15, color: SpendWiseColors.dim),
+        Card(
+          child: Column(
+            children: [
+              FutureBuilder<PackageInfo>(
+                future: packageInfo,
+                builder: (context, snapshot) {
+                  final info = snapshot.data;
+                  return ListTile(
+                    leading: const Icon(Icons.info_outline_rounded),
+                    title: const Text('App version'),
+                    subtitle: Text(
+                      info == null
+                          ? 'Loading version…'
+                          : 'v${info.version} (${info.buildNumber})',
+                    ),
+                  );
+                },
+              ),
+              const Divider(height: 1, indent: 56),
+              ListTile(
+                leading: const Icon(Icons.code_rounded),
+                title: const Text('GitHub repository'),
+                subtitle: const Text(
+                  'github.com/abdullah270602/spendwise-local',
+                ),
+                trailing: const Icon(Icons.open_in_new_rounded),
+                onTap: _openRepository,
+              ),
+            ],
           ),
-          onTap: _openRepository,
         ),
         const SizedBox(height: 22),
         const SectionHeading('Privacy controls'),
         const SizedBox(height: 8),
-        SettingsRow(
-          title: 'Network-free core',
-          titleColor: SpendWiseColors.keep,
-          subtitle: 'Ledger and reconciliation never require internet',
-        ),
-        SettingsRow(
-          title: 'Erase all local data',
-          titleColor: SpendWiseColors.spend,
-          onTap: () => _confirmErase(context),
+        Card(
+          child: Column(
+            children: [
+              ListTile(
+                leading: Icon(
+                  Icons.wifi_off_rounded,
+                  color: SpendWiseColors.accent,
+                ),
+                title: Text('Network-free core'),
+                subtitle: Text(
+                  'Ledger and reconciliation never require internet',
+                ),
+              ),
+              const Divider(height: 1, indent: 56),
+              ListTile(
+                leading: Icon(
+                  Icons.delete_forever_outlined,
+                  color: SpendWiseColors.expense,
+                ),
+                title: Text(
+                  'Erase all local data',
+                  style: TextStyle(color: SpendWiseColors.expense),
+                ),
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => EraseScreen(viewModel: viewModel),
+                    ),
+                  );
+                  if (mounted) setState(() {});
+                },
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 24),
         Center(
@@ -326,57 +407,4 @@ class _SettingsScreenState extends State<SettingsScreen> {
       });
     }
   }
-
-  Future<void> _confirmErase(BuildContext context) async {
-    var erasing = false;
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Erase all local data?'),
-          content: const Text(
-            'This permanently removes accounts, evidence, transactions, rules, and settings from this device.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: erasing ? null : () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: SpendWiseColors.expense,
-              ),
-              onPressed: erasing
-                  ? null
-                  : () async {
-                      setDialogState(() => erasing = true);
-                      try {
-                        await viewModel.eraseAllData();
-                        if (dialogContext.mounted) {
-                          Navigator.pop(dialogContext);
-                        }
-                      } catch (error) {
-                        if (dialogContext.mounted) {
-                          setDialogState(() => erasing = false);
-                          ScaffoldMessenger.of(dialogContext).showSnackBar(
-                            SnackBar(
-                              content: Text('Could not erase data: $error'),
-                            ),
-                          );
-                        }
-                      }
-                    },
-              child: Text(erasing ? 'Erasing…' : 'Erase everything'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
-
-/// One settings row, drawn the way the rest of the app draws a row: a
-/// hairline underneath and nothing else. No card, no leading icon in a tinted
-/// circle, no chevron glyph borrowed from Material -- the small dim mark on
-/// the right, where a row opens another screen, is a character out of the
-/// same drawer as the ⇄ transfer mark on a ledger row, not an Icon widget.

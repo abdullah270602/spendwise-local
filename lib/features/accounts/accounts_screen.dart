@@ -310,6 +310,11 @@ class _AccountsScreenState extends State<AccountsScreen> {
     return [
       for (final account in accounts)
         ProportionBlock(
+          // Keyed by account, not position: adding or removing one shifts
+          // every account after it down the list, and without this each
+          // shifted block would animate its height toward a neighbour's
+          // balance instead of snapping straight to its own.
+          key: ValueKey(account.id),
           name: account.name,
           amount: formatMinor(account.balance.minorUnits),
           detail: account.suffix.isEmpty ? '' : '••${account.suffix}',

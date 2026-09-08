@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
-import '../../widgets/shape_kit.dart';
 import '../../widgets/spendwise_components.dart';
 import '../shell/spendwise_view_model.dart';
 
@@ -32,36 +31,61 @@ class _ExportScreenState extends State<ExportScreen> {
           48,
         ),
         children: [
-          // A caution, not a card: a left rule in the warning tone and the
-          // app's own edge on the other three sides, same as the held-back
-          // block on Accounts -- there is no second surface colour to fill.
           Container(
             padding: const EdgeInsets.all(14),
-            decoration: const BoxDecoration(
-              border: Border(
-                left: BorderSide(color: SpendWiseColors.warning, width: 2),
-                top: BorderSide(color: SpendWiseColors.edge),
-                right: BorderSide(color: SpendWiseColors.edge),
-                bottom: BorderSide(color: SpendWiseColors.edge),
+            decoration: BoxDecoration(
+              color: SpendWiseColors.warning.withValues(alpha: .1),
+              border: Border.all(
+                color: SpendWiseColors.warning.withValues(alpha: .3),
               ),
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: Text(
-              'Exports are readable files and are not protected by SpendWise encryption. Store and share them carefully.',
-              style: SpendWiseType.body.copyWith(fontSize: 12.5),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  color: SpendWiseColors.warning,
+                ),
+                const SizedBox(width: 11),
+                Expanded(
+                  child: Text(
+                    'Exports are readable files and are not protected by SpendWise encryption. Store and share them carefully.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 22),
-          const Eyebrow('Format'),
-          const SizedBox(height: 11),
-          ViewToggle(
-            options: const ['CSV', 'JSON'],
-            selected: format == ExportFormat.csv ? 0 : 1,
-            onSelected: (index) => setState(
-              () => format = index == 0 ? ExportFormat.csv : ExportFormat.json,
-            ),
+          const SizedBox(height: 20),
+          Text('Format', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          SegmentedButton<ExportFormat>(
+            segments: const [
+              ButtonSegment(
+                value: ExportFormat.csv,
+                label: Text('CSV'),
+                icon: Icon(Icons.table_view_outlined),
+              ),
+              ButtonSegment(
+                value: ExportFormat.json,
+                label: Text('JSON'),
+                icon: Icon(Icons.data_object_rounded),
+              ),
+            ],
+            selected: {format},
+            onSelectionChanged: (v) => setState(() => format = v.first),
           ),
           const SizedBox(height: 18),
-          InkWell(
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Date range'),
+            subtitle: Text(
+              range == null
+                  ? 'All dates'
+                  : '${_date(range!.start)} – ${_date(range!.end)}',
+            ),
+            trailing: const Icon(Icons.date_range_outlined),
             onTap: () async {
               final result = await showDateRangePicker(
                 context: context,
@@ -70,54 +94,20 @@ class _ExportScreenState extends State<ExportScreen> {
               );
               if (result != null) setState(() => range = result);
             },
-            child: Container(
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: SpendWiseColors.line)),
-              ),
-              padding: const EdgeInsets.symmetric(vertical: 13),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('Date range', style: SpendWiseType.row),
-                        const SizedBox(height: 2),
-                        Text(
-                          range == null
-                              ? 'All dates'
-                              : '${_date(range!.start)} – ${_date(range!.end)}',
-                          style: SpendWiseType.body.copyWith(fontSize: 12.5),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    '›',
-                    style: TextStyle(
-                      fontSize: 20,
-                      height: 1,
-                      color: SpendWiseColors.dim,
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ),
           if (range != null)
             Align(
               alignment: Alignment.centerLeft,
-              child: TextButton(
+              child: TextButton.icon(
                 onPressed: () => setState(() => range = null),
-                child: const Text('Clear date range'),
+                icon: const Icon(Icons.close_rounded),
+                label: const Text('Clear date range'),
               ),
             ),
-          const SizedBox(height: 22),
-          const Eyebrow('Accounts'),
-          const SizedBox(height: 11),
+          const Divider(),
+          const SizedBox(height: 10),
+          Text('Accounts', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
           Wrap(
             spacing: 7,
             children: [
@@ -131,9 +121,12 @@ class _ExportScreenState extends State<ExportScreen> {
                 ),
             ],
           ),
-          const SizedBox(height: 22),
-          const Eyebrow('Transaction types'),
-          const SizedBox(height: 11),
+          const SizedBox(height: 18),
+          Text(
+            'Transaction types',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
           Wrap(
             spacing: 7,
             children: [
@@ -147,9 +140,9 @@ class _ExportScreenState extends State<ExportScreen> {
                 ),
             ],
           ),
-          const SizedBox(height: 22),
-          const Eyebrow('Categories'),
-          const SizedBox(height: 11),
+          const SizedBox(height: 18),
+          Text('Categories', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
           Wrap(
             spacing: 7,
             children: [
@@ -166,45 +159,21 @@ class _ExportScreenState extends State<ExportScreen> {
                 ),
             ],
           ),
-          const SizedBox(height: 18),
-          InkWell(
-            onTap: () => setState(() => evidence = !evidence),
-            child: Container(
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: SpendWiseColors.line)),
-              ),
-              padding: const EdgeInsets.symmetric(vertical: 13),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('Include raw evidence', style: SpendWiseType.row),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Adds notification/import text and parser reasoning',
-                          style: SpendWiseType.body.copyWith(fontSize: 12.5),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Switch(
-                    value: evidence,
-                    onChanged: (v) => setState(() => evidence = v),
-                  ),
-                ],
-              ),
+          const SizedBox(height: 12),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Include raw evidence'),
+            subtitle: const Text(
+              'Adds notification/import text and parser reasoning',
             ),
+            value: evidence,
+            onChanged: (v) => setState(() => evidence = v),
           ),
-          const SizedBox(height: 20),
-          PrimaryAction(
-            label: busy ? 'Preparing…' : 'Create export',
-            busy: busy,
+          const SizedBox(height: 18),
+          FilledButton.icon(
             onPressed: busy ? null : _export,
+            icon: const Icon(Icons.download_rounded),
+            label: Text(busy ? 'Preparing…' : 'Create export'),
           ),
         ],
       ),

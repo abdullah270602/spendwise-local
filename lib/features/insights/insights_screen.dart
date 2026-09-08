@@ -691,13 +691,12 @@ class _SummaryBand extends StatelessWidget {
             category == null ? 'Spent in this view' : 'Spent on $category',
           ),
           const SizedBox(height: 6),
-          Text(
-            formatAmount(
-              MoneyViewData(
-                analytics.totalSpendingMinor,
-                currency: analytics.currency,
-              ),
-            ),
+          // A period switch or a category tap changes this figure outright --
+          // it is not the same spending restated, it is a different question
+          // answered -- so it travels to its new value the same way every
+          // other headline figure in the app does, rather than cutting to it.
+          AnimatedMinor(
+            analytics.totalSpendingMinor,
             style: SpendWiseType.figure.copyWith(fontSize: 30),
           ),
           const SizedBox(height: 16),

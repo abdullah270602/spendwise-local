@@ -60,9 +60,16 @@ class _ChronographState extends State<Chronograph>
   /// touched again -- rebuilding it on every filter tap would replay the
   /// whole entrance each time someone taps a category, which is the "two
   /// clocks fighting" trap the design brief calls out by name.
+  ///
+  /// Slower than the app's own 1300ms arrival on purpose: this is the one
+  /// dial in the app with a needle sweeping a full circle while every tick
+  /// grows in behind it, and at 1300ms that read on the device as arriving
+  /// rather than gliding. 1700ms is the owner's own ceiling on this screen --
+  /// past roughly two seconds a settle stops reading as unhurried and starts
+  /// reading as a wait.
   late final AnimationController _entry = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1300),
+    duration: const Duration(milliseconds: 1700),
   );
 
   /// The independent, much shorter mechanism for dimming and undimming ticks
@@ -180,6 +187,17 @@ class _ChronographState extends State<Chronograph>
     );
   }
 }
+
+/// How much of the whole entrance the stagger spreads its first-tick-to-
+/// last-tick delay across, and how much of it one tick's own growth takes --
+/// both as a fraction of `_ChronographState._entry`'s full length, not as
+/// literal milliseconds. The two were originally 550ms and 750ms of a
+/// 1300ms entrance; kept as that same ratio (550/1300, 750/1300) here so
+/// slowing the entrance down stretches every tick's own glide along with it
+/// instead of leaving the stagger's shape tied to a duration that moved on
+/// without it.
+const _staggerSpanFraction = 550 / 1300;
+const _tickGrowthFraction = 750 / 1300;
 
 /// The fixed geometry the dial and its hit-testing are both built from, so
 /// painting and tapping can never quietly disagree about where a tick is.
@@ -401,12 +419,17 @@ class _ChronographPainter extends CustomPainter {
       final mid = Offset.lerp(outer, inner, 0.5)!;
 
       // The bounded stagger: tick i's delay grows with its index but the
-      // whole window is capped at 550ms regardless of how many categories
-      // there are, so twenty-five ticks finish their entrance in the same
-      // 1300ms as three do.
-      final delayMs = (i / math.max(1, n - 1)) * 550;
-      final start = (delayMs / 1300).clamp(0.0, 1.0);
-      final end = ((delayMs + 750) / 1300).clamp(start, 1.0);
+      // whole window is capped at a fixed share of the entrance regardless of
+      // how many categories there are, so twenty-five ticks finish in the
+      // same sweep three do. Expressed as a fraction of the entrance rather
+      // than as literal milliseconds over a hardcoded total, so retuning
+      // `_entry`'s own duration can never silently throw this out of
+      // proportion again.
+      final start = (i / math.max(1, n - 1) * _staggerSpanFraction).clamp(
+        0.0,
+        1.0,
+      );
+      final end = (start + _tickGrowthFraction).clamp(start, 1.0);
       final tickT = reduce
           ? 1.0
           : Interval(
