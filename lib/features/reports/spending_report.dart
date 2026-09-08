@@ -145,6 +145,12 @@ class ReportData {
 
   bool get isEmpty => transactions.isEmpty;
 
+  /// True when the register lists something the figures deliberately do not
+  /// count, which is the moment the page owes the reader an explanation.
+  bool get hasExcludedMovements => transactions.any(
+    (item) => item.isLoanMovement || item.kind == TransactionKind.transfer,
+  );
+
   static ReportData gather({
     required ReportRequest request,
     required List<TransactionViewData> transactions,
@@ -167,6 +173,13 @@ class ReportData {
     final categories = <String, int>{};
     final merchants = <String, int>{};
     for (final item in within) {
+      // Lending, being repaid, and holding money for somebody else move an
+      // account without being spending or income. The ledger already knows
+      // which those are, and Home and Insights both leave them out; this did
+      // not, so a month in which money passed through on its way to a
+      // relative counted it as income on arrival and as spending on the way
+      // out, and "Transfer" could outrank every real category on the page.
+      if (item.isLoanMovement) continue;
       final amount = item.amount.minorUnits.abs();
       switch (item.kind) {
         case TransactionKind.income:
@@ -307,6 +320,25 @@ class SpendingReport {
             _dailySpine(data, medium, mono),
             pw.Spacer(),
             _merchants(data, medium, mono),
+          ],
+          // The figures above count what was earned and spent; the register
+          // lists everything that moved. Without this line the two disagree
+          // by exactly the amount that was never anybody's, and the reader is
+          // left to work out which of them is lying.
+          if (data.hasExcludedMovements) ...[
+            pw.SizedBox(height: 16),
+            pw.Text(
+              'Figures exclude moves between your own accounts, and money '
+              'lent, borrowed or held for someone else. Those entries are '
+              'still listed in the register, because the money really did '
+              'move.',
+              style: pw.TextStyle(
+                font: mono,
+                fontSize: 7.5,
+                color: _muted,
+                height: 1.5,
+              ),
+            ),
           ],
           pw.SizedBox(height: 18),
           _colophon(mono),

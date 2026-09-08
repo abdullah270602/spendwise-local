@@ -19,6 +19,7 @@ void main() {
     required int day,
     String category = 'Groceries',
     String account = 'Meezan Debit',
+    String? debtId,
   }) => TransactionViewData(
     id: id,
     title: title,
@@ -28,6 +29,7 @@ void main() {
     occurredAt: DateTime(2026, 9, day, 12),
     category: category,
     accountName: account,
+    debtId: debtId,
   );
 
   final ledger = [
@@ -64,6 +66,98 @@ void main() {
       account: 'Meezan Debit → NayaPay',
     ),
   ];
+
+  group('money that was never spending stays out of the figures', () {
+    // Lending, being repaid, and holding money for somebody else all move an
+    // account without being spending or income -- the ledger already knows,
+    // through `debtId`, and Home and Insights both leave them out. The report
+    // did not, so a month in which 200,000 passed through on its way to a
+    // relative reported 200,000 of income and 200,000 of spending that never
+    // belonged to anybody here.
+    final held = [
+      entry(
+        id: 'salary',
+        title: 'Salary',
+        minor: 15000000,
+        kind: TransactionKind.income,
+        day: 1,
+        category: 'Income',
+      ),
+      entry(
+        id: 'groceries',
+        title: 'Corner shop',
+        minor: 420000,
+        kind: TransactionKind.expense,
+        day: 4,
+      ),
+      entry(
+        id: 'held-in',
+        title: 'From a relative, to pass on',
+        minor: 20000000,
+        kind: TransactionKind.income,
+        day: 6,
+        category: 'Transfer',
+        debtId: 'debt-held',
+      ),
+      entry(
+        id: 'held-out',
+        title: 'Passed on',
+        minor: 20000000,
+        kind: TransactionKind.expense,
+        day: 7,
+        category: 'Transfer',
+        debtId: 'debt-held',
+      ),
+      entry(
+        id: 'lent',
+        title: 'Lent to a friend',
+        minor: 5000000,
+        kind: TransactionKind.expense,
+        day: 9,
+        category: 'Transfer',
+        debtId: 'debt-lent',
+      ),
+    ];
+
+    ReportData read() => ReportData.gather(
+      request: ReportRequest.forRange(
+        ReportRange.thisMonth,
+        ReportTemplate.shape,
+        now: DateTime(2026, 9, 30),
+      ),
+      transactions: held,
+      accounts: const [],
+    );
+
+    test('held money is neither received nor spent', () {
+      final data = read();
+      expect(data.receivedMinor, 15000000, reason: 'only the salary arrived');
+      expect(
+        data.spentMinor,
+        420000,
+        reason: 'only the groceries were spending',
+      );
+    });
+
+    test('no debt movement reaches the category breakdown', () {
+      final categories = read().byCategory.map((entry) => entry.key);
+      expect(categories, contains('Groceries'));
+      expect(
+        categories,
+        isNot(contains('Transfer')),
+        reason: 'holding and lending are not a category of spending',
+      );
+    });
+
+    test('the register still lists them, because they happened', () {
+      // Leaving them out of the figures is not the same as pretending the
+      // money never moved: the account really did go up and down, and a
+      // register that hid it could not be reconciled against a statement.
+      final ids = read().transactions.map((item) => item.id);
+      expect(ids, containsAll(<String>['held-in', 'held-out', 'lent']));
+      expect(read().hasExcludedMovements, isTrue);
+    });
+  });
 
   ReportData dataFor(
     ReportTemplate template, {

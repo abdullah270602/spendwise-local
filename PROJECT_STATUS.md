@@ -4,17 +4,17 @@ Last updated: 2026-09-08
 
 ## Current release
 
-- Version: `0.9.13+28`
+- Version: `0.9.14+29`
 - Android package: `com.spendwise.app` — keep this stable so upgrades retain data.
 - Public repository: <https://github.com/abdullah270602/spendwise-local>
-- Latest release: <https://github.com/abdullah270602/spendwise-local/releases/tag/v0.9.13>
+- Latest release: <https://github.com/abdullah270602/spendwise-local/releases/tag/v0.9.14>
 - Shipped APK is the optimized split-per-ABI release build, not a Flutter debug
   build. Build with `flutter build apk --release --split-per-abi`; a plain
   `--release` writes only the universal APK and leaves the per-ABI files from
   the *previous* build sitting in the output directory, which is an easy way to
   install a stale binary and believe it is current. Check the APK's mtime
   against the commit before installing.
-- Split-per-ABI adds 2000 to the version code for arm64: `28` becomes `2028`.
+- Split-per-ABI adds 2000 to the version code for arm64: `29` becomes `2029`.
 - Installed on the connected Pixel 9 at this version, with `adb install -r`.
 
 ## Known reliability issues
@@ -209,7 +209,7 @@ invalidation behavior when changing the shell/controller.
 
 ## Verification baseline
 
-At `0.9.13`, the analyzer is clean and all 516 tests pass. Before shipping:
+At `0.9.14`, the analyzer is clean and all 520 tests pass. Before shipping:
 
 1. Run `dart format` on changed Dart files.
 2. Run `flutter analyze --no-pub`.
@@ -252,6 +252,14 @@ current configured paths rather than assume another user's home directory.
   itself. Widening one of them from the plain interface to the advanced one
   silently reroutes every other call away from the safe defaults a dozen
   unrelated tests are relying on — give the new need its own fake instead.
+- **Every figure needs the same exclusions.** The report counted debt
+  movements as ordinary income and spending for as long as it existed, while
+  Home and Insights had always left them out: money held for somebody else
+  was counted twice, once arriving and once leaving, and "Transfer" could
+  outrank every real category on a page meant to be handed to someone. The
+  ledger knew all along -- `TransactionViewData.isLoanMovement` -- and the
+  report simply never asked. When a figure excludes something the list beside
+  it still shows, say so on the page; otherwise the two disagree in silence.
 - **Percentages rank the wrong things.** A category that went from 350 to 900
   has risen further in percent than one that rose by 6,500 rupees, and only
   one of those belongs at the top of a list. Order by money moved, and gate

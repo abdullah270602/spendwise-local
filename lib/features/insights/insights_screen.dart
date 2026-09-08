@@ -41,7 +41,14 @@ class _InsightsScreenState extends State<InsightsScreen> {
       );
       final categories =
           widget.viewModel.transactions
-              .where((item) => item.kind == TransactionKind.expense)
+              // Debt movements are excluded from every figure on this screen,
+              // so a category that only ever appears on one would offer a
+              // chip that filters the screen down to nothing.
+              .where(
+                (item) =>
+                    item.kind == TransactionKind.expense &&
+                    !item.isLoanMovement,
+              )
               .map((item) => item.category)
               .toSet()
               .toList()

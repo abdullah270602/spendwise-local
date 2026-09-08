@@ -97,6 +97,35 @@ void main() {
     );
   });
 
+  test('a category that only ever held money is not a spending category', () {
+    // Held money arrives and leaves under a category like any other entry,
+    // but it was never anybody's here, so it must not create a category the
+    // rest of the screen has no figures for.
+    final analytics = SpendingAnalytics.calculate(
+      now: anchor,
+      resolution: AnalyticsResolution.thisMonth,
+      transactions: [
+        spend('Groceries', 40000, DateTime(2026, 3, 4)),
+        TransactionViewData(
+          id: 'held-out',
+          title: 'Passed on to a relative',
+          subtitle: '',
+          amount: const MoneyViewData(-200000),
+          kind: TransactionKind.expense,
+          occurredAt: DateTime(2026, 3, 5),
+          category: 'Transfer',
+          accountId: 'bank',
+          debtId: 'debt-held',
+        ),
+      ],
+    );
+
+    expect(analytics.categories.map((item) => item.category), [
+      'Groceries',
+    ], reason: 'holding money for someone is not a way of spending it');
+    expect(analytics.totalSpendingMinor, 40000);
+  });
+
   test('filtering the screen does not narrow what changed', () {
     // The headline figure follows the filter; the breakdown of what moved
     // must not, or selecting one category would report every other category
