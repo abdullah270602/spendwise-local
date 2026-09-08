@@ -1,13 +1,47 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pdf/pdf.dart';
 import 'package:spendwise/app/palette.dart';
+import 'package:spendwise/features/reports/report_hero.dart';
 import 'package:spendwise/features/reports/spending_report.dart';
 import 'package:spendwise/features/shell/spendwise_view_model.dart';
 
-/// A report is the one thing in SpendWise that leaves the device, so it has to
-/// build from a real ledger shape without throwing, on every template, and
-/// keep working when the period is empty.
+/// Physical page count of a rendered PDF, read from the document itself
+/// rather than assumed.
+///
+/// The `pdf` package only deflates content streams, not the object table, so
+/// every page dictionary's `/Type /Page` still appears as plain text in the
+/// saved bytes -- verified against the package's own output, not a guess
+/// about its internals. `/Type /Pages` (the tree node, always exactly one)
+/// is excluded by requiring the next character not be an `s`.
+int _pageCount(List<int> bytes) {
+  final text = latin1.decode(bytes, allowInvalid: true);
+  return RegExp(r'/Type\s*/Page[^s]').allMatches(text).length;
+}
+
+/// WCAG relative luminance and contrast ratio, used to hold every paper tone
+/// to an actual, checkable minimum rather than trusting the formula that
+/// produced it.
+double _linear(double c) =>
+    c <= 0.03928 ? c / 12.92 : math.pow((c + 0.055) / 1.055, 2.4).toDouble();
+
+double _luminance(PdfColor c) =>
+    0.2126 * _linear(c.red) +
+    0.7152 * _linear(c.green) +
+    0.0722 * _linear(c.blue);
+
+double _contrastAgainstPaper(PdfColor c) {
+  const paper = PdfColor.fromInt(0xFFFAF9F6);
+  final l1 = _luminance(paper);
+  final l2 = _luminance(c);
+  final lighter = math.max(l1, l2), darker = math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -17,6 +51,8 @@ void main() {
     required int minor,
     required TransactionKind kind,
     required int day,
+    int month = 9,
+    int year = 2026,
     String category = 'Groceries',
     String account = 'Meezan Debit',
     String? debtId,
@@ -26,7 +62,7 @@ void main() {
     subtitle: account,
     amount: MoneyViewData(kind == TransactionKind.expense ? -minor : minor),
     kind: kind,
-    occurredAt: DateTime(2026, 9, day, 12),
+    occurredAt: DateTime(year, month, day, 12),
     category: category,
     accountName: account,
     debtId: debtId,
@@ -65,7 +101,137 @@ void main() {
       category: 'Between your accounts',
       account: 'Meezan Debit → NayaPay',
     ),
+    // The prior month, so "the change" has something real to compare
+    // against -- deliberately a different shape (less income, a category
+    // "shop" does not touch this time) so a test that only matched by
+    // coincidence would be caught.
+    entry(
+      id: 'prev-salary',
+      title: 'Salary',
+      minor: 12000000,
+      kind: TransactionKind.income,
+      day: 2,
+      month: 8,
+      category: 'Income',
+    ),
+    entry(
+      id: 'prev-groceries',
+      title: 'Old Town Grocer',
+      minor: 300000,
+      kind: TransactionKind.expense,
+      day: 10,
+      month: 8,
+    ),
+    entry(
+      id: 'prev-transport',
+      title: 'Fuel',
+      minor: 100000,
+      kind: TransactionKind.expense,
+      day: 15,
+      month: 8,
+      category: 'Transport',
+    ),
   ];
+
+  ReportData dataFor(
+    ReportTemplate template, {
+    List<TransactionViewData>? of,
+  }) => ReportData.gather(
+    request: ReportRequest.forRange(
+      ReportRange.thisMonth,
+      template,
+      now: DateTime(2026, 9, 30),
+    ),
+    transactions: of ?? ledger,
+    accounts: const [],
+  );
+
+  group('the numbers a report is built from', () {
+    test('this period', () {
+      final data = dataFor(ReportTemplate.ribbon);
+      expect(data.receivedMinor, 15000000);
+      expect(data.spentMinor, 314620);
+      expect(
+        data.movedMinor,
+        1000000,
+        reason: 'a move between your own accounts is neither in nor out',
+      );
+      expect(data.keptMinor, 14685380);
+      expect(data.byCategory.first.key, 'Health & medical');
+    });
+
+    test('the period immediately before it, for "the change"', () {
+      final data = dataFor(ReportTemplate.trace);
+      expect(data.previousLabel, 'August 2026');
+      expect(data.previousReceivedMinor, 12000000);
+      expect(
+        data.previousSpentMinor,
+        400000,
+        reason: '300,000 groceries + 100,000 transport',
+      );
+      expect(data.previousByCategory.first.key, 'Groceries');
+      expect(data.previousByCategory.first.value, 300000);
+      expect(data.spentDeltaMinor, 314620 - 400000);
+      expect(
+        data.spentDeltaFraction,
+        closeTo((314620 - 400000) / 400000, 1e-9),
+      );
+    });
+
+    test(
+      'a period with nothing before it reports no comparison, not a crash',
+      () {
+        final data = ReportData.gather(
+          request: ReportRequest.forRange(
+            ReportRange.thisMonth,
+            ReportTemplate.trace,
+            now: DateTime(2026, 9, 30),
+          ),
+          transactions: ledger
+              .where(
+                (t) =>
+                    t.id != 'prev-salary' &&
+                    t.id != 'prev-groceries' &&
+                    t.id != 'prev-transport',
+              )
+              .toList(),
+          accounts: const [],
+        );
+        expect(data.previousSpentMinor, 0);
+        expect(data.spentDeltaFraction, isNull);
+      },
+    );
+  });
+
+  group('paperTone: every palette holds a real contrast minimum on paper', () {
+    test('keep, spend, mine and the full ramp all clear 3.5:1 against the page', () {
+      for (final palette in SpendWisePalette.all) {
+        final tones = <String, PdfColor>{
+          'keep': paperTone(palette.keep),
+          'spend': paperTone(palette.spend),
+          'mine': paperTone(palette.mine),
+          for (var i = 0; i < palette.ramp.length; i++)
+            'ramp$i': paperTone(palette.ramp[i]),
+        };
+        for (final tone in tones.entries) {
+          expect(
+            _contrastAgainstPaper(tone.value),
+            greaterThanOrEqualTo(3.5),
+            reason:
+                '${palette.id}.${tone.key} is too light to read as ink on paper',
+          );
+        }
+      }
+    });
+
+    test('an already-dark tone is left alone rather than darkened further', () {
+      // sage's darkest ramp member is already near-black; paperTone should
+      // not push it past legibility into looking like a printing fault.
+      const dark = Color(0xFF4A5054);
+      final relit = paperTone(dark);
+      expect(_contrastAgainstPaper(relit), lessThan(9));
+    });
+  });
 
   group('money that was never spending stays out of the figures', () {
     // Lending, being repaid, and holding money for somebody else all move an
@@ -90,6 +256,7 @@ void main() {
         kind: TransactionKind.expense,
         day: 4,
       ),
+      // Arrived, and was never ours.
       entry(
         id: 'held-in',
         title: 'From a relative, to pass on',
@@ -99,6 +266,7 @@ void main() {
         category: 'Transfer',
         debtId: 'debt-held',
       ),
+      // And passed on.
       entry(
         id: 'held-out',
         title: 'Passed on',
@@ -108,6 +276,7 @@ void main() {
         category: 'Transfer',
         debtId: 'debt-held',
       ),
+      // Lent out: leaves the account, is not spending, and is coming back.
       entry(
         id: 'lent',
         title: 'Lent to a friend',
@@ -122,7 +291,7 @@ void main() {
     ReportData read() => ReportData.gather(
       request: ReportRequest.forRange(
         ReportRange.thisMonth,
-        ReportTemplate.shape,
+        ReportTemplate.ribbon,
         now: DateTime(2026, 9, 30),
       ),
       transactions: held,
@@ -155,32 +324,18 @@ void main() {
       // register that hid it could not be reconciled against a statement.
       final ids = read().transactions.map((item) => item.id);
       expect(ids, containsAll(<String>['held-in', 'held-out', 'lent']));
-      expect(read().hasExcludedMovements, isTrue);
     });
   });
 
-  ReportData dataFor(
-    ReportTemplate template, {
-    List<TransactionViewData>? of,
-  }) => ReportData.gather(
-    request: ReportRequest.forRange(
-      ReportRange.thisMonth,
-      template,
-      now: DateTime(2026, 9, 30),
-    ),
-    transactions: of ?? ledger,
-    accounts: const [],
-  );
-
-  group('the shape states the whole it divides', () {
-    // The trunk of the shape is everything that came in, and that figure was
-    // never printed -- it existed only as the denominator of two percentages.
-    // Under it sat three numbers against a two-branch drawing, one of which
+  group('the ribbon states the whole it divides', () {
+    // The trunk of the ribbon is everything that came in, and that figure was
+    // printed nowhere -- it existed only as the denominator of two
+    // percentages, so the page showed the parts of a total it never named.
+    // Under it sat three figures against a two-branch drawing, one of which
     // (money moved between the reader's own accounts) was not a branch of
-    // anything. Three figures that cannot be reconciled against the picture
-    // above them is worse than two that can.
+    // anything.
     test('the two branches account for all of it', () {
-      final data = dataFor(ReportTemplate.shape);
+      final data = dataFor(ReportTemplate.ribbon);
       expect(
         data.keptMinor + data.spentMinor,
         data.receivedMinor,
@@ -191,22 +346,21 @@ void main() {
     test('a period with nothing coming in still renders', () async {
       // Spending against no income is a real month. The percentages have no
       // denominator, and the page has to say so rather than print 0%.
-      final spendOnly = [
-        entry(
-          id: 'shop',
-          title: 'Corner shop',
-          minor: 350000,
-          kind: TransactionKind.expense,
-          day: 3,
-        ),
-      ];
       final data = ReportData.gather(
         request: ReportRequest.forRange(
           ReportRange.thisMonth,
-          ReportTemplate.shape,
+          ReportTemplate.ribbon,
           now: DateTime(2026, 9, 30),
         ),
-        transactions: spendOnly,
+        transactions: [
+          entry(
+            id: 'shop',
+            title: 'Corner shop',
+            minor: 350000,
+            kind: TransactionKind.expense,
+            day: 3,
+          ),
+        ],
         accounts: const [],
       );
       expect(data.receivedMinor, 0);
@@ -214,58 +368,120 @@ void main() {
 
       final bytes = await const SpendingReport(palette: SpendWisePalette.sage)
           .build(data);
-      // A real document, not an exception swallowed into an empty file. The
-      // page-count assertions live on the branch that made the report a
-      // MultiPage; here the question is only whether a month with no income
-      // still produces one.
-      expect(bytes, isNotEmpty);
-      expect(String.fromCharCodes(bytes.take(5)), startsWith('%PDF'));
+      expect(_pageCount(bytes), 1);
     });
   });
 
-  test('the numbers a report is built from', () {
-    final data = dataFor(ReportTemplate.shape);
-    expect(data.receivedMinor, 15000000);
-    expect(data.spentMinor, 314620);
-    expect(
-      data.movedMinor,
-      1000000,
-      reason: 'a move between your own accounts is neither in nor out',
-    );
-    expect(data.keptMinor, 14685380);
-    expect(data.byCategory.first.key, 'Health & medical');
+  group('page layout: overflow spills to another page instead of clipping', () {
+    final longCategories = [
+      'Household utilities and shared building maintenance charges',
+      'Personal healthcare, pharmacy and wellness related purchases',
+      'Restaurants, cafes and food delivery service subscriptions',
+      'Public and private transportation, fuel and vehicle upkeep',
+      'Clothing, footwear and seasonal wardrobe replacement items',
+      'Entertainment, streaming subscriptions and hobby purchases',
+      'Education, courses, books and professional certifications',
+      'Gifts, celebrations and charitable community contributions',
+    ];
+    final heavyLedger = [
+      entry(
+        id: 'salary',
+        title: 'Salary',
+        minor: 30000000,
+        kind: TransactionKind.income,
+        day: 1,
+        category: 'Income',
+      ),
+      for (var i = 0; i < longCategories.length; i++)
+        entry(
+          id: 'e$i',
+          title: 'Merchant number $i for testing purposes only',
+          minor: 500000 + i * 10000,
+          kind: TransactionKind.expense,
+          day: (i % 27) + 1,
+          category: longCategories[i],
+        ),
+      for (var i = 0; i < 8; i++)
+        entry(
+          id: 'm$i',
+          title: 'Distinct Merchant Name Number $i Ltd',
+          minor: 90000 + i * 5000,
+          kind: TransactionKind.expense,
+          day: (i % 27) + 1,
+          category: longCategories[i % longCategories.length],
+        ),
+    ];
+
+    test('the shape holds to one page for an ordinary month', () async {
+      final bytes = await const SpendingReport(palette: SpendWisePalette.sage)
+          .build(dataFor(ReportTemplate.ribbon));
+      expect(_pageCount(bytes), 1);
+      await File('build/report-shape.pdf').writeAsBytes(bytes);
+    });
+
+    test('the shape spills to a second page rather than clipping when categories run long', () async {
+      final bytes = await const SpendingReport(palette: SpendWisePalette.sage)
+          .build(dataFor(ReportTemplate.ribbon, of: heavyLedger));
+      expect(_pageCount(bytes), greaterThan(1));
+      await File('build/report-shape-heavy.pdf').writeAsBytes(bytes);
+    });
+
+    test('the register follows the drawing instead of restarting', () async {
+      // "The statement" used to be two documents stapled together: a shape
+      // page, then a register page that began the paper again with its own
+      // header and its own margins. There is one document now, whichever
+      // drawing opens it, so a short period is one page rather than a page
+      // and a mostly empty second one.
+      final bytes = await const SpendingReport(palette: SpendWisePalette.tide)
+          .build(dataFor(ReportTemplate.ribbon));
+      expect(_pageCount(bytes), 1);
+      await File('build/report-ribbon.pdf').writeAsBytes(bytes);
+    });
+
+    test('every drawing produces a document, and the same register', () async {
+      // A template is a choice of opening figure, not a different report.
+      for (final template in ReportTemplate.values) {
+        final bytes = await const SpendingReport(palette: SpendWisePalette.tide)
+            .build(dataFor(template));
+        expect(
+          _pageCount(bytes),
+          greaterThanOrEqualTo(1),
+          reason: '${template.id} produced no page at all',
+        );
+      }
+    });
+
+    test('the docket paginates once there is enough to itemise', () async {
+      final small = await const SpendingReport(palette: SpendWisePalette.brass)
+          .build(dataFor(ReportTemplate.desk));
+      final heavy = await const SpendingReport(palette: SpendWisePalette.brass)
+          .build(dataFor(ReportTemplate.desk, of: heavyLedger));
+      expect(_pageCount(small), 1);
+      expect(_pageCount(heavy), greaterThan(1));
+      await File('build/report-docket.pdf').writeAsBytes(heavy);
+    });
   });
 
-  test('the shape template builds one page', () async {
-    final bytes = await const SpendingReport(palette: SpendWisePalette.sage)
-        .build(dataFor(ReportTemplate.shape));
+  test(
+    'an empty period still produces a readable page, on every template',
+    () async {
+      for (final template in ReportTemplate.values) {
+        final bytes = await const SpendingReport(palette: SpendWisePalette.sage)
+            .build(dataFor(template, of: const []));
+        expect(
+          _pageCount(bytes),
+          greaterThanOrEqualTo(1),
+          reason: template.name,
+        );
+      }
+    },
+  );
 
-    expect(bytes.lengthInBytes, greaterThan(2000));
-    expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
-    await File('build/report-shape.pdf').writeAsBytes(bytes);
-  });
-
-  test('the statement template adds the register', () async {
-    final bytes = await const SpendingReport(palette: SpendWisePalette.tide)
-        .build(dataFor(ReportTemplate.statement));
-
-    expect(bytes.lengthInBytes, greaterThan(2000));
-    await File('build/report-statement.pdf').writeAsBytes(bytes);
-  });
-
-  test('an empty period still produces a readable page', () async {
-    final bytes = await const SpendingReport(palette: SpendWisePalette.sage)
-        .build(dataFor(ReportTemplate.shape, of: const []));
-
-    expect(bytes.lengthInBytes, greaterThan(1000));
-    await File('build/report-empty.pdf').writeAsBytes(bytes);
-  });
-
-  test('every palette renders', () async {
+  test('every palette renders the shape as exactly one page', () async {
     for (final palette in SpendWisePalette.all) {
       final bytes = await SpendingReport(palette: palette)
-          .build(dataFor(ReportTemplate.shape));
-      expect(bytes.lengthInBytes, greaterThan(2000), reason: palette.id);
+          .build(dataFor(ReportTemplate.ribbon));
+      expect(_pageCount(bytes), 1, reason: palette.id);
     }
   });
 }

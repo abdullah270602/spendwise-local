@@ -482,7 +482,9 @@ List<HelpTopic> helpTopics(SpendWiseViewModel viewModel) => [
     glyph: Icons.picture_as_pdf_outlined,
     brief:
         'A spending report is a PDF of a month, a '
-        'quarter or any range you pick, in one of two layouts, generated on '
+        'quarter or any range you pick, opening with whichever drawing the app '
+        'already uses that you read best -- the ribbon, the dial, the desk or '
+        'the trace -- generated on '
         'the phone and saved to a file you choose. An export is the whole '
         'ledger as CSV or JSON, filtered by date, account, kind or category, '
         'optionally including the raw alert behind every entry. Nothing is '
@@ -490,7 +492,9 @@ List<HelpTopic> helpTopics(SpendWiseViewModel viewModel) => [
     body: () => [
       const HelpHeading('A PDF you can hand over'),
       const HelpProse(
-        'A month, a quarter or any range, in two layouts. Made on the phone.',
+        'A month, a quarter or any range. It opens with a drawing you already '
+        'read on Insights, unless you say otherwise, and every entry follows '
+        'underneath. Made on the phone.',
       ),
       const HelpWhere('Settings · Spending report'),
       const HelpHeading('The whole thing, as data'),

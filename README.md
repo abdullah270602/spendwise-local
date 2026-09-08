@@ -120,8 +120,9 @@ in the month before, so the 3rd never looks like a collapse in spending.
 category three times and SpendWise starts doing it for you. Disagree once and
 it stops.
 
-**Gives it all back.** A PDF report, or the whole ledger as CSV or JSON.
-Nothing here is locked in.
+**Gives it all back.** A PDF report that opens with whichever drawing you
+already read on Insights, or the whole ledger as CSV or JSON. Nothing here
+is locked in.
 
 **Locks, if you want.** A PIN of any length, with a fingerprint as the fast
 path.

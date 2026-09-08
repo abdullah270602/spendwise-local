@@ -1,43 +1,25 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show immutable;
+import 'package:flutter/material.dart' show Color, HSLColor;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../../app/category_tones.dart';
+import '../../app/theme.dart';
 import '../../app/palette.dart';
 import '../shell/spendwise_view_model.dart';
+import 'report_hero.dart';
+import 'report_hero_desk.dart';
+import 'report_hero_dial.dart';
+import 'report_hero_ribbon.dart';
+import 'report_hero_trace.dart';
 
 /// How much of the ledger a report covers.
 enum ReportRange { thisMonth, lastThreeMonths, thisYear, everything, custom }
-
-/// What the report looks like. Two shapes, because the two reasons anyone
-/// wants a PDF are "show someone the shape of my month" and "give me the
-/// actual list on paper".
-enum ReportTemplate {
-  /// One page. The month as a picture: what arrived, what stayed, what went,
-  /// and where. Nothing you would not want to hand to somebody.
-  shape,
-
-  /// The summary, then every transaction, day by day. Runs to as many pages
-  /// as the period needs.
-  statement,
-}
-
-extension ReportTemplateCopy on ReportTemplate {
-  String get title => switch (this) {
-    ReportTemplate.shape => 'The shape',
-    ReportTemplate.statement => 'The statement',
-  };
-
-  String get blurb => switch (this) {
-    ReportTemplate.shape =>
-      'One page. What came in, what stayed, where the rest went.',
-    ReportTemplate.statement =>
-      'The summary, then every transaction, day by day.',
-  };
-}
 
 extension ReportRangeCopy on ReportRange {
   String get title => switch (this) {
@@ -98,11 +80,15 @@ class ReportRequest {
       template: template,
       from: from,
       to: to,
-      label: _label(from, to),
+      label: periodLabel(from, to),
     );
   }
 
-  static String _label(DateTime from, DateTime to) {
+  /// Shared with [ReportData], which uses it a second time to name the
+  /// comparison period on "the change" -- the two must read in the same
+  /// voice, or a report that talks about itself in two dialects reads as a
+  /// bug.
+  static String periodLabel(DateTime from, DateTime to) {
     final sameMonth = from.year == to.year && from.month == to.month;
     if (sameMonth) return DateFormat('MMMM yyyy').format(from);
     if (from.year == to.year) {
@@ -114,7 +100,71 @@ class ReportRequest {
   }
 }
 
-/// The numbers a report is made of, computed once so both templates agree.
+/// Received, spent and moved, plus the two rankings every template draws
+/// from. Factored out because "the change" needs this shape twice -- once
+/// for the period asked for, once for the one before it -- and a report
+/// disagreeing with itself about how a category total is computed is worse
+/// than the duplication it would take to avoid this.
+class _Totals {
+  const _Totals({
+    required this.received,
+    required this.spent,
+    required this.moved,
+    required this.byCategory,
+    required this.byMerchant,
+  });
+
+  final int received;
+  final int spent;
+  final int moved;
+  final List<MapEntry<String, int>> byCategory;
+  final List<MapEntry<String, int>> byMerchant;
+
+  static _Totals of(List<TransactionViewData> items) {
+    var received = 0, spent = 0, moved = 0;
+    final categories = <String, int>{};
+    final merchants = <String, int>{};
+    for (final item in items) {
+      // Lending, being repaid, and holding money for somebody else move an
+      // account without being spending or income. The ledger already knows
+      // which those are, and Home and Insights both leave them out; this did
+      // not, so a month in which money passed through on its way to a
+      // relative reported it as income on arrival and as spending on the way
+      // out, and "Transfer" could outrank every real category on the page.
+      if (item.isLoanMovement) continue;
+      final amount = item.amount.minorUnits.abs();
+      switch (item.kind) {
+        case TransactionKind.income:
+          received += amount;
+        case TransactionKind.expense:
+          spent += amount;
+          categories.update(
+            item.category,
+            (value) => value + amount,
+            ifAbsent: () => amount,
+          );
+          merchants.update(
+            item.title,
+            (value) => value + amount,
+            ifAbsent: () => amount,
+          );
+        case TransactionKind.transfer:
+          moved += amount;
+      }
+    }
+    List<MapEntry<String, int>> ranked(Map<String, int> source) =>
+        source.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    return _Totals(
+      received: received,
+      spent: spent,
+      moved: moved,
+      byCategory: ranked(categories),
+      byMerchant: ranked(merchants),
+    );
+  }
+}
+
+/// The numbers a report is made of, computed once so every template agrees.
 class ReportData {
   ReportData._({
     required this.request,
@@ -124,6 +174,10 @@ class ReportData {
     required this.movedMinor,
     required this.byCategory,
     required this.byMerchant,
+    required this.previousLabel,
+    required this.previousReceivedMinor,
+    required this.previousSpentMinor,
+    required this.previousByCategory,
     required this.currency,
     required this.accounts,
   });
@@ -135,6 +189,14 @@ class ReportData {
   final int movedMinor;
   final List<MapEntry<String, int>> byCategory;
   final List<MapEntry<String, int>> byMerchant;
+
+  /// How the equal-length period immediately before this one reads on the
+  /// cover -- "August 2026" against "September 2026".
+  final String previousLabel;
+  final int previousReceivedMinor;
+  final int previousSpentMinor;
+  final List<MapEntry<String, int>> previousByCategory;
+
   final String currency;
   final List<AccountViewData> accounts;
 
@@ -142,6 +204,14 @@ class ReportData {
 
   double get keptFraction =>
       receivedMinor <= 0 ? 0 : (keptMinor / receivedMinor).clamp(0.0, 1.0);
+
+  /// Positive: spent more than the period before. Negative: spent less.
+  int get spentDeltaMinor => spentMinor - previousSpentMinor;
+
+  /// Null when there is nothing from before to compare against, rather than
+  /// a claimed "infinite" increase.
+  double? get spentDeltaFraction =>
+      previousSpentMinor <= 0 ? null : spentDeltaMinor / previousSpentMinor;
 
   bool get isEmpty => transactions.isEmpty;
 
@@ -169,53 +239,56 @@ class ReportData {
       return !at.isBefore(request.from) && !at.isAfter(to);
     }).toList()..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
 
-    var received = 0, spent = 0, moved = 0;
-    final categories = <String, int>{};
-    final merchants = <String, int>{};
-    for (final item in within) {
-      // Lending, being repaid, and holding money for somebody else move an
-      // account without being spending or income. The ledger already knows
-      // which those are, and Home and Insights both leave them out; this did
-      // not, so a month in which money passed through on its way to a
-      // relative counted it as income on arrival and as spending on the way
-      // out, and "Transfer" could outrank every real category on the page.
-      if (item.isLoanMovement) continue;
-      final amount = item.amount.minorUnits.abs();
-      switch (item.kind) {
-        case TransactionKind.income:
-          received += amount;
-        case TransactionKind.expense:
-          spent += amount;
-          categories.update(
-            item.category,
-            (value) => value + amount,
-            ifAbsent: () => amount,
-          );
-          merchants.update(
-            item.title,
-            (value) => value + amount,
-            ifAbsent: () => amount,
-          );
-        case TransactionKind.transfer:
-          moved += amount;
-      }
-    }
+    // The comparison period is always the window of the same length
+    // immediately before this one -- the same rule Insights uses for its own
+    // period-over-period reading, so "did this get better" means one thing
+    // across the app.
+    final spanDays = to.difference(request.from).inDays + 1;
+    final previousFrom = request.from.subtract(Duration(days: spanDays));
+    final previousTo = request.from.subtract(const Duration(seconds: 1));
+    final previousWithin = transactions.where((item) {
+      final at = item.occurredAt.toLocal();
+      return !at.isBefore(previousFrom) && !at.isAfter(previousTo);
+    }).toList();
 
-    List<MapEntry<String, int>> ranked(Map<String, int> source) =>
-        source.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final current = _Totals.of(within);
+    final previous = _Totals.of(previousWithin);
 
     return ReportData._(
       request: request,
       transactions: within,
-      receivedMinor: received,
-      spentMinor: spent,
-      movedMinor: moved,
-      byCategory: ranked(categories),
-      byMerchant: ranked(merchants),
+      receivedMinor: current.received,
+      spentMinor: current.spent,
+      movedMinor: current.moved,
+      byCategory: current.byCategory,
+      byMerchant: current.byMerchant,
+      previousLabel: ReportRequest.periodLabel(previousFrom, previousTo),
+      previousReceivedMinor: previous.received,
+      previousSpentMinor: previous.spent,
+      previousByCategory: previous.byCategory,
       currency: within.isEmpty ? 'PKR' : within.first.amount.currency,
       accounts: accounts,
     );
   }
+}
+
+/// A dark-ground colour, re-lit for paper.
+///
+/// Every [SpendWisePalette] is tuned for contrast against
+/// `SpendWiseColors.bg` -- near-black -- and several of the lighter members
+/// (a pale sage, a light brass tan) read as a wash once the ground turns to
+/// off-white paper, and a home printer's dot gain only lightens them further.
+/// Capping lightness rather than rescaling every tone leaves whatever was
+/// already dark enough alone, and a small saturation lift keeps a relit tone
+/// from reading as merely greyed-out. The result is not the palette repainted
+/// for a light theme -- it is the same hues, held to the darkness paper
+/// actually needs.
+PdfColor paperTone(Color source) {
+  final hsl = HSLColor.fromColor(source);
+  final lightness = math.min(hsl.lightness, 0.40);
+  final saturation = (hsl.saturation * 1.25).clamp(0.0, 1.0);
+  final relit = hsl.withLightness(lightness).withSaturation(saturation);
+  return PdfColor.fromInt(relit.toColor().toARGB32());
 }
 
 /// Builds the PDF.
@@ -225,18 +298,34 @@ class ReportData {
 /// palette's three tones only where they carry meaning. The typography is the
 /// app's, so it still reads as the same product.
 class SpendingReport {
-  const SpendingReport({required this.palette});
+  const SpendingReport({required this.palette, this.categoryOrder = const []});
 
   final SpendWisePalette palette;
+
+  /// The ledger's own category list, in its own order.
+  ///
+  /// Threaded in so a category's tone and its channel number are decided the
+  /// same way here as on the screen. Derived from the report's own contents
+  /// instead, they would be stable across reprints of one report and nothing
+  /// else -- the same category would answer to a different number next month,
+  /// and to a third one on Insights.
+  final List<String> categoryOrder;
 
   static const _paper = PdfColor.fromInt(0xFFFAF9F6);
   static const _ink = PdfColor.fromInt(0xFF17191A);
   static const _muted = PdfColor.fromInt(0xFF6B7176);
   static const _rule = PdfColor.fromInt(0xFFDFDDD6);
 
-  PdfColor get _keep => PdfColor.fromInt(palette.keep.toARGB32());
-  PdfColor get _spend => PdfColor.fromInt(palette.spend.toARGB32());
-  PdfColor get _mine => PdfColor.fromInt(palette.mine.toARGB32());
+  /// One margin for every page of every template. The original had the
+  /// register a few points tighter than the shape page it follows in "the
+  /// statement" -- an arbitrary difference nothing asked for, and a report
+  /// whose pages disagree about where the edge of the paper is reads as
+  /// unfinished.
+  static const _margin = pw.EdgeInsets.fromLTRB(48, 50, 48, 42);
+
+  PdfColor get _keep => paperTone(palette.keep);
+  PdfColor get _spend => paperTone(palette.spend);
+  PdfColor get _mine => paperTone(palette.mine);
 
   Future<Uint8List> build(ReportData data) async {
     final sans = pw.Font.ttf(
@@ -265,90 +354,142 @@ class SpendingReport {
       theme: theme,
     );
 
-    switch (data.request.template) {
-      case ReportTemplate.shape:
-        document.addPage(_shapePage(data, sansBold, sansMedium, mono));
-      case ReportTemplate.statement:
-        document.addPage(_shapePage(data, sansBold, sansMedium, mono));
-        document.addPage(_registerPages(data, sansBold, sansMedium, mono));
-    }
+    final tones = CategoryTones(
+      known: categoryOrder,
+      present: data.byCategory.map((entry) => entry.key),
+    );
+    final paper = ReportPaper(
+      data: data,
+      sans: sans,
+      bold: sansBold,
+      mono: mono,
+      ink: _ink,
+      muted: _muted,
+      rule: _rule,
+      paper: _paper,
+      keep: _keep,
+      spend: _spend,
+      mine: _mine,
+      toneOf: (category) =>
+          paperTone(SpendWiseColors.category(tones.slotOf(category))),
+      channelOf: tones.channelOf,
+      money: _money,
+      width: PdfPageFormat.a4.width - _margin.left - _margin.right,
+    );
+
+    document.addPage(
+      _document(
+        data,
+        paper,
+        _heroFor(data.request.template),
+        sansBold,
+        sansMedium,
+        mono,
+      ),
+    );
     return document.save();
   }
 
-  // ---- page one: the shape ------------------------------------------------
+  /// The drawing that opens the document.
+  ReportHero _heroFor(ReportTemplate template) => switch (template) {
+    ReportTemplate.ribbon => const RibbonHero(),
+    ReportTemplate.dial => const DialHero(),
+    ReportTemplate.desk => const DeskHero(),
+    ReportTemplate.trace => const TraceHero(),
+  };
+
+  /// One document, whichever drawing opens it.
+  ///
+  /// Every template used to build its own pages, which is how the register
+  /// came to sit a few points tighter than the page above it and how "the
+  /// statement" ended up as two documents stapled together. The masthead, the
+  /// margins, the running header and the colophon are the document's; the
+  /// hero is the only thing that differs.
+  pw.MultiPage _document(
+    ReportData data,
+    ReportPaper paper,
+    ReportHero hero,
+    pw.Font bold,
+    pw.Font medium,
+    pw.Font mono,
+  ) => pw.MultiPage(
+    pageTheme: _pageTheme(),
+    header: (context) => context.pageNumber == 1
+        ? _cover(data, bold, mono)
+        : _continuationHeader(hero.template.title, data, bold, mono, context),
+    footer: (context) => _colophon(mono),
+    build: (context) => [
+      ...hero.build(paper),
+      if (data.transactions.isNotEmpty) ...[
+        pw.SizedBox(height: 26),
+        _eyebrow('Every entry', mono),
+        pw.SizedBox(height: 10),
+        ..._registerRows(data, medium, mono),
+      ],
+      // The register lists everything that moved; the figures above count
+      // only what was earned or spent. Without this line the two disagree by
+      // exactly the amount that was never anybody's, and the reader is left
+      // to work out which of them is lying.
+      if (data.hasExcludedMovements) ...[
+        pw.SizedBox(height: 18),
+        _footnote(
+          'Figures above exclude moves between your own accounts, and money '
+          'lent, borrowed or held for someone else. Those entries are still '
+          'listed, because the money really did move.',
+          mono,
+        ),
+      ],
+    ],
+  );
+
+  // ---- shared page furniture -----------------------------------------------
 
   /// Paper edge to edge. Painting a filled box inside the margins instead
   /// leaves a visible rectangle of white around it.
-  pw.PageTheme _pageTheme(pw.EdgeInsets margin) => pw.PageTheme(
+  pw.PageTheme _pageTheme() => pw.PageTheme(
     pageFormat: PdfPageFormat.a4,
-    margin: margin,
+    margin: _margin,
     buildBackground: (context) =>
         pw.FullPage(ignoreMargins: true, child: pw.Container(color: _paper)),
   );
 
-  pw.Page _shapePage(
+  /// The masthead, plus the gap every template gives it before its own
+  /// content starts. Used as page one's header on every multi-page template,
+  /// so a template that spills past a single page still opens the same way.
+  pw.Widget _cover(ReportData data, pw.Font bold, pw.Font mono) => pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [_masthead(data, bold, mono), pw.SizedBox(height: 26)],
+  );
+
+  /// The slim header a template falls back to once it runs past its first
+  /// page: a title, the period, and a page count -- the same shape the
+  /// register has always used, now shared so a fourth template does not
+  /// reinvent it a fourth time.
+  pw.Widget _continuationHeader(
+    String title,
     ReportData data,
     pw.Font bold,
-    pw.Font medium,
     pw.Font mono,
-  ) => pw.Page(
-    pageTheme: _pageTheme(const pw.EdgeInsets.fromLTRB(48, 52, 48, 44)),
-    build: (context) => pw.Padding(
-      padding: pw.EdgeInsets.zero,
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          _masthead(data, bold, mono),
-          pw.SizedBox(height: 30),
-          if (data.isEmpty)
-            _nothing(bold)
-          else ...[
-            _eyebrow('What came in, and what happened to it', mono),
-            pw.SizedBox(height: 10),
-            // The trunk of the shape below is this figure. It was never
-            // printed: it existed only as the denominator of two percentages,
-            // so the page showed the parts of a total it never named.
-            _cameIn(data, bold, mono),
-            pw.SizedBox(height: 14),
-            pw.SizedBox(
-              height: 150,
-              width: double.infinity,
-              child: pw.CustomPaint(
-                painter: (canvas, size) => _paintFlow(canvas, size, data),
-              ),
-            ),
-            pw.SizedBox(height: 14),
-            _legend(data, bold, mono),
-            pw.SizedBox(height: 30),
-            _categories(data, bold, medium, mono),
-            pw.SizedBox(height: 26),
-            _dailySpine(data, medium, mono),
-            pw.Spacer(),
-            _merchants(data, medium, mono),
-          ],
-          // The figures above count what was earned and spent; the register
-          // lists everything that moved. Without this line the two disagree
-          // by exactly the amount that was never anybody's, and the reader is
-          // left to work out which of them is lying.
-          if (data.hasExcludedMovements) ...[
-            pw.SizedBox(height: 16),
-            pw.Text(
-              'Figures exclude moves between your own accounts, and money '
-              'lent, borrowed or held for someone else. Those entries are '
-              'still listed in the register, because the money really did '
-              'move.',
-              style: pw.TextStyle(
-                font: mono,
-                fontSize: 7.5,
-                color: _muted,
-                height: 1.5,
-              ),
-            ),
-          ],
-          pw.SizedBox(height: 18),
-          _colophon(mono),
-        ],
-      ),
+    pw.Context context,
+  ) => pw.Container(
+    margin: const pw.EdgeInsets.only(bottom: 14),
+    padding: const pw.EdgeInsets.only(bottom: 8),
+    decoration: const pw.BoxDecoration(
+      border: pw.Border(bottom: pw.BorderSide(color: _ink, width: 1.2)),
+    ),
+    child: pw.Row(
+      children: [
+        pw.Expanded(
+          child: pw.Text(
+            '$title · ${data.request.label}',
+            style: pw.TextStyle(font: bold, fontSize: 12, color: _ink),
+          ),
+        ),
+        pw.Text(
+          '${context.pageNumber} / ${context.pagesCount}',
+          style: pw.TextStyle(font: mono, fontSize: 7.5, color: _muted),
+        ),
+      ],
     ),
   );
 
@@ -409,329 +550,9 @@ class SpendingReport {
     ),
   );
 
-  /// Everything that arrived, which is what the shape divides.
-  pw.Widget _cameIn(ReportData data, pw.Font bold, pw.Font mono) => pw.Row(
-    crossAxisAlignment: pw.CrossAxisAlignment.end,
-    children: [
-      pw.Text(
-        _money(data.receivedMinor),
-        style: pw.TextStyle(
-          font: bold,
-          fontSize: 32,
-          color: _ink,
-          letterSpacing: -1.1,
-        ),
-      ),
-      pw.SizedBox(width: 9),
-      pw.Padding(
-        padding: const pw.EdgeInsets.only(bottom: 5),
-        child: pw.Text(
-          data.receivedMinor > 0 ? 'came in' : 'came in this period',
-          style: pw.TextStyle(fontSize: 10, color: _muted),
-        ),
-      ),
-    ],
-  );
-
-  /// The two halves of what came in, and nothing else.
-  ///
-  /// There were three figures here, and the shape above has two branches.
-  /// The third -- money moved between the reader's own accounts -- is not a
-  /// branch of anything: it is a separate quantity that never touched the
-  /// split, so three numbers sat under a two-way figure and could not be
-  /// reconciled against it. What it was there to say, the footnote at the
-  /// foot of the page now says properly.
-  pw.Widget _legend(ReportData data, pw.Font bold, pw.Font mono) => pw.Row(
-    crossAxisAlignment: pw.CrossAxisAlignment.start,
-    children: [
-      pw.Expanded(
-        child: _figure(
-          'Still yours',
-          _money(data.keptMinor),
-          data.receivedMinor > 0
-              ? '${_percent(data.keptMinor, data.receivedMinor)} of it'
-              : 'nothing came in',
-          _ink,
-          bold,
-          mono,
-        ),
-      ),
-      pw.Expanded(
-        child: _figure(
-          'Gone',
-          _money(data.spentMinor),
-          data.receivedMinor > 0
-              ? '${_percent(data.spentMinor, data.receivedMinor)} of it'
-              // Spending with nothing to measure it against is a real month,
-              // and a bare percentage of zero would be a made-up one.
-              : 'nothing came in to measure it against',
-          _spend,
-          bold,
-          mono,
-        ),
-      ),
-    ],
-  );
-
-  pw.Widget _figure(
-    String label,
-    String value,
-    String note,
-    PdfColor tone,
-    pw.Font bold,
-    pw.Font mono,
-  ) => pw.Column(
-    crossAxisAlignment: pw.CrossAxisAlignment.start,
-    children: [
-      _eyebrow(label, mono),
-      pw.SizedBox(height: 5),
-      pw.Text(
-        value,
-        style: pw.TextStyle(
-          font: bold,
-          fontSize: 19,
-          color: tone,
-          letterSpacing: -.6,
-        ),
-      ),
-      pw.SizedBox(height: 2),
-      pw.Text(note, style: pw.TextStyle(fontSize: 8.5, color: _muted)),
-    ],
-  );
-
-  pw.Widget _categories(
-    ReportData data,
-    pw.Font bold,
-    pw.Font medium,
-    pw.Font mono,
-  ) {
-    if (data.byCategory.isEmpty) return pw.SizedBox();
-    final total = data.byCategory.fold<int>(0, (sum, e) => sum + e.value);
-    final shown = data.byCategory.take(8).toList();
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Container(
-          decoration: const pw.BoxDecoration(
-            border: pw.Border(top: pw.BorderSide(color: _rule)),
-          ),
-          padding: const pw.EdgeInsets.only(top: 11),
-          child: pw.Row(
-            children: [
-              pw.Expanded(child: _eyebrow('Where it went', mono)),
-              _eyebrow('${data.byCategory.length} categories', mono),
-            ],
-          ),
-        ),
-        pw.SizedBox(height: 10),
-        pw.SizedBox(
-          height: 22,
-          child: pw.Row(
-            children: [
-              for (var i = 0; i < shown.length; i++) ...[
-                if (i > 0) pw.SizedBox(width: 2),
-                pw.Expanded(
-                  flex: shown[i].value < 1 ? 1 : shown[i].value,
-                  child: pw.Container(color: _ramp(i)),
-                ),
-              ],
-            ],
-          ),
-        ),
-        pw.SizedBox(height: 12),
-        for (var i = 0; i < shown.length; i++)
-          pw.Padding(
-            padding: const pw.EdgeInsets.only(bottom: 6),
-            child: pw.Row(
-              children: [
-                pw.Container(width: 7, height: 7, color: _ramp(i)),
-                pw.SizedBox(width: 9),
-                pw.Expanded(
-                  child: pw.Text(
-                    shown[i].key,
-                    style: pw.TextStyle(fontSize: 10, color: _ink),
-                  ),
-                ),
-                pw.Text(
-                  _percent(shown[i].value, total),
-                  style: pw.TextStyle(font: mono, fontSize: 8, color: _muted),
-                ),
-                pw.SizedBox(width: 14),
-                pw.Text(
-                  _money(shown[i].value),
-                  style: pw.TextStyle(font: medium, fontSize: 10, color: _ink),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-
-  /// Every day of the period, in above the line and out below it. On a page
-  /// this is what turns a summary into something you can actually read a month
-  /// off -- where the salary landed, which weeks were heavy.
-  pw.Widget _dailySpine(ReportData data, pw.Font medium, pw.Font mono) {
-    final from = data.request.from;
-    final days = data.request.to.difference(from).inDays + 1;
-    if (days < 2 || days > 400) return pw.SizedBox();
-
-    final incoming = List<int>.filled(days, 0);
-    final outgoing = List<int>.filled(days, 0);
-    for (final item in data.transactions) {
-      final index = item.occurredAt.toLocal().difference(from).inDays;
-      if (index < 0 || index >= days) continue;
-      final amount = item.amount.minorUnits.abs();
-      if (item.kind == TransactionKind.income) {
-        incoming[index] += amount;
-      } else if (item.kind == TransactionKind.expense) {
-        outgoing[index] += amount;
-      }
-    }
-    var peak = 1;
-    for (var i = 0; i < days; i++) {
-      peak = [peak, incoming[i], outgoing[i]].reduce((a, b) => a > b ? a : b);
-    }
-    if (peak <= 1) return pw.SizedBox();
-
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Container(
-          decoration: const pw.BoxDecoration(
-            border: pw.Border(top: pw.BorderSide(color: _rule)),
-          ),
-          padding: const pw.EdgeInsets.only(top: 11),
-          child: pw.Row(
-            children: [
-              pw.Expanded(child: _eyebrow('Day by day', mono)),
-              _eyebrow('in above, out below', mono),
-            ],
-          ),
-        ),
-        pw.SizedBox(height: 12),
-        pw.SizedBox(
-          height: 92,
-          width: double.infinity,
-          child: pw.CustomPaint(
-            painter: (canvas, size) =>
-                _paintSpine(canvas, size, incoming, outgoing, peak),
-          ),
-        ),
-        pw.SizedBox(height: 5),
-        pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            pw.Text(
-              DateFormat('d MMM').format(from),
-              style: pw.TextStyle(font: mono, fontSize: 7, color: _muted),
-            ),
-            pw.Text(
-              DateFormat('d MMM').format(data.request.to),
-              style: pw.TextStyle(font: mono, fontSize: 7, color: _muted),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  void _paintSpine(
-    PdfGraphics canvas,
-    PdfPoint size,
-    List<int> incoming,
-    List<int> outgoing,
-    int peak,
-  ) {
-    final days = incoming.length;
-    final slot = size.x / days;
-    final barW = slot > 3 ? slot * .62 : slot;
-    final mid = size.y / 2;
-    final arm = mid - 4;
-
-    canvas
-      ..setStrokeColor(_rule)
-      ..setLineWidth(.7)
-      ..drawLine(0, mid, size.x, mid)
-      ..strokePath();
-
-    for (var i = 0; i < days; i++) {
-      final x = i * slot + (slot - barW) / 2;
-      if (incoming[i] > 0) {
-        final h = (incoming[i] / peak) * arm;
-        canvas
-          ..setFillColor(_keep)
-          ..drawRect(x, mid + 1, barW, h < 1 ? 1 : h)
-          ..fillPath();
-      }
-      if (outgoing[i] > 0) {
-        final h = (outgoing[i] / peak) * arm;
-        canvas
-          ..setFillColor(_spend)
-          ..drawRect(x, mid - 1 - (h < 1 ? 1 : h), barW, h < 1 ? 1 : h)
-          ..fillPath();
-      }
-    }
-  }
-
-  pw.Widget _merchants(ReportData data, pw.Font medium, pw.Font mono) {
-    if (data.byMerchant.length < 2) return pw.SizedBox();
-    final shown = data.byMerchant.take(5).toList();
-    return pw.Container(
-      decoration: const pw.BoxDecoration(
-        border: pw.Border(top: pw.BorderSide(color: _rule)),
-      ),
-      padding: const pw.EdgeInsets.only(top: 11),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          _eyebrow('Most of it went to', mono),
-          pw.SizedBox(height: 9),
-          pw.Row(
-            children: [
-              for (final entry in shown)
-                pw.Expanded(
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        entry.key,
-                        maxLines: 2,
-                        overflow: pw.TextOverflow.clip,
-                        style: pw.TextStyle(fontSize: 8.5, color: _muted),
-                      ),
-                      pw.SizedBox(height: 3),
-                      pw.Text(
-                        _money(entry.value),
-                        style: pw.TextStyle(
-                          font: medium,
-                          fontSize: 11,
-                          color: _ink,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  pw.Widget _nothing(pw.Font bold) => pw.Column(
-    crossAxisAlignment: pw.CrossAxisAlignment.start,
-    children: [
-      pw.Text(
-        'Nothing moved in this period.',
-        style: pw.TextStyle(font: bold, fontSize: 17, color: _ink),
-      ),
-      pw.SizedBox(height: 8),
-      pw.Text(
-        'No transactions fall inside these dates.',
-        style: const pw.TextStyle(fontSize: 10, color: _muted),
-      ),
-    ],
+  pw.Widget _footnote(String text, pw.Font mono) => pw.Text(
+    text,
+    style: pw.TextStyle(font: mono, fontSize: 7.5, color: _muted, height: 1.5),
   );
 
   pw.Widget _colophon(pw.Font mono) => pw.Container(
@@ -751,193 +572,134 @@ class SpendingReport {
     ),
   );
 
-  // ---- the register -------------------------------------------------------
+  // ---- the shape ------------------------------------------------------
 
-  pw.MultiPage _registerPages(
-    ReportData data,
-    pw.Font bold,
-    pw.Font medium,
-    pw.Font mono,
-  ) {
+  // ---- the register (part of "the statement") -----------------------------
+
+  /// The ledger itself, day by day, beneath whichever drawing opened the
+  /// page. Returned as rows rather than as its own document so it flows on
+  /// from the hero instead of restarting the paper.
+  List<pw.Widget> _registerRows(ReportData data, pw.Font medium, pw.Font mono) {
     final rows = <pw.Widget>[];
     DateTime? lastDay;
     for (final item in data.transactions) {
       final at = item.occurredAt.toLocal();
       final day = DateTime(at.year, at.month, at.day);
+      final row = _registerRow(item, medium, mono);
       if (day != lastDay) {
         lastDay = day;
+        // Glued to the day's first row, so a break can only ever fall
+        // between two transactions -- never between a date and the one
+        // entry it was naming.
         rows.add(
-          pw.Padding(
-            padding: const pw.EdgeInsets.only(top: 13, bottom: 5),
-            child: pw.Row(
-              children: [
-                pw.Text(
-                  DateFormat('EEE dd MMM').format(day).toUpperCase(),
-                  style: pw.TextStyle(
-                    font: mono,
-                    fontSize: 7.5,
-                    color: _muted,
-                    letterSpacing: 1.4,
-                  ),
-                ),
-                pw.SizedBox(width: 10),
-                pw.Expanded(child: pw.Container(height: .6, color: _rule)),
-              ],
+          pw.Inseparable(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [_registerDayHeader(day, mono), row],
             ),
           ),
         );
+      } else {
+        rows.add(row);
       }
-      final tone = switch (item.kind) {
-        TransactionKind.income => _keep,
-        TransactionKind.transfer => _mine,
-        TransactionKind.expense => _spend,
-      };
-      rows.add(
-        pw.Container(
-          decoration: const pw.BoxDecoration(
-            border: pw.Border(bottom: pw.BorderSide(color: _rule, width: .5)),
-          ),
-          padding: const pw.EdgeInsets.symmetric(vertical: 5),
-          child: pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Expanded(
-                flex: 5,
-                child: pw.Row(
-                  children: [
-                    // A drawn marker, because the arrows glyph is not in
-                    // Archivo and renders as a tofu box.
-                    if (item.kind == TransactionKind.transfer) ...[
-                      pw.Container(width: 5, height: 5, color: _mine),
-                      pw.SizedBox(width: 6),
-                    ],
-                    pw.Expanded(
-                      child: pw.Text(
-                        item.title,
-                        maxLines: 1,
-                        style: pw.TextStyle(fontSize: 9.5, color: _ink),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              pw.Expanded(
-                flex: 4,
-                child: pw.Text(
-                  [
-                    item.category,
-                    if (item.accountName.isNotEmpty) item.accountName,
-                  ].join(' · ').toUpperCase(),
-                  maxLines: 1,
-                  style: pw.TextStyle(
-                    font: mono,
-                    fontSize: 6.8,
-                    color: _muted,
-                    letterSpacing: .5,
-                  ),
-                ),
-              ),
-              pw.Expanded(
-                flex: 2,
-                child: pw.Text(
-                  _money(item.amount.minorUnits.abs()),
-                  textAlign: pw.TextAlign.right,
-                  style: pw.TextStyle(font: medium, fontSize: 9.5, color: tone),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
     }
 
-    return pw.MultiPage(
-      pageTheme: _pageTheme(const pw.EdgeInsets.fromLTRB(48, 46, 48, 40)),
-      header: (context) => pw.Container(
-        margin: const pw.EdgeInsets.only(bottom: 14),
-        padding: const pw.EdgeInsets.only(bottom: 8),
-        decoration: const pw.BoxDecoration(
-          border: pw.Border(bottom: pw.BorderSide(color: _ink, width: 1.2)),
+    return rows;
+  }
+
+  pw.Widget _registerDayHeader(DateTime day, pw.Font mono) => pw.Padding(
+    padding: const pw.EdgeInsets.only(top: 13, bottom: 5),
+    child: pw.Row(
+      children: [
+        pw.Text(
+          DateFormat('EEE dd MMM').format(day).toUpperCase(),
+          style: pw.TextStyle(
+            font: mono,
+            fontSize: 7.5,
+            color: _muted,
+            letterSpacing: 1.4,
+          ),
         ),
-        child: pw.Row(
-          children: [
-            pw.Expanded(
-              child: pw.Text(
-                'The register · ${data.request.label}',
-                style: pw.TextStyle(font: bold, fontSize: 12, color: _ink),
+        pw.SizedBox(width: 10),
+        pw.Expanded(child: pw.Container(height: .6, color: _rule)),
+      ],
+    ),
+  );
+
+  pw.Widget _registerRow(
+    TransactionViewData item,
+    pw.Font medium,
+    pw.Font mono,
+  ) {
+    final tone = switch (item.kind) {
+      TransactionKind.income => _keep,
+      TransactionKind.transfer => _mine,
+      TransactionKind.expense => _spend,
+    };
+    return pw.Container(
+      decoration: const pw.BoxDecoration(
+        border: pw.Border(bottom: pw.BorderSide(color: _rule, width: .5)),
+      ),
+      padding: const pw.EdgeInsets.symmetric(vertical: 5),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Expanded(
+            flex: 5,
+            child: pw.Row(
+              children: [
+                // A drawn marker, because the arrows glyph is not in
+                // Archivo and renders as a tofu box.
+                if (item.kind == TransactionKind.transfer) ...[
+                  pw.Container(width: 5, height: 5, color: _mine),
+                  pw.SizedBox(width: 6),
+                ],
+                pw.Expanded(
+                  child: pw.Text(
+                    item.title,
+                    maxLines: 1,
+                    style: pw.TextStyle(fontSize: 9.5, color: _ink),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          pw.Expanded(
+            flex: 4,
+            child: pw.Text(
+              [
+                item.category,
+                if (item.accountName.isNotEmpty) item.accountName,
+              ].join(' · ').toUpperCase(),
+              maxLines: 1,
+              style: pw.TextStyle(
+                font: mono,
+                fontSize: 6.8,
+                color: _muted,
+                letterSpacing: .5,
               ),
             ),
-            pw.Text(
-              '${context.pageNumber} / ${context.pagesCount}',
-              style: pw.TextStyle(font: mono, fontSize: 7.5, color: _muted),
+          ),
+          pw.Expanded(
+            flex: 2,
+            child: pw.Text(
+              _money(item.amount.minorUnits.abs()),
+              textAlign: pw.TextAlign.right,
+              style: pw.TextStyle(font: medium, fontSize: 9.5, color: tone),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-      build: (context) => rows,
     );
   }
 
+  // ---- the change -----------------------------------------------------
+
+  // ---- the docket -------------------------------------------------------
+
+  // ---- the almanac ------------------------------------------------------
+
   // ---- drawing ------------------------------------------------------------
-
-  /// The same ribbon as Home: one band in, a wide kept band and a thin spent
-  /// thread out, to true proportion.
-  void _paintFlow(PdfGraphics canvas, PdfPoint size, ReportData data) {
-    final w = size.x;
-    final h = size.y;
-    const barH = 9.0;
-    final topW = w * .44;
-    final topX = (w - topW) / 2;
-    final topY = h - barH;
-    final botY = 2.0;
-    final margin = w * .06;
-
-    final keptW = topW * data.keptFraction;
-    final spentW = topW - keptW;
-    final splitX = topX + keptW;
-    final keptBotX = margin;
-    final spentBotX = w - margin - spentW;
-
-    // PDF's origin is bottom-left, so "down the page" is decreasing y.
-    final yTop = topY;
-    final c1 = topY - (topY - botY - barH) * .42;
-    final c2 = topY - (topY - botY - barH) * .60;
-    final barTop = botY + barH;
-
-    void ribbon(
-      double aTop,
-      double bTop,
-      double aBot,
-      double bBot,
-      PdfColor colour,
-      double opacity,
-    ) {
-      canvas
-        ..setFillColor(colour)
-        ..setGraphicState(PdfGraphicState(fillOpacity: opacity))
-        ..moveTo(aTop, yTop)
-        ..curveTo(aTop, c1, aBot, c2, aBot, barTop)
-        ..lineTo(bBot, barTop)
-        ..curveTo(bBot, c2, bTop, c1, bTop, yTop)
-        ..closePath()
-        ..fillPath()
-        ..setGraphicState(const PdfGraphicState(fillOpacity: 1));
-    }
-
-    ribbon(topX, splitX, keptBotX, keptBotX + keptW, _keep, .34);
-    ribbon(splitX, topX + topW, spentBotX, spentBotX + spentW, _spend, .5);
-
-    canvas
-      ..setFillColor(_ink)
-      ..drawRect(topX, topY, topW, barH)
-      ..fillPath()
-      ..setFillColor(_keep)
-      ..drawRect(keptBotX, botY, keptW, barH)
-      ..fillPath()
-      ..setFillColor(_spend)
-      ..drawRect(spentBotX, botY, spentW, barH)
-      ..fillPath();
-  }
 
   /// The Split mark: one band in, a wide kept mass and a thin spent thread
   /// out. Authored on a 64-unit grid spanning x 10..52 and y 8..56, so it is
@@ -971,9 +733,10 @@ class SpendingReport {
       ..fillPath();
   }
 
-  PdfColor _ramp(int index) =>
-      PdfColor.fromInt(palette.ramp[index % palette.ramp.length].toARGB32());
-
+  /// Grouped, and without the trailing `.00` that makes a column of round
+  /// figures harder to scan than it needs to be. Handed to every hero through
+  /// `ReportPaper.money`, so the document cannot disagree with its own figure
+  /// about how a number is written.
   static String _money(int minorUnits) {
     final value = (minorUnits.abs() / 100).toStringAsFixed(2);
     final parts = value.split('.');
@@ -982,13 +745,5 @@ class SpendingReport {
       (_) => ',',
     );
     return parts.last == '00' ? grouped : '$grouped.${parts.last}';
-  }
-
-  static String _percent(int part, int whole) {
-    if (whole <= 0) return '0%';
-    final value = (part / whole) * 100;
-    return value < 10 && value > 0
-        ? '${value.toStringAsFixed(1)}%'
-        : '${value.round()}%';
   }
 }
