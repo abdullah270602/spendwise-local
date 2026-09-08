@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/category_tones.dart';
 import '../../app/theme.dart';
 import '../../widgets/shape_kit.dart';
 import '../shell/spendwise_view_model.dart';
@@ -151,10 +152,16 @@ class CategoryPreview extends StatelessWidget {
     super.key,
     required this.spending,
     required this.style,
+    this.tones,
   });
 
   final List<CategorySpendViewData> spending;
   final HomeCategories style;
+
+  /// The real tones, where the screen showing this preview has a ledger to
+  /// ask. Without them the preview colours by position and quietly disagrees
+  /// with the Home screen it is a picture of.
+  final CategoryTones? tones;
 
   /// A pinned preview cannot grow with the list, and a preview that silently
   /// stops after four rows would be making the same claim the fold exists to
@@ -182,6 +189,8 @@ class CategoryPreview extends StatelessWidget {
       );
     }
 
+    final palette =
+        tones ?? CategoryTones.positional(items.map((item) => item.category));
     final shown = items.take(_visibleRows).toList();
     final hidden = items.length - shown.length;
 
@@ -201,15 +210,13 @@ class CategoryPreview extends StatelessWidget {
             for (final item in items)
               total == 0 ? 1 : item.amount.minorUnits / total,
           ],
-          colors: [
-            for (var i = 0; i < items.length; i++) categoryColor(items[i], i),
-          ],
+          colors: [for (final item in items) categoryColor(item, palette)],
         ),
         const SizedBox(height: 4),
         for (var i = 0; i < shown.length; i++)
           CategoryRow(
             item: shown[i],
-            color: categoryColor(shown[i], i),
+            color: categoryColor(shown[i], palette),
             onTap: () {},
           ),
         if (hidden > 0)

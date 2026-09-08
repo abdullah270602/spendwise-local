@@ -44,17 +44,46 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final controller = PageController();
+
+  /// Held here rather than in the card, because the button that leaves the
+  /// card has to know whether anything was typed: it says "Skip for now"
+  /// when the field is empty, which is how the card admits it is optional
+  /// without spending words saying so.
+  final names = TextEditingController();
   int page = 0;
   bool finishing = false;
 
-  static const _cards = 4;
+  static const _cards = 5;
+
+  /// Which card asks for the name. Named because two places need it and a
+  /// bare 3 in a switch is the kind of thing that survives a reorder.
+  static const _nameCard = 3;
 
   SpendWiseViewModel get viewModel => widget.viewModel;
 
   @override
+  void initState() {
+    super.initState();
+    names.text = viewModel.uiOwnNames.join(', ');
+  }
+
+  @override
   void dispose() {
     controller.dispose();
+    names.dispose();
     super.dispose();
+  }
+
+  /// Written when the card is left and again when setup finishes, rather than
+  /// on every keystroke, which would be a database write per letter.
+  Future<void> _saveNames() async {
+    final typed = names.text
+        .split(',')
+        .map((name) => name.trim())
+        .where((name) => name.isNotEmpty)
+        .toList();
+    if (typed.join('\u0000') == viewModel.uiOwnNames.join('\u0000')) return;
+    await viewModel.uiSetOwnNames(typed);
   }
 
   void _go(int next) {
@@ -70,6 +99,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (widget.onDone case final done?) return done();
     setState(() => finishing = true);
     try {
+      await _saveNames();
       await viewModel.completeOnboarding();
     } catch (error) {
       if (mounted) {
@@ -87,6 +117,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       const _ShowIt(),
       _Access(viewModel: viewModel),
       _Sources(viewModel: viewModel),
+      _Name(controller: names, onChanged: () => setState(() {})),
       _Landing(viewModel: viewModel, onFinish: _finish, finishing: finishing),
     ];
 
@@ -98,7 +129,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             Expanded(
               child: PageView(
                 controller: controller,
-                onPageChanged: (value) => setState(() => page = value),
+                onPageChanged: (value) {
+                  // Leaving the card is what commits it, in either direction:
+                  // someone who types a name and swipes back has still
+                  // answered the question.
+                  if (page == _nameCard && value != _nameCard) _saveNames();
+                  setState(() => page = value);
+                },
                 children: [
                   for (var index = 0; index < pages.length; index++)
                     // Short cards sit in the middle of the screen rather than
@@ -149,6 +186,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       viewModel.notificationAccessGranted
                           ? 'Next'
                           : 'Skip for now',
+                    _nameCard =>
+                      names.text.trim().isEmpty ? 'Skip for now' : 'Next',
                     _ => 'Next',
                   },
                   onPressed: () => _go(page + 1),
@@ -338,7 +377,58 @@ class _Sources extends StatelessWidget {
   }
 }
 
-// ---- 4. Where it lands, and the first win --------------------------------
+// ---- 4. Who you are, in their words --------------------------------------
+
+/// The one thing the app cannot read off a notification: which name in it is
+/// yours.
+///
+/// Banks name the account holder when money moves between that person's own
+/// accounts. Knowing the name lets the reconciler pair those two legs into
+/// one transfer instead of filing a spend and an income that never happened.
+///
+/// Asked here rather than left to Settings because the answer is worth most
+/// before any alert arrives. Reconciliation runs on ingest and skips anything
+/// already resolved by hand, so a transfer misfiled while this was blank and
+/// then corrected manually can never be re-derived correctly, whatever is
+/// typed later.
+///
+/// Optional, and visibly so: the button below says "Skip for now" until
+/// something is typed. This app's argument is that it needs no account and no
+/// signup, and a first-run screen demanding a name is the most signup-shaped
+/// thing it could do.
+class _Name extends StatelessWidget {
+  const _Name({required this.controller, required this.onChanged});
+
+  final TextEditingController controller;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) => Stagger(
+    children: [
+      const _Say(
+        'What name is on your alerts?',
+        detail: 'Only to spot money you send yourself.',
+      ),
+      TextField(
+        controller: controller,
+        textCapitalization: TextCapitalization.words,
+        autocorrect: false,
+        onChanged: (_) => onChanged(),
+        decoration: const InputDecoration(
+          labelText: 'Your name(s)',
+          // The example shows how banks shout, and shows the comma
+          // convention -- but showing a convention is not stating it, and
+          // anyone with a second name variant has to be told, not hinted at.
+          helperText: 'Several? Use commas.',
+          hintText: 'AMINA R KHAN, A KHAN',
+        ),
+      ),
+      const SizedBox(height: 26),
+    ],
+  );
+}
+
+// ---- 5. Where it lands, and the first win --------------------------------
 
 /// One account, then a look in the notification tray.
 ///

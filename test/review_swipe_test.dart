@@ -160,4 +160,11 @@ class _FakeReviewViewModel extends ChangeNotifier
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+
+  /// The ledger's category list, which colour is now keyed to so a category
+  /// holds one tone as its spending rank moves. Empty here: these fakes have
+  /// no ledger, so tones fall back to the order of whatever is drawn, which
+  /// is what every screen did before.
+  @override
+  List<CategoryViewData> get categories => const [];
 }

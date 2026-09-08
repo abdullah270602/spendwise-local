@@ -37,6 +37,10 @@ actually invalidated. Say which ones you checked and which needed nothing;
   test to fix"; it is the old contract, and it needs rewriting to state the
   new one deliberately. Never edit an assertion merely to make it pass.
 
+**Commits.** Do not add a `Co-Authored-By` trailer for Claude or any other
+assistant. This is a repository the user publishes as their own work, and the
+trailer is noise in a history they read back. Subject and body only.
+
 **Installing on the device.** Build with
 `flutter build apk --release --split-per-abi`. A plain `--release` writes only
 the universal APK and leaves the previous build's per-ABI files in place, so

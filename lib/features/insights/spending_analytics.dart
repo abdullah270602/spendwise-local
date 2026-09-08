@@ -1,32 +1,28 @@
 import '../shell/spendwise_view_model.dart';
 
-/// How far back a reading looks, and how finely it is cut. The two day
-/// windows are the ones people actually ask about — "this week" and "this
-/// month so far" — which a single "days" bucket could not express.
-enum AnalyticsResolution { last7Days, last30Days, months, years }
+/// How far back a reading looks, and how finely it is cut.
+///
+/// The two day windows are aligned to the calendar rather than rolling back
+/// from today, because that is what their names claim. A rolling thirty days
+/// labelled "This month" would, on the 3rd, be showing you almost all of last
+/// month under this month's name — the exact class of quiet mismatch this
+/// app exists to not produce.
+enum AnalyticsResolution { thisWeek, thisMonth, months, years }
 
 extension AnalyticsResolutionCopy on AnalyticsResolution {
   String get shortLabel => switch (this) {
-    AnalyticsResolution.last7Days => '7 days',
-    AnalyticsResolution.last30Days => '30 days',
+    AnalyticsResolution.thisWeek => 'This week',
+    AnalyticsResolution.thisMonth => 'This month',
     AnalyticsResolution.months => 'Months',
     AnalyticsResolution.years => 'Years',
   };
 
   /// The unit one bar covers.
   String get cadence => switch (this) {
-    AnalyticsResolution.last7Days || AnalyticsResolution.last30Days => 'day',
+    AnalyticsResolution.thisWeek || AnalyticsResolution.thisMonth => 'day',
     AnalyticsResolution.months => 'month',
     AnalyticsResolution.years => 'year',
   };
-
-  int get dayCount => switch (this) {
-    AnalyticsResolution.last7Days => 7,
-    AnalyticsResolution.last30Days => 30,
-    _ => 0,
-  };
-
-  bool get isDaily => dayCount > 0;
 }
 
 final class AnalyticsBucket {
@@ -48,11 +44,35 @@ final class CategoryAnalytics {
     required this.category,
     required this.amountMinor,
     required this.fraction,
+    this.previousAmountMinor = 0,
   });
 
   final String category;
   final int amountMinor;
   final double fraction;
+
+  /// What this category cost over the comparison window.
+  ///
+  /// Zero means one of two different things — nothing was spent, or the
+  /// category did not exist yet — and the difference matters, so ask
+  /// [isNew] rather than reading a percentage off a zero.
+  final int previousAmountMinor;
+
+  int get changeMinor => amountMinor - previousAmountMinor;
+
+  /// First seen this period. There is no percentage to quote: everything is
+  /// an infinite rise from nothing, which is a true statement that tells a
+  /// reader nothing.
+  bool get isNew => previousAmountMinor == 0 && amountMinor > 0;
+
+  /// Spent on last period and not this one.
+  bool get isStopped => amountMinor == 0 && previousAmountMinor > 0;
+
+  /// Null where no honest percentage exists.
+  double? get changePercent {
+    if (previousAmountMinor == 0) return null;
+    return changeMinor / previousAmountMinor * 100;
+  }
 }
 
 final class SpendingAnalytics {
@@ -61,6 +81,7 @@ final class SpendingAnalytics {
     required this.category,
     required this.buckets,
     required this.categories,
+    required this.categoryChanges,
     required this.weekdaySpending,
     required this.totalSpendingMinor,
     required this.totalIncomeMinor,
@@ -72,7 +93,18 @@ final class SpendingAnalytics {
   final AnalyticsResolution resolution;
   final String? category;
   final List<AnalyticsBucket> buckets;
+
+  /// What this period cost, by category, largest first. Only categories with
+  /// spending in it — this answers "where your money went", and a category
+  /// nothing went to did not receive any.
   final List<CategoryAnalytics> categories;
+
+  /// The same categories seen against the period before, largest movement in
+  /// money first. This is a different list on purpose: it must include a
+  /// category that was spent on last period and abandoned this one, which is
+  /// exactly the thing [categories] cannot contain.
+  final List<CategoryAnalytics> categoryChanges;
+
   final List<int> weekdaySpending;
   final int totalSpendingMinor;
   final int totalIncomeMinor;
@@ -100,16 +132,25 @@ final class SpendingAnalytics {
     final starts = _bucketStarts(resolution, localNow, transactions);
     final start = starts.first;
     final endExclusive = localNow.add(const Duration(days: 1));
-    // The comparison period is always the window immediately before this one,
-    // so "spending rate" answers "against the last stretch of the same length".
+    // The comparison period is the same stretch of the previous calendar
+    // unit, cut to the number of days that have elapsed in this one -- so on
+    // the 3rd, "this month" is measured against the first three days of last
+    // month, not against the whole of it. Comparing three days against thirty
+    // would report a collapse in spending at the start of every month.
+    final elapsedDays = starts.length;
     final previousStart = switch (resolution) {
-      AnalyticsResolution.last7Days || AnalyticsResolution.last30Days =>
-        start.subtract(Duration(days: resolution.dayCount)),
+      AnalyticsResolution.thisWeek => DateTime(
+        start.year,
+        start.month,
+        start.day - 7,
+      ),
+      AnalyticsResolution.thisMonth => DateTime(start.year, start.month - 1),
       AnalyticsResolution.months => DateTime(start.year - 1, start.month),
       AnalyticsResolution.years => start,
     };
     final previousEndExclusive = switch (resolution) {
-      AnalyticsResolution.last7Days || AnalyticsResolution.last30Days => start,
+      AnalyticsResolution.thisWeek || AnalyticsResolution.thisMonth =>
+        _matchingLength(resolution, previousStart, elapsedDays),
       AnalyticsResolution.months => DateTime(
         endExclusive.year - 1,
         endExclusive.month,
@@ -121,6 +162,7 @@ final class SpendingAnalytics {
     final income = List<int>.filled(starts.length, 0);
     final weekdays = List<int>.filled(7, 0);
     final categoryTotals = <String, int>{};
+    final previousCategoryTotals = <String, int>{};
     var previousSpending = 0;
     var currency = transactions.firstOrNull?.amount.currency ?? 'PKR';
 
@@ -134,10 +176,17 @@ final class SpendingAnalytics {
       final categoryMatches =
           category == null || transaction.category == category;
       if (transaction.kind == TransactionKind.expense &&
-          categoryMatches &&
           !occurred.isBefore(previousStart) &&
           occurred.isBefore(previousEndExclusive)) {
-        previousSpending += amount;
+        // Per category, the comparison period is collected whole, exactly as
+        // the current one is: a screen filtered to Groceries still has to be
+        // able to say what everything else did.
+        previousCategoryTotals.update(
+          transaction.category,
+          (value) => value + amount,
+          ifAbsent: () => amount,
+        );
+        if (categoryMatches) previousSpending += amount;
       }
       if (occurred.isBefore(start) || !occurred.isBefore(endExclusive)) {
         continue;
@@ -180,6 +229,32 @@ final class SpendingAnalytics {
             .toList()
           ..sort((a, b) => b.amountMinor.compareTo(a.amountMinor));
 
+    // Every category that took money in either period. A category that was
+    // spent on last month and abandoned this one is absent from
+    // `categoryTotals` entirely, and "you stopped spending on this" is one of
+    // the few things a comparison exists to say.
+    final movingNames = <String>{
+      ...categoryTotals.keys,
+      ...previousCategoryTotals.keys,
+    };
+    final categoryChanges =
+        movingNames
+            .map(
+              (name) => CategoryAnalytics(
+                category: name,
+                amountMinor: categoryTotals[name] ?? 0,
+                previousAmountMinor: previousCategoryTotals[name] ?? 0,
+                fraction: allCategorySpending == 0
+                    ? 0
+                    : (categoryTotals[name] ?? 0) / allCategorySpending,
+              ),
+            )
+            .toList()
+          // By money moved, not by percentage. A category that went from 350
+          // to 900 has risen further in percent than one that rose by 6,500
+          // rupees, and only one of those is worth the top of a list.
+          ..sort((a, b) => b.changeMinor.abs().compareTo(a.changeMinor.abs()));
+
     return SpendingAnalytics(
       resolution: resolution,
       category: category,
@@ -193,6 +268,7 @@ final class SpendingAnalytics {
           ),
       ],
       categories: categories,
+      categoryChanges: categoryChanges,
       weekdaySpending: weekdays,
       totalSpendingMinor: totalSpending,
       totalIncomeMinor: totalIncome,
@@ -209,9 +285,13 @@ final class SpendingAnalytics {
     DateTime now,
     List<TransactionViewData> transactions,
   ) => switch (resolution) {
-    AnalyticsResolution.last7Days || AnalyticsResolution.last30Days => [
-      for (var offset = resolution.dayCount - 1; offset >= 0; offset--)
-        now.subtract(Duration(days: offset)),
+    AnalyticsResolution.thisWeek || AnalyticsResolution.thisMonth => [
+      for (
+        var day = _windowStart(resolution, now);
+        !day.isAfter(now);
+        day = DateTime(day.year, day.month, day.day + 1)
+      )
+        day,
     ],
     AnalyticsResolution.months => [
       for (var offset = 11; offset >= 0; offset--)
@@ -226,6 +306,33 @@ final class SpendingAnalytics {
         DateTime(year),
     ],
   };
+
+  /// The first day of the calendar window: Monday for a week, the 1st for a
+  /// month. Days are stepped through by date rather than by adding durations,
+  /// so a clock change cannot land a bucket an hour either side of midnight.
+  static DateTime _windowStart(AnalyticsResolution resolution, DateTime now) =>
+      resolution == AnalyticsResolution.thisWeek
+      ? DateTime(now.year, now.month, now.day - (now.weekday - 1))
+      : DateTime(now.year, now.month);
+
+  /// The end of the comparison window: the same number of days into the
+  /// previous unit, but never past the end of it. A reading taken on the 31st
+  /// cannot look at thirty-one days of February, so it stops at the 1st of
+  /// March and compares the whole of the shorter month instead.
+  static DateTime _matchingLength(
+    AnalyticsResolution resolution,
+    DateTime previousStart,
+    int elapsedDays,
+  ) {
+    final wanted = DateTime(
+      previousStart.year,
+      previousStart.month,
+      previousStart.day + elapsedDays,
+    );
+    if (resolution == AnalyticsResolution.thisWeek) return wanted;
+    final unitEnd = DateTime(previousStart.year, previousStart.month + 1);
+    return wanted.isAfter(unitEnd) ? unitEnd : wanted;
+  }
 
   static int _firstYear(List<TransactionViewData> transactions, int fallback) {
     final years = transactions.map((item) => item.occurredAt.toLocal().year);
@@ -249,7 +356,7 @@ final class SpendingAnalytics {
       switch (resolution) {
         // A week reads by weekday; a month of days needs the date, or every
         // label repeats four times over.
-        AnalyticsResolution.last7Days => const [
+        AnalyticsResolution.thisWeek => const [
           'Mon',
           'Tue',
           'Wed',
@@ -258,7 +365,7 @@ final class SpendingAnalytics {
           'Sat',
           'Sun',
         ][value.weekday - 1],
-        AnalyticsResolution.last30Days => '${value.day}',
+        AnalyticsResolution.thisMonth => '${value.day}',
         AnalyticsResolution.months => const [
           'Jan',
           'Feb',

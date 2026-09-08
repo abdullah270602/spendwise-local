@@ -11,12 +11,7 @@ import '../shell/spendwise_view_model.dart';
 import 'app_lock_screen.dart';
 import 'source_selection_screen.dart';
 import '../reports/report_screen.dart';
-import '../dashboard/home_categories.dart';
-import '../dashboard/home_savings.dart';
-import 'home_period_screen.dart';
-import 'home_categories_screen.dart';
-import 'home_savings_screen.dart';
-import 'palette_screen.dart';
+import 'appearance_screen.dart';
 import 'export_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -38,19 +33,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   /// Both halves of the savings choice in one line, because the row has one
   /// line and hiding half the answer is how a setting becomes a surprise.
-  static String _savingsSummary(SpendWiseViewModel viewModel) {
-    final style = HomeSavingsStyle.fromId(
-      viewModel.uiViewPreference('home_savings'),
-    );
-    final extra = HomeSavingsExtra.resolve(
-      viewModel.uiViewPreference('home_savings_extra'),
-      viewModel.uiViewPreference('home_savings'),
-      legacyOn: viewModel.uiShowSavingsOnHome,
-    );
-    if (extra == HomeSavingsExtra.none) return style.title;
-    return '${style.title}  ·  ${extra.title}';
-  }
-
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Settings & privacy')),
@@ -206,82 +188,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         const SizedBox(height: 22),
-        const SectionHeading('Home'),
+        const SectionHeading('Appearance'),
         const SizedBox(height: 8),
         Card(
-          child: Column(
-            children: [
-              ListTile(
-                leading: const Icon(Icons.date_range_outlined),
-                title: const Text('How much time Home shows'),
-                subtitle: Text(viewModel.uiHomePeriod.title),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute<void>(
-                      builder: (_) => HomePeriodScreen(viewModel: viewModel),
-                    ),
-                  );
-                  if (mounted) setState(() {});
-                },
-              ),
-              const Divider(height: 1, indent: 56),
-              // Two questions, not a switch: whether saving comes out of
-              // the figure, and whether a line appears beneath the shape.
-              ListTile(
-                leading: const Icon(Icons.savings_outlined),
-                title: const Text('Savings on Home'),
-                subtitle: Text(_savingsSummary(viewModel)),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute<void>(
-                      builder: (_) => HomeSavingsScreen(viewModel: viewModel),
-                    ),
-                  );
-                  if (mounted) setState(() {});
-                },
-              ),
-              const Divider(height: 1, indent: 56),
-              ListTile(
-                leading: const Icon(Icons.donut_small_outlined),
-                title: const Text('Categories on Home'),
-                subtitle: Text(
-                  HomeCategories.fromId(
-                    viewModel.uiViewPreference('home_categories'),
-                  ).title,
+          child: ListTile(
+            leading: const Icon(Icons.tune_rounded),
+            title: const Text('How the app is drawn'),
+            subtitle: const Text('Home, Insights and the colour of everything'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => AppearanceScreen(viewModel: viewModel),
                 ),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute<void>(
-                      builder: (_) =>
-                          HomeCategoriesScreen(viewModel: viewModel),
-                    ),
-                  );
-                  if (mounted) setState(() {});
-                },
-              ),
-              const Divider(height: 1, indent: 56),
-              ListTile(
-                leading: const Icon(Icons.palette_outlined),
-                title: const Text('Colour'),
-                subtitle: Text(SpendWiseColors.palette.name),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute<void>(
-                      builder: (_) => PaletteScreen(viewModel: viewModel),
-                    ),
-                  );
-                  if (mounted) setState(() {});
-                },
-              ),
-            ],
+              );
+              if (mounted) setState(() {});
+            },
           ),
         ),
         const SizedBox(height: 22),

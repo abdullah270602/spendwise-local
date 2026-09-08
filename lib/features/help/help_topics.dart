@@ -423,23 +423,71 @@ List<HelpTopic> helpTopics(SpendWiseViewModel viewModel) => [
   ),
 
   HelpTopic(
+    title: 'Insights',
+    summary: 'Three questions, and which of them you want',
+    glyph: Icons.insights_rounded,
+    brief:
+        'Insights answers three separate questions, and each one can be '
+        'turned off. Over time draws the days themselves, what came in and '
+        'what left, one bar apiece. Where your money went splits the period '
+        'by category — as bars, as a dial, or as a fader per category, the '
+        'same figures drawn three ways. What changed measures this period '
+        'against the one before it, either as a single continuous trace '
+        'where a quiet period is nearly a straight line, or as a corridor '
+        'that only draws what moved enough to be worth your attention. That '
+        'last one is off until you ask for it. The period is yours to '
+        'choose: this week runs Monday to today, this month the 1st to '
+        'today, and both are compared against the same number of days in the '
+        'week or month before — so early in a month you are not shown a '
+        'collapse in spending that is really just a shorter stretch of days. '
+        'Tapping a category narrows the whole screen to it without taking '
+        'the rest of the picture away. Every choice shows a live preview '
+        'drawn from your own figures, in Settings under Appearance or at the '
+        'foot of Insights itself.',
+    body: () => [
+      const HelpProse(
+        'Three questions, asked separately. Turn off the ones you do not ask.',
+      ),
+      const HelpHeading('Over time'),
+      const HelpProse(
+        'The days themselves: what came in, what left, one bar a day.',
+      ),
+      const HelpHeading('Where your money went'),
+      const HelpProse(
+        'The period split by category. Bars, a dial, or a fader per '
+        'category — the same figures, drawn the way you prefer to read them.',
+      ),
+      const HelpHeading('What changed'),
+      const HelpProse(
+        'This period against the one before. A trace of the whole period, or '
+        'only the categories that moved enough to matter. Off until you ask.',
+      ),
+      const HelpNote(
+        'This week is Monday to today and this month is the 1st to today, '
+        'each measured against the same number of days in the one before. '
+        'Three days are never compared against a whole month.',
+      ),
+      const HelpHeading('Looking at one category'),
+      const HelpProse(
+        'Tap it. The figures narrow to that category and the breakdown stays '
+        'on screen, dimmed, so you can still see where it sits.',
+      ),
+      const HelpWhere('Settings · Appearance · What Insights shows'),
+    ],
+  ),
+
+  HelpTopic(
     title: 'Reports and exports',
     summary: 'Taking your figures out',
     glyph: Icons.picture_as_pdf_outlined,
     brief:
-        'Insights covers longer stretches than Home: the last seven days, the '
-        'last thirty, by month or by year, each compared against the stretch '
-        'immediately before it. A spending report is a PDF of a month, a '
+        'A spending report is a PDF of a month, a '
         'quarter or any range you pick, in one of two layouts, generated on '
         'the phone and saved to a file you choose. An export is the whole '
         'ledger as CSV or JSON, filtered by date, account, kind or category, '
         'optionally including the raw alert behind every entry. Nothing is '
         'uploaded to produce either one, and nothing here is locked in.',
     body: () => [
-      const HelpProse(
-        'Insights reads seven days, thirty, months or years — each against '
-        'the stretch immediately before it.',
-      ),
       const HelpHeading('A PDF you can hand over'),
       const HelpProse(
         'A month, a quarter or any range, in two layouts. Made on the phone.',

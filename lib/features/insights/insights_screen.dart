@@ -2,9 +2,17 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../app/category_tones.dart';
 import '../../app/theme.dart';
 import '../../widgets/shape_kit.dart';
 import '../shell/spendwise_view_model.dart';
+import 'chronograph.dart';
+import 'gate.dart';
+import 'insights_layout.dart';
+import 'insights_period_screen.dart';
+import 'insights_sections_screen.dart';
+import 'mixing_desk.dart';
+import 'seismograph.dart';
 import 'spending_analytics.dart';
 
 class InsightsScreen extends StatefulWidget {
@@ -17,9 +25,9 @@ class InsightsScreen extends StatefulWidget {
 }
 
 class _InsightsScreenState extends State<InsightsScreen> {
-  /// Thirty days of all spending is the question people actually arrive with,
-  /// so it is what the screen opens on.
-  AnalyticsResolution resolution = AnalyticsResolution.last30Days;
+  /// The month you are in, all spending, is the question people actually
+  /// arrive with, so it is what the screen opens on.
+  AnalyticsResolution resolution = AnalyticsResolution.thisMonth;
   String? category;
 
   @override
@@ -38,6 +46,22 @@ class _InsightsScreenState extends State<InsightsScreen> {
               .toSet()
               .toList()
             ..sort();
+      // Keyed to the ledger's own order, so a category holds one colour from
+      // one period to the next and Home agrees with this screen about which
+      // colour it is.
+      final tones = widget.viewModel.tonesFor(categories);
+      // Three questions, three settings. What is drawn here is whatever the
+      // reader has asked for, and nothing else.
+      final overTime = InsightsOverTime.fromId(
+        widget.viewModel.uiViewPreference(InsightsPreference.overTime),
+      );
+      final share = InsightsShare.fromId(
+        widget.viewModel.uiViewPreference(InsightsPreference.share),
+      );
+      final change = InsightsChange.fromId(
+        widget.viewModel.uiViewPreference(InsightsPreference.change),
+      );
+      void select(String? value) => setState(() => category = value);
 
       return SafeArea(
         bottom: false,
@@ -54,18 +78,23 @@ class _InsightsScreenState extends State<InsightsScreen> {
                 children: [
                   Expanded(child: Text('Insights', style: SpendWiseType.title)),
                   // The only choice left in the header is how far back to
-                  // look. There used to be a second toggle above it choosing
-                  // between three views, two of which drew the same numbers
-                  // as each other or as another screen.
-                  ViewToggle(
-                    options: [
-                      for (final value in AnalyticsResolution.values)
-                        value.shortLabel,
-                    ],
-                    selected: AnalyticsResolution.values.indexOf(resolution),
-                    onSelected: (index) => setState(() {
-                      resolution = AnalyticsResolution.values[index];
-                    }),
+                  // look. It was a four-way segmented control until the two
+                  // day windows were named for what they are; "This week" and
+                  // "This month" do not fit beside a title on a phone, and
+                  // the old short labels did not either.
+                  _PeriodButton(
+                    label: resolution.shortLabel,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute<void>(
+                        builder: (_) => InsightsPeriodScreen(
+                          viewModel: widget.viewModel,
+                          selected: resolution,
+                          onSelected: (value) =>
+                              setState(() => resolution = value),
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -105,13 +134,14 @@ class _InsightsScreenState extends State<InsightsScreen> {
                             ),
                           ),
                         ),
-                        SliverToBoxAdapter(
-                          child: FlowSpine(
-                            buckets: analytics.buckets,
-                            currency: analytics.currency,
-                            spendingOnly: category != null,
+                        if (overTime.isOn)
+                          SliverToBoxAdapter(
+                            child: FlowSpine(
+                              buckets: analytics.buckets,
+                              currency: analytics.currency,
+                              spendingOnly: category != null,
+                            ),
                           ),
-                        ),
                         SliverPadding(
                           padding: const EdgeInsets.fromLTRB(
                             SpendWiseTheme.gutter,
@@ -128,10 +158,68 @@ class _InsightsScreenState extends State<InsightsScreen> {
                               // of the user.
                               _SummaryBand(analytics, category: category),
                               const SizedBox(height: 24),
-                              if (category == null) ...[
+                              // Every section below is shown whether or not a
+                              // category is selected. The breakdown used to
+                              // disappear entirely on selection, which took
+                              // the whole picture away at the exact moment
+                              // someone was examining one part of it -- and
+                              // needlessly, because these totals are computed
+                              // across every category regardless of the
+                              // filter, so nothing here has to move.
+                              if (share == InsightsShare.bars) ...[
                                 const Eyebrow('Where your money went'),
                                 const SizedBox(height: 12),
-                                _CategoryBreakdown(analytics),
+                                CategoryBars(
+                                  analytics: analytics,
+                                  tones: tones,
+                                  selected: category,
+                                  onSelect: select,
+                                ),
+                                const SizedBox(height: 24),
+                              ] else if (share ==
+                                  InsightsShare.chronograph) ...[
+                                Chronograph(
+                                  categories: analytics.categories,
+                                  tones: tones,
+                                  selected: category,
+                                  onSelect: select,
+                                  currency: analytics.currency,
+                                ),
+                                const SizedBox(height: 24),
+                              ] else if (share == InsightsShare.mixingDesk) ...[
+                                MixingDesk(
+                                  categories: analytics.categories,
+                                  tones: tones,
+                                  selected: category,
+                                  onSelect: select,
+                                  currency: analytics.currency,
+                                ),
+                                const SizedBox(height: 24),
+                              ],
+                              if (change == InsightsChange.seismograph) ...[
+                                Seismograph(
+                                  changes: analytics.categoryChanges,
+                                  tones: tones,
+                                  selected: category,
+                                  onSelect: select,
+                                  currency: analytics.currency,
+                                ),
+                                const SizedBox(height: 24),
+                              ] else if (change == InsightsChange.gate) ...[
+                                Gate(
+                                  changes: analytics.categoryChanges,
+                                  tones: tones,
+                                  sensitivity: GateSensitivity.fromId(
+                                    widget.viewModel.uiViewPreference(
+                                      InsightsPreference.gateSensitivity,
+                                    ),
+                                  ),
+                                  totalSpendingMinor:
+                                      analytics.totalSpendingMinor,
+                                  selected: category,
+                                  onSelect: select,
+                                  currency: analytics.currency,
+                                ),
                                 const SizedBox(height: 24),
                               ],
                               Text(
@@ -141,6 +229,25 @@ class _InsightsScreenState extends State<InsightsScreen> {
                                   fontSize: 12.5,
                                   color: SpendWiseColors.dim,
                                 ),
+                              ),
+                              // At the end of what it draws, where someone who
+                              // has just read the screen and wants it drawn
+                              // differently is already looking. Settings has
+                              // the same door for anyone who went there first.
+                              const SizedBox(height: 20),
+                              _SectionsEntry(
+                                onTap: () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => InsightsSectionsScreen(
+                                        viewModel: widget.viewModel,
+                                        resolution: resolution,
+                                      ),
+                                    ),
+                                  );
+                                  if (mounted) setState(() {});
+                                },
                               ),
                             ],
                           ),
@@ -198,12 +305,97 @@ class _CategoryFilter extends StatelessWidget {
 /// money out growing downward, drawn to a shared scale so the two sides are
 /// directly comparable. This is the whole history in one object -- scroll it
 /// sideways and you walk back through every period you have records for.
+/// The way to change what this screen is made of, from the screen itself.
+class _SectionsEntry extends StatelessWidget {
+  const _SectionsEntry({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          const Icon(Icons.tune_rounded, size: 15, color: SpendWiseColors.dim),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Change what Insights shows',
+              style: SpendWiseType.body.copyWith(
+                fontSize: 12.5,
+                color: SpendWiseColors.dim,
+              ),
+            ),
+          ),
+          const Icon(
+            Icons.chevron_right_rounded,
+            size: 16,
+            color: SpendWiseColors.dim,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// The header's one control: the period, named, with somewhere to go.
+///
+/// Deliberately built like one segment of the toggle it replaced, so the
+/// header still reads as a control rather than as a label that happens to be
+/// tappable.
+class _PeriodButton extends StatelessWidget {
+  const _PeriodButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label: 'Period: $label. Choose how far back Insights looks',
+    child: InkWell(
+      onTap: onTap,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border.all(color: SpendWiseColors.edge),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(11, 7, 7, 7),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label.toUpperCase(),
+                style: const TextStyle(
+                  fontFamily: SpendWiseType.sans,
+                  fontSize: 10,
+                  letterSpacing: 1.2,
+                  fontWeight: FontWeight.w700,
+                  color: SpendWiseColors.fg,
+                ),
+              ),
+              const SizedBox(width: 5),
+              const Icon(
+                Icons.expand_more_rounded,
+                size: 14,
+                color: SpendWiseColors.dim,
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 class FlowSpine extends StatelessWidget {
   const FlowSpine({
     super.key,
     required this.buckets,
     required this.currency,
-    this.height = 252,
+    this.height = 237,
     this.spendingOnly = false,
   });
 
@@ -213,11 +405,11 @@ class FlowSpine extends StatelessWidget {
 
   /// True while a single category is being looked at.
   ///
-  /// Income is not attributed to categories -- a salary is not "Groceries" --
-  /// so a filtered bucket carries no income at all. Drawing the usual net
-  /// figure from it would print `0 - spending`: a confident rust number that
-  /// says the day lost money, on a day the salary may well have landed. The
-  /// spine then shows the one thing it can honestly show, and says so.
+  /// Income is not attributed to categories — a salary is not "Groceries"
+  /// — so a filtered bucket carries no income at all. That zero must not
+  /// be allowed to set the scale: measuring the columns against an income
+  /// peak of nothing would draw every day's spending at full height. Filtered,
+  /// the spine scales to spending alone and shows only the arm it has.
   final bool spendingOnly;
 
   @override
@@ -233,8 +425,30 @@ class FlowSpine extends StatelessWidget {
       ),
     );
     // Wide enough that a column is readable, narrow enough that a year of
-    // months does not need six swipes.
-    final columnWidth = buckets.length > 18 ? 34.0 : 46.0;
+    // months does not need six swipes — but never narrower than the widest
+    // figure it has to print. A fixed 46 was clipping the label on any day
+    // large enough to be worth looking at, which is exactly the wrong day to
+    // lose a digit on. The spine scrolls, so paying for the width is cheap.
+    final base = buckets.length > 18 ? 34.0 : 46.0;
+    final widest = buckets.fold<double>(0, (best, bucket) {
+      var worst = best;
+      // Measured under the same conditions the labels are drawn under, so a
+      // figure that is not printed cannot widen the column.
+      if (bucket.incomeMinor > 0) {
+        worst = math.max(
+          worst,
+          _tickWidth(formatMinor(bucket.incomeMinor, cents: false)),
+        );
+      }
+      if (bucket.spendingMinor > 0) {
+        worst = math.max(
+          worst,
+          _tickWidth(formatMinor(bucket.spendingMinor, cents: false)),
+        );
+      }
+      return worst;
+    });
+    final columnWidth = math.max(base, widest + 8);
 
     return SizedBox(
       height: height,
@@ -283,12 +497,6 @@ class _SpineColumn extends StatelessWidget {
         ? 0.0
         : (bucket.incomeMinor / peak) * armHeight;
     final outHeight = (bucket.spendingMinor / peak) * armHeight;
-    // Filtered, the only honest figure is what left. `income - spending` on a
-    // bucket that was never given any income is not a net; it is the spending
-    // with a minus sign in front of it.
-    final tick = spendingOnly
-        ? -bucket.spendingMinor
-        : bucket.incomeMinor - bucket.spendingMinor;
     return Semantics(
       label: spendingOnly
           ? '${bucket.label}: ${formatMinor(bucket.spendingMinor)} out'
@@ -353,20 +561,32 @@ class _SpineColumn extends StatelessWidget {
               ),
             ),
             const Spacer(),
+            // The date, and nothing else. A net figure used to sit under it,
+            // repeating in one cramped line what the two arms above already
+            // say in full, and doing it in a third colour.
             _Tick(
               text: bucket.label,
               color: latest ? SpendWiseColors.fg : SpendWiseColors.dim,
-            ),
-            const SizedBox(height: 3),
-            _Tick(
-              text: formatMinor(tick, signed: true, cents: false),
-              color: tick >= 0 ? SpendWiseColors.keep : SpendWiseColors.spend,
             ),
           ],
         ),
       ),
     );
   }
+}
+
+/// The printed width of one spine figure.
+///
+/// A column has to be at least as wide as the widest number it will print,
+/// and the only way to know that is to lay the text out. Estimating it from
+/// the character count is what clipped large days.
+double _tickWidth(String text) {
+  final painter = TextPainter(
+    text: TextSpan(text: text, style: _Tick.style),
+    maxLines: 1,
+    textDirection: TextDirection.ltr,
+  )..layout();
+  return painter.width;
 }
 
 /// A one-line figure on the spine, in a box tall enough for exactly one line.
@@ -378,6 +598,14 @@ class _Tick extends StatelessWidget {
   });
 
   static const height = 12.0;
+
+  /// Shared with [_tickWidth]. If the label and the measurement ever drift
+  /// apart, columns go back to being sized for text they do not contain.
+  static final style = SpendWiseType.metaTight.copyWith(
+    fontSize: 8.5,
+    letterSpacing: .2,
+    height: 1.15,
+  );
 
   final String text;
   final Color color;
@@ -393,12 +621,7 @@ class _Tick extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.clip,
         softWrap: false,
-        style: SpendWiseType.metaTight.copyWith(
-          fontSize: 8.5,
-          letterSpacing: .2,
-          height: 1.15,
-          color: color,
-        ),
+        style: style.copyWith(color: color),
       ),
     ),
   );
@@ -505,14 +728,23 @@ class _SummaryItem extends StatelessWidget {
 /// trimmed every sweep by a fixed amount so the segments would separate,
 /// which could clip a small category to nothing while its row still printed
 /// a confident 1%.
-class _CategoryBreakdown extends StatelessWidget {
-  const _CategoryBreakdown(this.analytics);
+/// The original breakdown: one bar to true proportion, then every category
+/// by name. Public because the chooser previews it beside the dial and the
+/// desk, and a preview drawn from a copy of the real thing is a preview that
+/// can drift from it.
+class CategoryBars extends StatelessWidget {
+  const CategoryBars({
+    super.key,
+    required this.analytics,
+    required this.tones,
+    required this.selected,
+    required this.onSelect,
+  });
 
   final SpendingAnalytics analytics;
-
-  /// The one ramp, so this bar, the bar on Home and the category rows all
-  /// agree about which colour a category is.
-  static List<Color> get colors => SpendWiseColors.categoryRamp;
+  final CategoryTones tones;
+  final String? selected;
+  final ValueChanged<String?> onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -539,45 +771,82 @@ class _CategoryBreakdown extends StatelessWidget {
               for (final item in shown)
                 total == 0 ? 1 : item.amountMinor / total,
             ],
-            colors: [
-              for (var i = 0; i < shown.length; i++) colors[i % colors.length],
-            ],
+            // Through the tones, like every other swatch. The bar used to
+            // take the raw ramp and wrap at eight while the dot beside each
+            // row stepped the tone down instead, so from the ninth category
+            // on, a row's dot and its slice of the bar were different
+            // colours -- the chart disagreeing with itself.
+            colors: [for (final item in shown) tones.of(item.category)],
           ),
         ),
         const SizedBox(height: 4),
-        for (var i = 0; i < shown.length; i++)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              children: [
-                Container(
-                  width: 9,
-                  height: 9,
-                  color: SpendWiseColors.category(i),
-                ),
-                const SizedBox(width: 11),
-                Expanded(
-                  child: Text(
-                    shown[i].category,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: SpendWiseType.row,
-                  ),
-                ),
-                Text(
-                  formatAmount(
-                    MoneyViewData(
-                      shown[i].amountMinor,
-                      currency: analytics.currency,
-                    ),
-                    cents: false,
-                  ),
-                  style: SpendWiseType.rowStrong,
-                ),
-              ],
-            ),
+        for (final item in shown)
+          _BreakdownRow(
+            item: item,
+            currency: analytics.currency,
+            tone: tones.of(item.category),
+            // Nothing is dimmed while nothing is selected, so the list reads
+            // at full strength until someone actually asks a narrower
+            // question.
+            faded: selected != null && selected != item.category,
+            // Tapping the selected row again clears the filter, which is the
+            // only way back out without hunting for the "All spending" chip.
+            onTap: () =>
+                onSelect(selected == item.category ? null : item.category),
           ),
       ],
     );
   }
+}
+
+class _BreakdownRow extends StatelessWidget {
+  const _BreakdownRow({
+    required this.item,
+    required this.currency,
+    required this.tone,
+    required this.faded,
+    required this.onTap,
+  });
+
+  final CategoryAnalytics item;
+  final String currency;
+  final Color tone;
+  final bool faded;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    child: AnimatedOpacity(
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 220),
+      curve: Curves.easeOut,
+      opacity: faded ? .38 : 1,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Container(width: 9, height: 9, color: tone),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Text(
+                item.category,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: SpendWiseType.row,
+              ),
+            ),
+            Text(
+              formatAmount(
+                MoneyViewData(item.amountMinor, currency: currency),
+                cents: false,
+              ),
+              style: SpendWiseType.rowStrong,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }

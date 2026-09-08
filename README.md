@@ -109,6 +109,13 @@ to deliver becomes one decision with the same three answers: attach them to an
 account, file them as transactions, or drop them. Dropping is the only answer
 with no other way back, so it is the one that offers Undo.
 
+**Shows you the shape of a month, the way you want to read it.** Insights
+answers three questions and each one can be switched off: the days themselves,
+where the money went, and what changed since last period. The breakdown draws
+as bars, as a dial, or as a fader per category — the same figures, three ways.
+"This month" means the 1st to today, compared against the same number of days
+in the month before, so the 3rd never looks like a collapse in spending.
+
 **Learns where things go.** File the same shop or person under the same
 category three times and SpendWise starts doing it for you. Disagree once and
 it stops.

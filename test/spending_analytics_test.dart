@@ -8,7 +8,7 @@ void main() {
     () {
       final analytics = SpendingAnalytics.calculate(
         now: DateTime(2026, 8, 22, 18),
-        resolution: AnalyticsResolution.last7Days,
+        resolution: AnalyticsResolution.thisWeek,
         transactions: [
           _transaction(
             'food',
@@ -48,7 +48,10 @@ void main() {
         ],
       );
 
-      expect(analytics.buckets, hasLength(7));
+      // Saturday the 22nd, so the calendar week runs Monday the 17th to
+      // today: six days, not a rolling seven. The comparison window is the
+      // first six days of the week before, which is where the 10,000 sits.
+      expect(analytics.buckets, hasLength(6));
       expect(analytics.totalSpendingMinor, 15000);
       expect(analytics.totalIncomeMinor, 50000);
       expect(analytics.previousSpendingMinor, 10000);

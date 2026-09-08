@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/category_tones.dart';
 import '../../app/theme.dart';
 import '../../main.dart';
 import '../../widgets/shape_kit.dart';
@@ -71,6 +72,9 @@ class DashboardScreen extends StatelessWidget {
     // One fold, read by both the bar and the rows, so the picture and the
     // list can never disagree about what is on screen.
     final categories = categoriesForHome(data.categorySpending, categoryStyle);
+    // Keyed to the ledger's own category order, so a category does not change
+    // colour because its spending rank moved between one period and the next.
+    final tones = viewModel.tonesFor(categories.map((item) => item.category));
     final categoryTotal = categories.fold<int>(
       0,
       (sum, item) => sum + item.amount.minorUnits,
@@ -260,8 +264,8 @@ class DashboardScreen extends StatelessWidget {
                                 : item.amount.minorUnits / categoryTotal,
                         ],
                         colors: [
-                          for (var i = 0; i < categories.length; i++)
-                            categoryColor(categories[i], i),
+                          for (final item in categories)
+                            categoryColor(item, tones),
                         ],
                       ),
                       const SizedBox(height: 6),
@@ -277,7 +281,7 @@ class DashboardScreen extends StatelessWidget {
                 itemCount: categories.length,
                 itemBuilder: (context, index) => CategoryRow(
                   item: categories[index],
-                  color: categoryColor(categories[index], index),
+                  color: categoryColor(categories[index], tones),
                   onTap: onSeeLedger,
                 ),
               ),
@@ -466,8 +470,8 @@ class _LegendEntry extends StatelessWidget {
 /// The folded remainder is deliberately not given the next colour in the ramp:
 /// it is not a sixth category, it is the absence of a list of them, and
 /// colouring it like one invites the reader to look for its name in the list.
-Color categoryColor(CategorySpendViewData item, int index) =>
-    isRemainder(item) ? SpendWiseColors.dim : SpendWiseColors.category(index);
+Color categoryColor(CategorySpendViewData item, CategoryTones tones) =>
+    isRemainder(item) ? SpendWiseColors.dim : tones.of(item.category);
 
 /// Public so the settings preview draws the real row rather than an imitation.
 class CategoryRow extends StatelessWidget {

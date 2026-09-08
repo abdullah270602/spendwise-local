@@ -47,7 +47,7 @@ void main() {
     expect(find.textContaining('cannot go online'), findsNothing);
   });
 
-  testWidgets('it is four cards, and each one changes something', (
+  testWidgets('it is five cards, and each one changes something', (
     tester,
   ) async {
     await pump(tester);
@@ -58,11 +58,56 @@ void main() {
     expect(find.text('Which apps talk about money?'), findsOneWidget);
 
     await tapOn(tester, 'Next');
+    expect(find.text('What name is on your alerts?'), findsOneWidget);
+    // More than one name variant is common and the field cannot be guessed
+    // at: showing a comma in the example is not the same as saying you may
+    // use one.
+    expect(find.text('Several? Use commas.'), findsOneWidget);
+
+    // The name is optional, and the button is where it says so: nothing has
+    // been typed, so the way forward is worded as skipping rather than as
+    // completing something.
+    expect(find.text('Skip for now'), findsOneWidget);
+    await tapOn(tester, 'Skip for now');
     expect(find.text('Add as many as you like.'), findsOneWidget);
 
-    // Four cards and then out: nothing further to page to.
+    // Five cards and then out: nothing further to page to.
     expect(find.text('Next'), findsNothing);
     expect(find.text('Open SpendWise'), findsOneWidget);
+  });
+
+  testWidgets('a name typed at setup is kept, and reconciles', (tester) async {
+    // It reaches storage only when the card is left. Anything else is a
+    // database write per keystroke.
+    final model = _NameRecorder();
+    await pump(tester, model: model);
+    for (final label in ['Set it up', 'Next', 'Next']) {
+      await tapOn(tester, label);
+    }
+    await tester.enterText(find.byType(TextField), 'AMINA R KHAN, A KHAN');
+    await tester.pumpAndSettle();
+
+    // Typing changes what the button offers to do.
+    expect(find.text('Skip for now'), findsNothing);
+    await tapOn(tester, 'Next');
+
+    expect(model.ownNamesSet, ['AMINA R KHAN', 'A KHAN']);
+  });
+
+  testWidgets('an empty name is not stored as one', (tester) async {
+    // A stray space must not become a name that matches every counterparty
+    // it is asked about.
+    final model = _NameRecorder();
+    await pump(tester, model: model);
+    for (final label in ['Set it up', 'Next', 'Next']) {
+      await tapOn(tester, label);
+    }
+    await tester.enterText(find.byType(TextField), '   ,  ');
+    await tester.pumpAndSettle();
+    expect(find.text('Skip for now'), findsNothing);
+    await tapOn(tester, 'Next');
+
+    expect(model.ownNamesSet, isNull, reason: 'nothing worth storing');
   });
 
   testWidgets('the permission card names the warning before Android does', (
@@ -84,7 +129,7 @@ void main() {
 
   testWidgets('it ends on a result, not on a list of chores', (tester) async {
     final model = await pump(tester);
-    for (final label in ['Set it up', 'Next', 'Next']) {
+    for (final label in ['Set it up', 'Next', 'Next', 'Skip for now']) {
       await tapOn(tester, label);
     }
 
@@ -102,7 +147,7 @@ void main() {
 
   testWidgets('nothing off the golden path is asked for', (tester) async {
     await pump(tester);
-    for (final label in ['Set it up', 'Next', 'Next']) {
+    for (final label in ['Set it up', 'Next', 'Next', 'Skip for now']) {
       await tapOn(tester, label);
     }
     // A PIN and your own name matter, but not before the app has done
@@ -117,7 +162,7 @@ void main() {
     // The half of setup that decides whether an alert ever finds its way
     // home. It used to be three screens deep in Settings.
     await pump(tester, model: _Recorder(accounts: const []));
-    for (final label in ['Set it up', 'Next', 'Next']) {
+    for (final label in ['Set it up', 'Next', 'Next', 'Skip for now']) {
       await tapOn(tester, label);
     }
     expect(find.text('Which app tells you about it?'), findsOneWidget);
@@ -128,7 +173,7 @@ void main() {
 
   testWidgets('you can keep adding accounts, not just the one', (tester) async {
     await pump(tester);
-    for (final label in ['Set it up', 'Next', 'Next']) {
+    for (final label in ['Set it up', 'Next', 'Next', 'Skip for now']) {
       await tapOn(tester, label);
     }
     // One already exists, so the form is folded away behind an offer.
@@ -145,7 +190,7 @@ void main() {
 
   testWidgets('an account with nothing watching it says so', (tester) async {
     await pump(tester);
-    for (final label in ['Set it up', 'Next', 'Next']) {
+    for (final label in ['Set it up', 'Next', 'Next', 'Skip for now']) {
       await tapOn(tester, label);
     }
     // Silently listing an account that can never receive an alert is how
@@ -240,9 +285,12 @@ void main() {
   });
 }
 
-/// Every headline and sentence the four cards can show, kept here so the
+/// Every headline and sentence the five cards can show, kept here so the
 /// budget is checkable. Labels on buttons and fields are not prose.
 const _onboardingCopy = [
+  'What name is on your alerts?',
+  'Only to spot money you send yourself.',
+  'Several? Use commas.',
   'Your bank already tells you everything.',
   'Android is about to warn you.',
   'It will say SpendWise can read every notification. It reads only the apps '
@@ -330,4 +378,31 @@ class _Recorder extends ChangeNotifier implements SpendWiseViewModel {
   Future<void> saveManualTransaction(ManualTransactionDraft d) async {}
   @override
   Future<void> setSourceEnabled(String packageName, bool enabled) async {}
+}
+
+/// Own names live on the advanced half of the interface, and only the name
+/// card reaches for them. Kept as a separate fake rather than folded into
+/// [_Recorder]: making that one "advanced" would route every other advanced
+/// call away from the safe defaults the plain interface falls back to, and
+/// silently change what a dozen unrelated tests are exercising.
+class _NameRecorder extends _Recorder implements SpendWiseAdvancedViewModel {
+  /// Null until something is actually written, so a test can tell "stored an
+  /// empty list" apart from "never stored anything".
+  List<String>? ownNamesSet;
+
+  @override
+  List<String> get ownNames => ownNamesSet ?? const [];
+
+  @override
+  Future<void> setOwnNames(List<String> names) async => ownNamesSet = names;
+
+  /// What the plain interface fell back to, kept identical so this fake
+  /// differs from [_Recorder] in exactly one respect.
+  @override
+  bool isSharedSource(String packageName) => false;
+
+  /// Anything else the advanced interface offers throws rather than quietly
+  /// answering, so a card that starts reaching for something new says so.
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

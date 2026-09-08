@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spendwise/app/theme.dart';
+import 'package:spendwise/features/insights/chronograph.dart';
 import 'package:spendwise/features/insights/insights_screen.dart';
 import 'package:spendwise/features/shell/spendwise_view_model.dart';
-import 'package:spendwise/widgets/shape_kit.dart';
 
 void main() {
   testWidgets('insights switches resolution and filters a category', (
@@ -38,8 +38,19 @@ void main() {
     await tester.drag(find.byType(CustomScrollView), const Offset(0, 1000));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('7 DAYS'));
+    // The period is chosen on its own screen now, with a preview, because
+    // four segments named honestly do not fit across a phone.
+    expect(find.text('THIS MONTH'), findsOneWidget);
+    await tester.tap(find.text('THIS MONTH'));
     await tester.pumpAndSettle();
+    expect(find.text('How far back Insights looks'), findsOneWidget);
+
+    await tester.tap(find.text('This week'));
+    await tester.pumpAndSettle();
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    expect(find.text('THIS WEEK'), findsOneWidget);
     expect(find.text('Average per day'), findsOneWidget);
   });
 
@@ -67,8 +78,12 @@ void main() {
     expect(find.text('SPENT IN THIS VIEW'), findsNothing);
     expect(
       find.text('WHERE YOUR MONEY WENT'),
-      findsNothing,
-      reason: 'a breakdown of one category is that category',
+      findsOneWidget,
+      reason:
+          'the breakdown stays: it is computed across every category '
+          'regardless of the filter, so taking the whole picture away at '
+          'the moment someone examines one part of it cost them context '
+          'and bought nothing',
     );
   });
 
@@ -90,10 +105,11 @@ void main() {
     expect(find.textContaining('lent, borrowed or held'), findsOneWidget);
   });
 
-  testWidgets('the breakdown is drawn the way Home draws it', (tester) async {
-    // A donut said the same six numbers the list beside it already stated,
-    // through a weaker channel, and trimmed each sweep by a fixed amount --
-    // which could clip a small category to nothing while its row printed 1%.
+  testWidgets('the breakdown opens on the dial', (tester) async {
+    // This used to assert the bar, back when the bar was the only breakdown
+    // there was. There are now three, chosen in settings, and which one each
+    // choice produces is covered in insights_sections_honoured_test. What is
+    // worth pinning here is the default a first run meets.
     await tester.pumpWidget(
       MaterialApp(
         theme: SpendWiseTheme.dark,
@@ -104,9 +120,63 @@ void main() {
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
     await tester.pumpAndSettle();
 
-    expect(find.byType(SegmentBar), findsWidgets);
-    expect(find.textContaining('categories'), findsNothing);
+    expect(find.byType(Chronograph), findsOneWidget);
+    expect(
+      find.byType(CategoryBars),
+      findsNothing,
+      reason: 'two answers to one question drawn at once',
+    );
   });
+
+  testWidgets('the header survives a 360px phone', (tester) async {
+    // The resolution toggle sits in a Row beside the title, so its labels
+    // and the title compete for one line. At the test default of 800x600
+    // there is room for anything; on a real phone there is not, and a
+    // RenderFlex overflow here fails this test rather than shipping a
+    // black-and-yellow bar down the side of Insights.
+    _phoneSized(tester);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: Scaffold(body: InsightsScreen(viewModel: _InsightsModel())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('THIS MONTH'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the spine prints the date and no second figure', (tester) async {
+    // A net figure used to sit under every date, restating in one clipped
+    // line what the two arms above already draw in full. The dates stay.
+    _phoneSized(tester);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: Scaffold(body: InsightsScreen(viewModel: _InsightsModel())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final spine = find.byType(FlowSpine);
+    expect(spine, findsOneWidget);
+    expect(
+      find.descendant(of: spine, matching: find.textContaining('+')),
+      findsNothing,
+      reason: 'the signed net figure is gone from the spine',
+    );
+  });
+}
+
+/// Every previous widget test here ran at the 800x600 default, where a header
+/// can hold almost anything. The four-way period toggle overflowed a real
+/// 360px phone by 108 pixels and no test noticed, because no test was ever
+/// the size of a phone.
+void _phoneSized(WidgetTester tester) {
+  tester.view.physicalSize = const Size(1080, 2400);
+  tester.view.devicePixelRatio = 3;
+  addTearDown(tester.view.reset);
 }
 
 class _InsightsModel extends ChangeNotifier implements SpendWiseViewModel {

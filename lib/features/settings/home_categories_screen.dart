@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/category_tones.dart';
 import '../../widgets/chooser_kit.dart';
 import '../dashboard/home_categories.dart';
 import '../dashboard/home_preview.dart';
@@ -41,7 +42,13 @@ class _HomeCategoriesScreenState extends State<HomeCategoriesScreen> {
 
     return ChooserScreen(
       title: 'Categories on Home',
-      preview: CategoryPreview(spending: spending, style: current),
+      preview: CategoryPreview(
+        spending: spending,
+        style: current,
+        // The preview draws Home's real colours, not a positional imitation
+        // of them.
+        tones: viewModel.tonesFor(spending.map((item) => item.category)),
+      ),
       children: [
         ChoiceGroup(
           label: 'Under the figures',

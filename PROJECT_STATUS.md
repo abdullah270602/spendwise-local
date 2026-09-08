@@ -1,20 +1,20 @@
 # SpendWise project handoff
 
-Last updated: 2026-09-07
+Last updated: 2026-09-08
 
 ## Current release
 
-- Version: `0.9.12+27`
+- Version: `0.9.13+28`
 - Android package: `com.spendwise.app` — keep this stable so upgrades retain data.
 - Public repository: <https://github.com/abdullah270602/spendwise-local>
-- Latest release: <https://github.com/abdullah270602/spendwise-local/releases/tag/v0.9.12>
+- Latest release: <https://github.com/abdullah270602/spendwise-local/releases/tag/v0.9.13>
 - Shipped APK is the optimized split-per-ABI release build, not a Flutter debug
   build. Build with `flutter build apk --release --split-per-abi`; a plain
   `--release` writes only the universal APK and leaves the per-ABI files from
   the *previous* build sitting in the output directory, which is an easy way to
   install a stale binary and believe it is current. Check the APK's mtime
   against the commit before installing.
-- Split-per-ABI adds 2000 to the version code for arm64: `27` becomes `2027`.
+- Split-per-ABI adds 2000 to the version code for arm64: `28` becomes `2028`.
 - Installed on the connected Pixel 9 at this version, with `adb install -r`.
 
 ## Known reliability issues
@@ -151,6 +151,43 @@ in `AGENTS.md`. In particular:
 - Local deterministic categorization including entertainment, subscriptions,
   dining, groceries, bills/utilities, fees, cash withdrawal, health, education,
   travel, insurance, government/taxes, income, and transfers.
+- Insights is three questions, each answered separately and each able to be
+  turned off: **over time** (the spine of days), **where your money went**
+  (bars, the Chronograph dial, or the Mixing Desk fader bank), and **what
+  changed** against the previous period (the Seismograph trace or the Gate's
+  corridor). "What changed" is off by default — it is the only section that
+  makes a claim about the past rather than reporting the present.
+- Insights' two day windows are calendar-aligned, not rolling: **this week**
+  is Monday to today and **this month** is the 1st to today. The comparison
+  window is cut to the same number of elapsed days, so the 3rd of a month is
+  measured against the first three days of the previous month rather than
+  against all thirty-one. Rolling windows named "This month" would have been
+  showing most of the previous month under this month's name.
+- The period is chosen through a chooser with a live preview, not a segmented
+  control. Four segments named honestly want 424 logical pixels and a 360px
+  phone has 316; the old four-way toggle had been overflowing a real phone by
+  108px unnoticed, because every widget test ran at the 800x600 default.
+- A category's colour is keyed to the ledger's own category order
+  (`CategoryTones`, `lib/app/category_tones.dart`), not to its position in
+  whatever list is being drawn. Position moved every time spending did, so a
+  category changed colour between one period and the next, and two screens
+  showing the same month could disagree.
+- Selecting a category no longer hides the breakdown. The totals behind it are
+  computed across every category regardless of the filter, so the picture can
+  stay on screen, dimmed, at the moment somebody is examining one part of it.
+- Appearance is one door in Settings covering Home, Insights and colour.
+  Colour is no longer filed under "Home": it repaints the whole app and only
+  lived there because that was the section that existed.
+- Onboarding asks for the account holder's name on a fifth card, optional and
+  visibly so — the button reads "Skip for now" until something is typed. Own
+  names feed `OwnIdentity`, which is how the reconciler recognises a transfer
+  between the user's own accounts. Asking at setup matters because
+  reconciliation runs on ingest and skips anything already resolved by hand:
+  a transfer misfiled while this was blank and then corrected manually can
+  never be re-derived correctly, whatever is typed later.
+- `setOwnNames` now reconciles. It previously wrote the names and stopped, so
+  nothing changed until the next bank alert happened to arrive and the setting
+  looked broken for the whole gap.
 - Local export, insights, notification-source health, demo-data controls, and
   Settings version/build display with a user-invoked GitHub link.
 
@@ -172,7 +209,7 @@ invalidation behavior when changing the shell/controller.
 
 ## Verification baseline
 
-At `0.9.12`, the analyzer is clean and all 413 tests pass. Before shipping:
+At `0.9.13`, the analyzer is clean and all 516 tests pass. Before shipping:
 
 1. Run `dart format` on changed Dart files.
 2. Run `flutter analyze --no-pub`.
@@ -202,9 +239,38 @@ current configured paths rather than assume another user's home directory.
 - **Reduced motion is not automatic.** A raw `TweenAnimationBuilder` gets none
   of the help Flutter gives the `Animated*` widgets; it has to be honoured by
   hand or it is not honoured at all.
+- **Test at the size of a phone.** Every widget test ran at the 800x600
+  default, where a header can hold almost anything, and the Insights period
+  toggle had been overflowing a real 360px device by 108 pixels with nothing
+  to catch it. A layout assertion is worth only as much as the viewport it
+  was made in.
+- **A label is a claim about the data.** Renaming a rolling thirty-day window
+  to "This month" is not a copy change; it is either a lie or a reason to
+  change the window. The window was changed.
+- **A test double that throws is doing its job.** Six fakes refused a member
+  the app had never asked them for, which is how a new dependency announces
+  itself. Widening one of them from the plain interface to the advanced one
+  silently reroutes every other call away from the safe defaults a dozen
+  unrelated tests are relying on — give the new need its own fake instead.
+- **Percentages rank the wrong things.** A category that went from 350 to 900
+  has risen further in percent than one that rose by 6,500 rupees, and only
+  one of those belongs at the top of a list. Order by money moved, and gate
+  "did this matter" on an absolute floor as well as a percentage.
 
 ## Open work
 
+- **Two widget contracts are narrower than their designs.** The Chronograph's
+  hub cannot name the period because the period is not passed to it, and the
+  Mixing Desk cannot draw dead channels — a channel that exists with nothing
+  spent on it this period — because it receives only the active categories.
+  `CategoryTones` already holds the full list; it just does not expose it.
+  Until then the desk's channel numbers skip.
+- **The PDF report work is on the `pdf-report-templates` branch, not `main`.**
+  It fixes a real defect (the old template was a fixed `pw.Page`, so a busy
+  month could push content off the physical page rather than clip) and adds
+  three templates and paper-safe colours, with tests that read page counts out
+  of the generated bytes. It is held back because the user deferred reviewing
+  the template designs, not because anything is wrong with it.
 - **Screenshots are stale.** `assets/screenshots/*` still show the pre-`0.9.8`
   Home and Accounts, including the retired "TOTAL TRACKED" and
   "HELD BACK · SAVINGS" labels. Retake from the sandbox install with demo data

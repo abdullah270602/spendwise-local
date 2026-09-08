@@ -7,6 +7,12 @@ import 'package:spendwise/features/shell/spendwise_view_model.dart';
 /// before Insights was merged into one view, and both of which the tests
 /// written alongside that merge would have sailed past.
 void main() {
+  // Pinned rather than relative to today. These windows are calendar-aligned
+  // now, so "yesterday" falls outside this month on the 1st -- a test that
+  // passes thirty days a month and fails on the thirty-first is worse than
+  // no test at all.
+  final anchor = DateTime(2026, 3, 15);
+
   TransactionViewData tx({
     required String id,
     required TransactionKind kind,
@@ -19,7 +25,7 @@ void main() {
     subtitle: '',
     amount: MoneyViewData(kind == TransactionKind.income ? minor : -minor),
     kind: kind,
-    occurredAt: DateTime.now().subtract(Duration(days: daysAgo)),
+    occurredAt: anchor.subtract(Duration(days: daysAgo)),
     category: category,
     accountId: 'bank',
   );
@@ -47,7 +53,8 @@ void main() {
     test('unfiltered, the buckets carry the income', () {
       final all = SpendingAnalytics.calculate(
         transactions: ledger,
-        resolution: AnalyticsResolution.last30Days,
+        resolution: AnalyticsResolution.thisMonth,
+        now: anchor,
       );
       expect(
         all.buckets.fold<int>(0, (sum, b) => sum + b.incomeMinor),
@@ -58,8 +65,9 @@ void main() {
     test('filtered, they carry none — so no net may be drawn from them', () {
       final filtered = SpendingAnalytics.calculate(
         transactions: ledger,
-        resolution: AnalyticsResolution.last30Days,
+        resolution: AnalyticsResolution.thisMonth,
         category: 'Entertainment',
+        now: anchor,
       );
 
       expect(

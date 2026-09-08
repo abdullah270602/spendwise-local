@@ -817,6 +817,12 @@ final class SpendWiseController extends ChangeNotifier
   @override
   Future<void> setOwnNames(List<String> names) => _runBusy(() async {
     _ledger.setOwnNames(names);
+    // Reconciliation is the only thing that reads these, and it runs on
+    // ingest -- so without this, naming yourself changed nothing until the
+    // next bank alert happened to arrive, and the setting looked broken
+    // because for the whole gap it was. Everything already resolved by hand
+    // stays as the user left it; that is what `locked` is for.
+    _ledger.reconcilePendingEvidence();
   });
 
   /// One Review rule, applied to every alert it covers, with a single
