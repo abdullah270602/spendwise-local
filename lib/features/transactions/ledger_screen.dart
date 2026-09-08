@@ -142,6 +142,13 @@ class _LedgerScreenState extends State<LedgerScreen> {
           // that could never reconcile with the entries beneath it.
           if (scoped && view == _LedgerView.river) ...[
             SliverToBoxAdapter(
+              // Deliberately counts debt movements, unlike every figure on
+              // Insights. This is a heading over a list of what moved, not a
+              // reading of what was earned and spent: money held for somebody
+              // else really did arrive and really did leave, and a total that
+              // omitted it could not be reconciled against the rows beneath
+              // it -- which is the exact fault this heading was moved here to
+              // fix.
               child: RiverHeading(
                 inTotal: visible
                     .where((item) => item.kind == TransactionKind.income)

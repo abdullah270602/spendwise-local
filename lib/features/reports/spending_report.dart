@@ -8,59 +8,18 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../../app/category_tones.dart';
+import '../../app/theme.dart';
 import '../../app/palette.dart';
 import '../shell/spendwise_view_model.dart';
+import 'report_hero.dart';
+import 'report_hero_desk.dart';
+import 'report_hero_dial.dart';
+import 'report_hero_ribbon.dart';
+import 'report_hero_trace.dart';
 
 /// How much of the ledger a report covers.
 enum ReportRange { thisMonth, lastThreeMonths, thisYear, everything, custom }
-
-/// What the report looks like. Five editorial takes on the same numbers,
-/// because "a PDF of my spending" means different things to different
-/// people: the shape of a month, the full list, how it moved against last
-/// time, a claim ready to file, or a year read at a glance.
-enum ReportTemplate {
-  /// One page. What arrived, what stayed, what went, and where. Nothing you
-  /// would not want to hand to somebody.
-  shape,
-
-  /// The summary, then every transaction, day by day. Runs to as many pages
-  /// as the period needs.
-  statement,
-
-  /// This period against the one immediately before it, category by
-  /// category. For the question "shape" cannot answer: did this get better?
-  change,
-
-  /// Every expense, grouped and subtotalled by category, like a claim ready
-  /// to file rather than a diary of the month.
-  docket,
-
-  /// One tile per month, so a year -- or a decade -- reads at a glance.
-  almanac,
-}
-
-extension ReportTemplateCopy on ReportTemplate {
-  String get title => switch (this) {
-    ReportTemplate.shape => 'The shape',
-    ReportTemplate.statement => 'The statement',
-    ReportTemplate.change => 'The change',
-    ReportTemplate.docket => 'The docket',
-    ReportTemplate.almanac => 'The almanac',
-  };
-
-  String get blurb => switch (this) {
-    ReportTemplate.shape =>
-      'One page. What came in, what stayed, where the rest went.',
-    ReportTemplate.statement =>
-      'The summary, then every transaction, day by day.',
-    ReportTemplate.change =>
-      'This period against the one before it, category by category.',
-    ReportTemplate.docket =>
-      'Every expense, grouped and subtotalled by category.',
-    ReportTemplate.almanac =>
-      'One tile per month, so a year reads at a glance.',
-  };
-}
 
 extension ReportRangeCopy on ReportRange {
   String get title => switch (this) {
@@ -166,6 +125,13 @@ class _Totals {
     final categories = <String, int>{};
     final merchants = <String, int>{};
     for (final item in items) {
+      // Lending, being repaid, and holding money for somebody else move an
+      // account without being spending or income. The ledger already knows
+      // which those are, and Home and Insights both leave them out; this did
+      // not, so a month in which money passed through on its way to a
+      // relative reported it as income on arrival and as spending on the way
+      // out, and "Transfer" could outrank every real category on the page.
+      if (item.isLoanMovement) continue;
       final amount = item.amount.minorUnits.abs();
       switch (item.kind) {
         case TransactionKind.income:
@@ -248,6 +214,12 @@ class ReportData {
       previousSpentMinor <= 0 ? null : spentDeltaMinor / previousSpentMinor;
 
   bool get isEmpty => transactions.isEmpty;
+
+  /// True when the register lists something the figures deliberately do not
+  /// count, which is the moment the page owes the reader an explanation.
+  bool get hasExcludedMovements => transactions.any(
+    (item) => item.isLoanMovement || item.kind == TransactionKind.transfer,
+  );
 
   static ReportData gather({
     required ReportRequest request,
@@ -449,9 +421,18 @@ PdfColor paperTone(Color source) {
 /// palette's three tones only where they carry meaning. The typography is the
 /// app's, so it still reads as the same product.
 class SpendingReport {
-  const SpendingReport({required this.palette});
+  const SpendingReport({required this.palette, this.categoryOrder = const []});
 
   final SpendWisePalette palette;
+
+  /// The ledger's own category list, in its own order.
+  ///
+  /// Threaded in so a category's tone and its channel number are decided the
+  /// same way here as on the screen. Derived from the report's own contents
+  /// instead, they would be stable across reprints of one report and nothing
+  /// else -- the same category would answer to a different number next month,
+  /// and to a third one on Insights.
+  final List<String> categoryOrder;
 
   static const _paper = PdfColor.fromInt(0xFFFAF9F6);
   static const _ink = PdfColor.fromInt(0xFF17191A);
@@ -496,21 +477,93 @@ class SpendingReport {
       theme: theme,
     );
 
-    switch (data.request.template) {
-      case ReportTemplate.shape:
-        document.addPage(_shapeDocument(data, sansBold, sansMedium, mono));
-      case ReportTemplate.statement:
-        document.addPage(_shapeDocument(data, sansBold, sansMedium, mono));
-        document.addPage(_registerPages(data, sansBold, sansMedium, mono));
-      case ReportTemplate.change:
-        document.addPage(_changeDocument(data, sansBold, sansMedium, mono));
-      case ReportTemplate.docket:
-        document.addPage(_docketPages(data, sansBold, sansMedium, mono));
-      case ReportTemplate.almanac:
-        document.addPage(_almanacPages(data, sansBold, sansMedium, mono));
-    }
+    final tones = CategoryTones(
+      known: categoryOrder,
+      present: data.byCategory.map((entry) => entry.key),
+    );
+    final paper = ReportPaper(
+      data: data,
+      sans: sans,
+      bold: sansBold,
+      mono: mono,
+      ink: _ink,
+      muted: _muted,
+      rule: _rule,
+      paper: _paper,
+      keep: _keep,
+      spend: _spend,
+      mine: _mine,
+      toneOf: (category) =>
+          paperTone(SpendWiseColors.category(tones.slotOf(category))),
+      channelOf: tones.channelOf,
+      money: _money,
+      width: PdfPageFormat.a4.width - _margin.left - _margin.right,
+    );
+
+    document.addPage(
+      _document(
+        data,
+        paper,
+        _heroFor(data.request.template),
+        sansBold,
+        sansMedium,
+        mono,
+      ),
+    );
     return document.save();
   }
+
+  /// The drawing that opens the document.
+  ReportHero _heroFor(ReportTemplate template) => switch (template) {
+    ReportTemplate.ribbon => const RibbonHero(),
+    ReportTemplate.dial => const DialHero(),
+    ReportTemplate.desk => const DeskHero(),
+    ReportTemplate.trace => const TraceHero(),
+  };
+
+  /// One document, whichever drawing opens it.
+  ///
+  /// Every template used to build its own pages, which is how the register
+  /// came to sit a few points tighter than the page above it and how "the
+  /// statement" ended up as two documents stapled together. The masthead, the
+  /// margins, the running header and the colophon are the document's; the
+  /// hero is the only thing that differs.
+  pw.MultiPage _document(
+    ReportData data,
+    ReportPaper paper,
+    ReportHero hero,
+    pw.Font bold,
+    pw.Font medium,
+    pw.Font mono,
+  ) => pw.MultiPage(
+    pageTheme: _pageTheme(),
+    header: (context) => context.pageNumber == 1
+        ? _cover(data, bold, mono)
+        : _continuationHeader(hero.template.title, data, bold, mono, context),
+    footer: (context) => _colophon(mono),
+    build: (context) => [
+      ...hero.build(paper),
+      if (data.transactions.isNotEmpty) ...[
+        pw.SizedBox(height: 26),
+        _eyebrow('Every entry', mono),
+        pw.SizedBox(height: 10),
+        ..._registerRows(data, medium, mono),
+      ],
+      // The register lists everything that moved; the figures above count
+      // only what was earned or spent. Without this line the two disagree by
+      // exactly the amount that was never anybody's, and the reader is left
+      // to work out which of them is lying.
+      if (data.hasExcludedMovements) ...[
+        pw.SizedBox(height: 18),
+        _footnote(
+          'Figures above exclude moves between your own accounts, and money '
+          'lent, borrowed or held for someone else. Those entries are still '
+          'listed, because the money really did move.',
+          mono,
+        ),
+      ],
+    ],
+  );
 
   // ---- shared page furniture -----------------------------------------------
 
@@ -620,19 +673,9 @@ class SpendingReport {
     ),
   );
 
-  pw.Widget _nothing(
-    pw.Font bold, [
-    String detail = 'No transactions fall inside these dates.',
-  ]) => pw.Column(
-    crossAxisAlignment: pw.CrossAxisAlignment.start,
-    children: [
-      pw.Text(
-        'Nothing moved in this period.',
-        style: pw.TextStyle(font: bold, fontSize: 17, color: _ink),
-      ),
-      pw.SizedBox(height: 8),
-      pw.Text(detail, style: const pw.TextStyle(fontSize: 10, color: _muted)),
-    ],
+  pw.Widget _footnote(String text, pw.Font mono) => pw.Text(
+    text,
+    style: pw.TextStyle(font: mono, fontSize: 7.5, color: _muted, height: 1.5),
   );
 
   pw.Widget _colophon(pw.Font mono) => pw.Container(
@@ -652,368 +695,14 @@ class SpendingReport {
     ),
   );
 
-  /// A proportional bar drawn from flex ratios rather than fixed widths, so
-  /// it holds its shape at any column width. Shared by "the change" and "the
-  /// almanac", both of which pair two amounts against a common scale.
-  pw.Widget _bar(int amountMinor, int maxMinor, PdfColor tone) {
-    const total = 1000;
-    final used = maxMinor <= 0
-        ? 0
-        : ((amountMinor / maxMinor) * total).round().clamp(0, total);
-    return pw.Row(
-      children: [
-        if (used > 0)
-          pw.Expanded(
-            flex: used,
-            child: pw.Container(height: 5, color: tone),
-          ),
-        if (used < total)
-          pw.Expanded(flex: total - used, child: pw.SizedBox(height: 5)),
-      ],
-    );
-  }
-
   // ---- the shape ------------------------------------------------------
-
-  /// Built as a [pw.MultiPage] rather than a fixed [pw.Page]: the curation
-  /// (top categories, top merchants, a bounded day count) keeps this to one
-  /// page for almost every real period, but a fixed page does not clip
-  /// overflow -- it draws past the margin box in page-absolute coordinates,
-  /// which can push the masthead itself off the top of the sheet. A
-  /// MultiPage instead spills onto a quiet second page, so a period unusual
-  /// enough to overflow still prints something legible rather than
-  /// something silently missing its top half.
-  pw.MultiPage _shapeDocument(
-    ReportData data,
-    pw.Font bold,
-    pw.Font medium,
-    pw.Font mono,
-  ) => pw.MultiPage(
-    pageTheme: _pageTheme(),
-    header: (context) => context.pageNumber == 1
-        ? _cover(data, bold, mono)
-        : _continuationHeader('The shape', data, bold, mono, context),
-    footer: (context) => _colophon(mono),
-    build: (context) => data.isEmpty
-        ? [_nothing(bold)]
-        : [
-            _eyebrow('What happened to it', mono),
-            pw.SizedBox(height: 10),
-            pw.SizedBox(
-              height: 150,
-              width: double.infinity,
-              child: pw.CustomPaint(
-                painter: (canvas, size) => _paintFlow(canvas, size, data),
-              ),
-            ),
-            pw.SizedBox(height: 14),
-            _legend(data, bold, mono),
-            pw.SizedBox(height: 30),
-            // Inseparable, because a Column is spanning-capable by default in
-            // this package: without it, a section that lands right on a page
-            // boundary loses its eyebrow to the page above and its content
-            // to the page below, rather than moving as one block.
-            pw.Inseparable(child: _categories(data, bold, medium, mono)),
-            pw.SizedBox(height: 26),
-            pw.Inseparable(child: _dailySpine(data, medium, mono)),
-            pw.SizedBox(height: 26),
-            pw.Inseparable(child: _merchants(data, medium, mono)),
-          ],
-  );
-
-  pw.Widget _legend(ReportData data, pw.Font bold, pw.Font mono) => pw.Row(
-    crossAxisAlignment: pw.CrossAxisAlignment.start,
-    children: [
-      pw.Expanded(
-        child: _figure(
-          'Still yours',
-          _money(data.keptMinor),
-          data.receivedMinor > 0
-              ? '${_percent(data.keptMinor, data.receivedMinor)} of what came in'
-              : 'nothing came in',
-          _ink,
-          bold,
-          mono,
-        ),
-      ),
-      pw.Expanded(
-        child: _figure(
-          'Gone',
-          _money(data.spentMinor),
-          _percent(data.spentMinor, data.receivedMinor),
-          _spend,
-          bold,
-          mono,
-        ),
-      ),
-      if (data.movedMinor > 0)
-        pw.Expanded(
-          child: _figure(
-            'Moved between your accounts',
-            _money(data.movedMinor),
-            'not counted as spending',
-            _mine,
-            bold,
-            mono,
-          ),
-        ),
-    ],
-  );
-
-  pw.Widget _figure(
-    String label,
-    String value,
-    String note,
-    PdfColor tone,
-    pw.Font bold,
-    pw.Font mono,
-  ) => pw.Column(
-    crossAxisAlignment: pw.CrossAxisAlignment.start,
-    children: [
-      _eyebrow(label, mono),
-      pw.SizedBox(height: 5),
-      pw.Text(
-        value,
-        style: pw.TextStyle(
-          font: bold,
-          fontSize: 19,
-          color: tone,
-          letterSpacing: -.6,
-        ),
-      ),
-      pw.SizedBox(height: 2),
-      pw.Text(note, style: pw.TextStyle(fontSize: 8.5, color: _muted)),
-    ],
-  );
-
-  pw.Widget _categories(
-    ReportData data,
-    pw.Font bold,
-    pw.Font medium,
-    pw.Font mono,
-  ) {
-    if (data.byCategory.isEmpty) return pw.SizedBox();
-    final total = data.byCategory.fold<int>(0, (sum, e) => sum + e.value);
-    final shown = data.byCategory.take(8).toList();
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Container(
-          decoration: const pw.BoxDecoration(
-            border: pw.Border(top: pw.BorderSide(color: _rule)),
-          ),
-          padding: const pw.EdgeInsets.only(top: 11),
-          child: pw.Row(
-            children: [
-              pw.Expanded(child: _eyebrow('Where it went', mono)),
-              _eyebrow('${data.byCategory.length} categories', mono),
-            ],
-          ),
-        ),
-        pw.SizedBox(height: 10),
-        pw.SizedBox(
-          height: 22,
-          child: pw.Row(
-            children: [
-              for (var i = 0; i < shown.length; i++) ...[
-                if (i > 0) pw.SizedBox(width: 2),
-                pw.Expanded(
-                  flex: shown[i].value < 1 ? 1 : shown[i].value,
-                  child: pw.Container(color: _ramp(i)),
-                ),
-              ],
-            ],
-          ),
-        ),
-        pw.SizedBox(height: 12),
-        for (var i = 0; i < shown.length; i++)
-          pw.Padding(
-            padding: const pw.EdgeInsets.only(bottom: 6),
-            child: pw.Row(
-              children: [
-                pw.Container(width: 7, height: 7, color: _ramp(i)),
-                pw.SizedBox(width: 9),
-                pw.Expanded(
-                  child: pw.Text(
-                    shown[i].key,
-                    style: pw.TextStyle(fontSize: 10, color: _ink),
-                  ),
-                ),
-                pw.Text(
-                  _percent(shown[i].value, total),
-                  style: pw.TextStyle(font: mono, fontSize: 8, color: _muted),
-                ),
-                pw.SizedBox(width: 14),
-                pw.Text(
-                  _money(shown[i].value),
-                  style: pw.TextStyle(font: medium, fontSize: 10, color: _ink),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-
-  /// Every day of the period, in above the line and out below it. On a page
-  /// this is what turns a summary into something you can actually read a month
-  /// off -- where the salary landed, which weeks were heavy.
-  pw.Widget _dailySpine(ReportData data, pw.Font medium, pw.Font mono) {
-    final from = data.request.from;
-    final days = data.request.to.difference(from).inDays + 1;
-    if (days < 2 || days > 400) return pw.SizedBox();
-
-    final incoming = List<int>.filled(days, 0);
-    final outgoing = List<int>.filled(days, 0);
-    for (final item in data.transactions) {
-      final index = item.occurredAt.toLocal().difference(from).inDays;
-      if (index < 0 || index >= days) continue;
-      final amount = item.amount.minorUnits.abs();
-      if (item.kind == TransactionKind.income) {
-        incoming[index] += amount;
-      } else if (item.kind == TransactionKind.expense) {
-        outgoing[index] += amount;
-      }
-    }
-    var peak = 1;
-    for (var i = 0; i < days; i++) {
-      peak = [peak, incoming[i], outgoing[i]].reduce((a, b) => a > b ? a : b);
-    }
-    if (peak <= 1) return pw.SizedBox();
-
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Container(
-          decoration: const pw.BoxDecoration(
-            border: pw.Border(top: pw.BorderSide(color: _rule)),
-          ),
-          padding: const pw.EdgeInsets.only(top: 11),
-          child: pw.Row(
-            children: [
-              pw.Expanded(child: _eyebrow('Day by day', mono)),
-              _eyebrow('in above, out below', mono),
-            ],
-          ),
-        ),
-        pw.SizedBox(height: 12),
-        pw.SizedBox(
-          height: 92,
-          width: double.infinity,
-          child: pw.CustomPaint(
-            painter: (canvas, size) =>
-                _paintSpine(canvas, size, incoming, outgoing, peak),
-          ),
-        ),
-        pw.SizedBox(height: 5),
-        pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            pw.Text(
-              DateFormat('d MMM').format(from),
-              style: pw.TextStyle(font: mono, fontSize: 7, color: _muted),
-            ),
-            pw.Text(
-              DateFormat('d MMM').format(data.request.to),
-              style: pw.TextStyle(font: mono, fontSize: 7, color: _muted),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  void _paintSpine(
-    PdfGraphics canvas,
-    PdfPoint size,
-    List<int> incoming,
-    List<int> outgoing,
-    int peak,
-  ) {
-    final days = incoming.length;
-    final slot = size.x / days;
-    final barW = slot > 3 ? slot * .62 : slot;
-    final mid = size.y / 2;
-    final arm = mid - 4;
-
-    canvas
-      ..setStrokeColor(_rule)
-      ..setLineWidth(.7)
-      ..drawLine(0, mid, size.x, mid)
-      ..strokePath();
-
-    for (var i = 0; i < days; i++) {
-      final x = i * slot + (slot - barW) / 2;
-      if (incoming[i] > 0) {
-        final h = (incoming[i] / peak) * arm;
-        canvas
-          ..setFillColor(_keep)
-          ..drawRect(x, mid + 1, barW, h < 1 ? 1 : h)
-          ..fillPath();
-      }
-      if (outgoing[i] > 0) {
-        final h = (outgoing[i] / peak) * arm;
-        canvas
-          ..setFillColor(_spend)
-          ..drawRect(x, mid - 1 - (h < 1 ? 1 : h), barW, h < 1 ? 1 : h)
-          ..fillPath();
-      }
-    }
-  }
-
-  pw.Widget _merchants(ReportData data, pw.Font medium, pw.Font mono) {
-    if (data.byMerchant.length < 2) return pw.SizedBox();
-    final shown = data.byMerchant.take(5).toList();
-    return pw.Container(
-      decoration: const pw.BoxDecoration(
-        border: pw.Border(top: pw.BorderSide(color: _rule)),
-      ),
-      padding: const pw.EdgeInsets.only(top: 11),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          _eyebrow('Most of it went to', mono),
-          pw.SizedBox(height: 9),
-          pw.Row(
-            children: [
-              for (final entry in shown)
-                pw.Expanded(
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        entry.key,
-                        maxLines: 2,
-                        overflow: pw.TextOverflow.clip,
-                        style: pw.TextStyle(fontSize: 8.5, color: _muted),
-                      ),
-                      pw.SizedBox(height: 3),
-                      pw.Text(
-                        _money(entry.value),
-                        style: pw.TextStyle(
-                          font: medium,
-                          fontSize: 11,
-                          color: _ink,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
   // ---- the register (part of "the statement") -----------------------------
 
-  pw.MultiPage _registerPages(
-    ReportData data,
-    pw.Font bold,
-    pw.Font medium,
-    pw.Font mono,
-  ) {
+  /// The ledger itself, day by day, beneath whichever drawing opened the
+  /// page. Returned as rows rather than as its own document so it flows on
+  /// from the hero instead of restarting the paper.
+  List<pw.Widget> _registerRows(ReportData data, pw.Font medium, pw.Font mono) {
     final rows = <pw.Widget>[];
     DateTime? lastDay;
     for (final item in data.transactions) {
@@ -1038,13 +727,7 @@ class SpendingReport {
       }
     }
 
-    return pw.MultiPage(
-      pageTheme: _pageTheme(),
-      header: (context) =>
-          _continuationHeader('The register', data, bold, mono, context),
-      footer: (context) => _colophon(mono),
-      build: (context) => rows.isEmpty ? [_nothing(bold)] : rows,
-    );
+    return rows;
   }
 
   pw.Widget _registerDayHeader(DateTime day, pw.Font mono) => pw.Padding(
@@ -1135,582 +818,11 @@ class SpendingReport {
 
   // ---- the change -----------------------------------------------------
 
-  pw.MultiPage _changeDocument(
-    ReportData data,
-    pw.Font bold,
-    pw.Font medium,
-    pw.Font mono,
-  ) {
-    final current = {
-      for (final entry in data.byCategory) entry.key: entry.value,
-    };
-    final previous = {
-      for (final entry in data.previousByCategory) entry.key: entry.value,
-    };
-    final categories = {...current.keys, ...previous.keys}.toList()
-      ..sort((a, b) => (current[b] ?? 0).compareTo(current[a] ?? 0));
-    final maxAmount = categories.fold<int>(0, (peak, category) {
-      final here = math.max(current[category] ?? 0, previous[category] ?? 0);
-      return math.max(peak, here);
-    });
-
-    return pw.MultiPage(
-      pageTheme: _pageTheme(),
-      header: (context) => context.pageNumber == 1
-          ? _cover(data, bold, mono)
-          : _continuationHeader('The change', data, bold, mono, context),
-      footer: (context) => _colophon(mono),
-      build: (context) => data.isEmpty
-          ? [_nothing(bold)]
-          : [
-              _eyebrow('Against ${data.previousLabel}', mono),
-              pw.SizedBox(height: 12),
-              _changeHeadline(data, bold, mono),
-              pw.SizedBox(height: 28),
-              if (categories.isEmpty)
-                pw.Text(
-                  'Nothing to compare it against.',
-                  style: const pw.TextStyle(fontSize: 10, color: _muted),
-                )
-              else ...[
-                // The header is glued to the first row -- on its own, a bare
-                // "by category" label at the foot of a page promises a list
-                // the next page hasn't started yet.
-                pw.Inseparable(
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Container(
-                        decoration: const pw.BoxDecoration(
-                          border: pw.Border(top: pw.BorderSide(color: _rule)),
-                        ),
-                        padding: const pw.EdgeInsets.only(top: 11, bottom: 12),
-                        child: _eyebrow(
-                          'By category, against ${data.previousLabel}',
-                          mono,
-                        ),
-                      ),
-                      _changeRow(
-                        categories.first,
-                        current[categories.first] ?? 0,
-                        previous[categories.first] ?? 0,
-                        maxAmount,
-                        medium,
-                        mono,
-                      ),
-                    ],
-                  ),
-                ),
-                for (final category in categories.skip(1))
-                  // See the shape's categories/spine/merchants: a bare
-                  // Column can be split across a page boundary by this
-                  // package, which would separate a category's name from
-                  // its own bars.
-                  pw.Inseparable(
-                    child: _changeRow(
-                      category,
-                      current[category] ?? 0,
-                      previous[category] ?? 0,
-                      maxAmount,
-                      medium,
-                      mono,
-                    ),
-                  ),
-              ],
-            ],
-    );
-  }
-
-  pw.Widget _changeHeadline(ReportData data, pw.Font bold, pw.Font mono) {
-    final delta = data.spentDeltaMinor;
-    final fraction = data.spentDeltaFraction;
-    final tone = delta > 0 ? _spend : (delta < 0 ? _keep : _muted);
-    return pw.Row(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Expanded(
-          child: _figure(
-            'Spent this period',
-            _money(data.spentMinor),
-            data.request.label,
-            _ink,
-            bold,
-            mono,
-          ),
-        ),
-        pw.Expanded(
-          child: _figure(
-            'Spent last time',
-            _money(data.previousSpentMinor),
-            data.previousLabel,
-            _muted,
-            bold,
-            mono,
-          ),
-        ),
-        pw.Expanded(
-          child: _figure(
-            'The difference',
-            '${delta > 0
-                ? '+'
-                : delta < 0
-                ? '−'
-                : ''}${_money(delta.abs())}',
-            fraction == null
-                ? 'nothing to compare it against'
-                : '${(fraction * 100).abs().toStringAsFixed(0)}% '
-                      '${delta > 0
-                          ? 'more'
-                          : delta < 0
-                          ? 'less'
-                          : 'the same'}',
-            tone,
-            bold,
-            mono,
-          ),
-        ),
-      ],
-    );
-  }
-
-  pw.Widget _changeRow(
-    String category,
-    int current,
-    int previous,
-    int maxAmount,
-    pw.Font medium,
-    pw.Font mono,
-  ) {
-    final delta = current - previous;
-    final tone = delta > 0 ? _spend : (delta < 0 ? _keep : _muted);
-    final percent = previous <= 0 ? null : (delta / previous) * 100;
-    return pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 12),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Row(
-            children: [
-              pw.Expanded(
-                child: pw.Text(
-                  category,
-                  style: pw.TextStyle(fontSize: 10, color: _ink),
-                ),
-              ),
-              pw.Text(
-                _money(current),
-                style: pw.TextStyle(font: medium, fontSize: 10, color: _ink),
-              ),
-              pw.SizedBox(width: 10),
-              pw.SizedBox(
-                width: 46,
-                child: pw.Text(
-                  percent == null
-                      ? 'new'
-                      : '${percent > 0 ? '+' : ''}${percent.toStringAsFixed(0)}%',
-                  textAlign: pw.TextAlign.right,
-                  style: pw.TextStyle(font: mono, fontSize: 8, color: tone),
-                ),
-              ),
-            ],
-          ),
-          pw.SizedBox(height: 5),
-          _bar(previous, maxAmount, _muted),
-          pw.SizedBox(height: 2),
-          _bar(current, maxAmount, tone),
-        ],
-      ),
-    );
-  }
-
   // ---- the docket -------------------------------------------------------
-
-  pw.MultiPage _docketPages(
-    ReportData data,
-    pw.Font bold,
-    pw.Font medium,
-    pw.Font mono,
-  ) {
-    final groups = categoryGroups(data.transactions);
-    final total = groups.fold<int>(0, (sum, group) => sum + group.totalMinor);
-    final count = groups.fold<int>(0, (sum, group) => sum + group.items.length);
-
-    // A group's header names a category nobody has read the amount for yet,
-    // and a subtotal means nothing once its last row is a page away -- each
-    // is glued to its neighbour so a page break can only fall between two
-    // whole transactions, never leave a heading or a total stranded alone.
-    final rows = <pw.Widget>[];
-    for (final group in groups) {
-      final header = _docketGroupHeader(group, bold, mono);
-      final items = group.items;
-      if (items.length == 1) {
-        rows.add(
-          pw.Inseparable(
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                header,
-                _docketRow(items.first, medium, mono),
-                _docketSubtotal(group, medium, mono),
-              ],
-            ),
-          ),
-        );
-        continue;
-      }
-      rows.add(
-        pw.Inseparable(
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [header, _docketRow(items.first, medium, mono)],
-          ),
-        ),
-      );
-      for (final item in items.skip(1).take(items.length - 2)) {
-        rows.add(_docketRow(item, medium, mono));
-      }
-      rows.add(
-        pw.Inseparable(
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              _docketRow(items.last, medium, mono),
-              _docketSubtotal(group, medium, mono),
-            ],
-          ),
-        ),
-      );
-    }
-    if (groups.isNotEmpty) {
-      rows.add(pw.SizedBox(height: 10));
-      rows.add(_docketGrandTotal(total, count, bold, mono));
-    }
-
-    return pw.MultiPage(
-      pageTheme: _pageTheme(),
-      header: (context) => context.pageNumber == 1
-          ? _cover(data, bold, mono)
-          : _continuationHeader('The docket', data, bold, mono, context),
-      footer: (context) => _colophon(mono),
-      build: (context) => rows.isEmpty
-          ? [
-              _nothing(
-                bold,
-                'No expenses fall inside these dates -- only income or '
-                'transfers, which a docket does not itemise.',
-              ),
-            ]
-          : rows,
-    );
-  }
-
-  pw.Widget _docketGroupHeader(
-    CategoryGroup group,
-    pw.Font bold,
-    pw.Font mono,
-  ) => pw.Padding(
-    padding: const pw.EdgeInsets.only(top: 16, bottom: 6),
-    child: pw.Row(
-      children: [
-        pw.Expanded(
-          child: pw.Text(
-            group.category,
-            style: pw.TextStyle(font: bold, fontSize: 11.5, color: _ink),
-          ),
-        ),
-        pw.Text(
-          '${group.items.length} ${group.items.length == 1 ? 'item' : 'items'}',
-          style: pw.TextStyle(
-            font: mono,
-            fontSize: 7.5,
-            color: _muted,
-            letterSpacing: .8,
-          ),
-        ),
-      ],
-    ),
-  );
-
-  pw.Widget _docketRow(
-    TransactionViewData item,
-    pw.Font medium,
-    pw.Font mono,
-  ) => pw.Container(
-    decoration: const pw.BoxDecoration(
-      border: pw.Border(bottom: pw.BorderSide(color: _rule, width: .5)),
-    ),
-    padding: const pw.EdgeInsets.symmetric(vertical: 5),
-    child: pw.Row(
-      children: [
-        pw.SizedBox(
-          width: 52,
-          child: pw.Text(
-            DateFormat('d MMM').format(item.occurredAt.toLocal()),
-            style: pw.TextStyle(font: mono, fontSize: 8, color: _muted),
-          ),
-        ),
-        pw.Expanded(
-          child: pw.Text(
-            item.title,
-            maxLines: 1,
-            style: pw.TextStyle(fontSize: 9.5, color: _ink),
-          ),
-        ),
-        pw.SizedBox(width: 8),
-        pw.SizedBox(
-          width: 92,
-          child: pw.Text(
-            item.accountName,
-            maxLines: 1,
-            textAlign: pw.TextAlign.right,
-            overflow: pw.TextOverflow.clip,
-            style: pw.TextStyle(
-              font: mono,
-              fontSize: 7,
-              color: _muted,
-              letterSpacing: .3,
-            ),
-          ),
-        ),
-        pw.SizedBox(width: 10),
-        pw.SizedBox(
-          width: 62,
-          child: pw.Text(
-            _money(item.amount.minorUnits.abs()),
-            textAlign: pw.TextAlign.right,
-            style: pw.TextStyle(font: medium, fontSize: 9.5, color: _spend),
-          ),
-        ),
-      ],
-    ),
-  );
-
-  pw.Widget _docketSubtotal(
-    CategoryGroup group,
-    pw.Font medium,
-    pw.Font mono,
-  ) => pw.Container(
-    padding: const pw.EdgeInsets.only(top: 5),
-    decoration: const pw.BoxDecoration(
-      border: pw.Border(top: pw.BorderSide(color: _ink, width: .8)),
-    ),
-    child: pw.Row(
-      children: [
-        pw.Expanded(
-          child: pw.Text(
-            'Subtotal',
-            style: pw.TextStyle(
-              font: mono,
-              fontSize: 7.5,
-              color: _muted,
-              letterSpacing: .8,
-            ),
-          ),
-        ),
-        pw.Text(
-          _money(group.totalMinor),
-          style: pw.TextStyle(font: medium, fontSize: 10, color: _ink),
-        ),
-      ],
-    ),
-  );
-
-  pw.Widget _docketGrandTotal(
-    int total,
-    int count,
-    pw.Font bold,
-    pw.Font mono,
-  ) => pw.Container(
-    padding: const pw.EdgeInsets.only(top: 10),
-    decoration: const pw.BoxDecoration(
-      border: pw.Border(top: pw.BorderSide(color: _ink, width: 1.4)),
-    ),
-    child: pw.Row(
-      children: [
-        pw.Expanded(
-          child: pw.Text(
-            '$count ${count == 1 ? 'expense' : 'expenses'} in total',
-            style: const pw.TextStyle(fontSize: 10, color: _muted),
-          ),
-        ),
-        pw.Text(
-          _money(total),
-          style: pw.TextStyle(font: bold, fontSize: 16, color: _spend),
-        ),
-      ],
-    ),
-  );
 
   // ---- the almanac ------------------------------------------------------
 
-  pw.MultiPage _almanacPages(
-    ReportData data,
-    pw.Font bold,
-    pw.Font medium,
-    pw.Font mono,
-  ) {
-    final buckets = monthBuckets(
-      data.request.from,
-      data.request.to,
-      data.transactions,
-    );
-    final peak = buckets.fold<int>(
-      1,
-      (top, bucket) =>
-          math.max(top, math.max(bucket.receivedMinor, bucket.spentMinor)),
-    );
-    final rows = <pw.Widget>[
-      for (var i = 0; i < buckets.length; i += 3)
-        _almanacRow(buckets.skip(i).take(3).toList(), peak, bold, medium, mono),
-    ];
-
-    return pw.MultiPage(
-      pageTheme: _pageTheme(),
-      header: (context) => context.pageNumber == 1
-          ? _cover(data, bold, mono)
-          : _continuationHeader('The almanac', data, bold, mono, context),
-      footer: (context) => _colophon(mono),
-      build: (context) => rows.isEmpty ? [_nothing(bold)] : rows,
-    );
-  }
-
-  pw.Widget _almanacRow(
-    List<MonthBucket> slice,
-    int peak,
-    pw.Font bold,
-    pw.Font medium,
-    pw.Font mono,
-  ) => pw.Padding(
-    padding: const pw.EdgeInsets.only(bottom: 14),
-    child: pw.Row(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        for (var i = 0; i < 3; i++) ...[
-          if (i > 0) pw.SizedBox(width: 14),
-          pw.Expanded(
-            child: i < slice.length
-                ? _almanacTile(slice[i], peak, bold, medium, mono)
-                : pw.SizedBox(),
-          ),
-        ],
-      ],
-    ),
-  );
-
-  pw.Widget _almanacTile(
-    MonthBucket bucket,
-    int peak,
-    pw.Font bold,
-    pw.Font medium,
-    pw.Font mono,
-  ) {
-    final tone = bucket.netMinor >= 0 ? _keep : _spend;
-    return pw.Container(
-      padding: const pw.EdgeInsets.all(10),
-      decoration: pw.BoxDecoration(border: pw.Border.all(color: _rule)),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text(
-            DateFormat('MMM yyyy').format(bucket.start).toUpperCase(),
-            style: pw.TextStyle(
-              font: mono,
-              fontSize: 7.5,
-              color: _muted,
-              letterSpacing: 1.4,
-            ),
-          ),
-          pw.SizedBox(height: 7),
-          pw.Text(
-            _money(bucket.netMinor.abs()),
-            style: pw.TextStyle(
-              font: bold,
-              fontSize: 15,
-              color: tone,
-              letterSpacing: -.4,
-            ),
-          ),
-          pw.SizedBox(height: 2),
-          pw.Text(
-            bucket.netMinor >= 0 ? 'kept' : 'over',
-            style: const pw.TextStyle(fontSize: 7.5, color: _muted),
-          ),
-          pw.SizedBox(height: 8),
-          _bar(bucket.receivedMinor, peak, _keep),
-          pw.SizedBox(height: 2),
-          _bar(bucket.spentMinor, peak, _spend),
-          pw.SizedBox(height: 8),
-          pw.Text(
-            bucket.topCategory ?? 'no spending',
-            maxLines: 1,
-            overflow: pw.TextOverflow.clip,
-            style: pw.TextStyle(font: medium, fontSize: 8.5, color: _ink),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ---- drawing ------------------------------------------------------------
-
-  /// The same ribbon as Home: one band in, a wide kept band and a thin spent
-  /// thread out, to true proportion.
-  void _paintFlow(PdfGraphics canvas, PdfPoint size, ReportData data) {
-    final w = size.x;
-    final h = size.y;
-    const barH = 9.0;
-    final topW = w * .44;
-    final topX = (w - topW) / 2;
-    final topY = h - barH;
-    final botY = 2.0;
-    final margin = w * .06;
-
-    final keptW = topW * data.keptFraction;
-    final spentW = topW - keptW;
-    final splitX = topX + keptW;
-    final keptBotX = margin;
-    final spentBotX = w - margin - spentW;
-
-    // PDF's origin is bottom-left, so "down the page" is decreasing y.
-    final yTop = topY;
-    final c1 = topY - (topY - botY - barH) * .42;
-    final c2 = topY - (topY - botY - barH) * .60;
-    final barTop = botY + barH;
-
-    void ribbon(
-      double aTop,
-      double bTop,
-      double aBot,
-      double bBot,
-      PdfColor colour,
-      double opacity,
-    ) {
-      canvas
-        ..setFillColor(colour)
-        ..setGraphicState(PdfGraphicState(fillOpacity: opacity))
-        ..moveTo(aTop, yTop)
-        ..curveTo(aTop, c1, aBot, c2, aBot, barTop)
-        ..lineTo(bBot, barTop)
-        ..curveTo(bBot, c2, bTop, c1, bTop, yTop)
-        ..closePath()
-        ..fillPath()
-        ..setGraphicState(const PdfGraphicState(fillOpacity: 1));
-    }
-
-    ribbon(topX, splitX, keptBotX, keptBotX + keptW, _keep, .34);
-    ribbon(splitX, topX + topW, spentBotX, spentBotX + spentW, _spend, .5);
-
-    canvas
-      ..setFillColor(_ink)
-      ..drawRect(topX, topY, topW, barH)
-      ..fillPath()
-      ..setFillColor(_keep)
-      ..drawRect(keptBotX, botY, keptW, barH)
-      ..fillPath()
-      ..setFillColor(_spend)
-      ..drawRect(spentBotX, botY, spentW, barH)
-      ..fillPath();
-  }
 
   /// The Split mark: one band in, a wide kept mass and a thin spent thread
   /// out. Authored on a 64-unit grid spanning x 10..52 and y 8..56, so it is
@@ -1744,9 +856,10 @@ class SpendingReport {
       ..fillPath();
   }
 
-  PdfColor _ramp(int index) =>
-      paperTone(palette.ramp[index % palette.ramp.length]);
-
+  /// Grouped, and without the trailing `.00` that makes a column of round
+  /// figures harder to scan than it needs to be. Handed to every hero through
+  /// `ReportPaper.money`, so the document cannot disagree with its own figure
+  /// about how a number is written.
   static String _money(int minorUnits) {
     final value = (minorUnits.abs() / 100).toStringAsFixed(2);
     final parts = value.split('.');
@@ -1755,13 +868,5 @@ class SpendingReport {
       (_) => ',',
     );
     return parts.last == '00' ? grouped : '$grouped.${parts.last}';
-  }
-
-  static String _percent(int part, int whole) {
-    if (whole <= 0) return '0%';
-    final value = (part / whole) * 100;
-    return value < 10 && value > 0
-        ? '${value.toStringAsFixed(1)}%'
-        : '${value.round()}%';
   }
 }
