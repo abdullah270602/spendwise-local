@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../insights/river_view.dart';
+
 import '../../app/theme.dart';
 import '../../widgets/shape_kit.dart';
 import '../shell/spendwise_view_model.dart';
@@ -21,12 +23,12 @@ class LedgerScreen extends StatefulWidget {
 }
 
 class _LedgerScreenState extends State<LedgerScreen> {
-  static const _preferenceKey = 'ledger_chart';
+  static const _preferenceKey = 'ledger_view';
   static const _spanKey = 'ledger_span';
 
   final searchController = TextEditingController();
   late DateTime month;
-  late bool showChart;
+  late _LedgerView view;
 
   /// Whether the register shows the whole ledger rather than one month.
   ///
@@ -47,7 +49,9 @@ class _LedgerScreenState extends State<LedgerScreen> {
     super.initState();
     final now = DateTime.now();
     month = DateTime(now.year, now.month);
-    showChart = widget.viewModel.uiViewPreference(_preferenceKey) != 'plain';
+    view = _LedgerView.fromId(
+      widget.viewModel.uiViewPreference(_preferenceKey),
+    );
     allMonths = widget.viewModel.uiViewPreference(_spanKey) == 'all';
   }
 
@@ -130,7 +134,36 @@ class _LedgerScreenState extends State<LedgerScreen> {
                 ),
               ),
             ),
-          if (scoped && showChart) SliverToBoxAdapter(child: _chart(visible)),
+          if (scoped && view == _LedgerView.chart)
+            SliverToBoxAdapter(child: _chart(visible)),
+          // The river reads the same entries the register does, scoped to the
+          // same month. It used to live on Insights, where its heading showed
+          // one period's totals over a list of the whole ledger -- a total
+          // that could never reconcile with the entries beneath it.
+          if (scoped && view == _LedgerView.river) ...[
+            SliverToBoxAdapter(
+              child: RiverHeading(
+                inTotal: visible
+                    .where((item) => item.kind == TransactionKind.income)
+                    .fold<int>(0, (sum, i) => sum + i.amount.minorUnits.abs()),
+                outTotal: visible
+                    .where((item) => item.kind == TransactionKind.expense)
+                    .fold<int>(0, (sum, i) => sum + i.amount.minorUnits.abs()),
+              ),
+            ),
+            RiverView(
+              transactions: visible,
+              onOpen: (item) => Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => TransactionDetailsScreen(
+                    viewModel: widget.viewModel,
+                    transaction: item,
+                  ),
+                ),
+              ),
+            ),
+          ],
           if (!scoped)
             SliverToBoxAdapter(
               child: Padding(
@@ -316,9 +349,9 @@ class _LedgerScreenState extends State<LedgerScreen> {
           children: [
             if (scoped)
               ViewToggle(
-                options: const ['Chart', 'Plain'],
-                selected: showChart ? 0 : 1,
-                onSelected: _setChart,
+                options: const ['Chart', 'River', 'Plain'],
+                selected: view.index,
+                onSelected: _setView,
               ),
             const Spacer(),
             // A large balance and the toggle together are wider than a 360dp
@@ -482,12 +515,9 @@ class _LedgerScreenState extends State<LedgerScreen> {
 
   // ---- actions ---------------------------------------------------------
 
-  void _setChart(int index) {
-    setState(() => showChart = index == 0);
-    widget.viewModel.uiSetViewPreference(
-      _preferenceKey,
-      showChart ? 'chart' : 'plain',
-    );
+  void _setView(int index) {
+    setState(() => view = _LedgerView.values[index]);
+    widget.viewModel.uiSetViewPreference(_preferenceKey, view.id);
   }
 
   void _stepMonth(int delta) =>
@@ -662,4 +692,27 @@ class _Step extends StatelessWidget {
           : SpendWiseColors.dim,
     ),
   );
+}
+
+/// How the month is drawn.
+///
+/// The river came from Insights, where it answered "what happened" -- which is
+/// this screen's question, not that one's. Here it is a third way to read the
+/// same month, sharing the toggle that was already deciding between the
+/// balance chart and the plain register, so it costs the screen no new chrome.
+enum _LedgerView {
+  chart(id: 'chart'),
+  river(id: 'river'),
+  plain(id: 'plain');
+
+  const _LedgerView({required this.id});
+
+  final String id;
+
+  static _LedgerView fromId(String? id) {
+    for (final value in values) {
+      if (value.id == id) return value;
+    }
+    return chart;
+  }
 }
