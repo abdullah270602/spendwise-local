@@ -172,6 +172,57 @@ void main() {
     accounts: const [],
   );
 
+  group('the shape states the whole it divides', () {
+    // The trunk of the shape is everything that came in, and that figure was
+    // never printed -- it existed only as the denominator of two percentages.
+    // Under it sat three numbers against a two-branch drawing, one of which
+    // (money moved between the reader's own accounts) was not a branch of
+    // anything. Three figures that cannot be reconciled against the picture
+    // above them is worse than two that can.
+    test('the two branches account for all of it', () {
+      final data = dataFor(ReportTemplate.shape);
+      expect(
+        data.keptMinor + data.spentMinor,
+        data.receivedMinor,
+        reason: 'still yours plus gone is what came in, or the legend lies',
+      );
+    });
+
+    test('a period with nothing coming in still renders', () async {
+      // Spending against no income is a real month. The percentages have no
+      // denominator, and the page has to say so rather than print 0%.
+      final spendOnly = [
+        entry(
+          id: 'shop',
+          title: 'Corner shop',
+          minor: 350000,
+          kind: TransactionKind.expense,
+          day: 3,
+        ),
+      ];
+      final data = ReportData.gather(
+        request: ReportRequest.forRange(
+          ReportRange.thisMonth,
+          ReportTemplate.shape,
+          now: DateTime(2026, 9, 30),
+        ),
+        transactions: spendOnly,
+        accounts: const [],
+      );
+      expect(data.receivedMinor, 0);
+      expect(data.keptFraction, 0);
+
+      final bytes = await const SpendingReport(palette: SpendWisePalette.sage)
+          .build(data);
+      // A real document, not an exception swallowed into an empty file. The
+      // page-count assertions live on the branch that made the report a
+      // MultiPage; here the question is only whether a month with no income
+      // still produces one.
+      expect(bytes, isNotEmpty);
+      expect(String.fromCharCodes(bytes.take(5)), startsWith('%PDF'));
+    });
+  });
+
   test('the numbers a report is built from', () {
     final data = dataFor(ReportTemplate.shape);
     expect(data.receivedMinor, 15000000);

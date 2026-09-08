@@ -303,8 +303,13 @@ class SpendingReport {
           if (data.isEmpty)
             _nothing(bold)
           else ...[
-            _eyebrow('What happened to it', mono),
+            _eyebrow('What came in, and what happened to it', mono),
             pw.SizedBox(height: 10),
+            // The trunk of the shape below is this figure. It was never
+            // printed: it existed only as the denominator of two percentages,
+            // so the page showed the parts of a total it never named.
+            _cameIn(data, bold, mono),
+            pw.SizedBox(height: 14),
             pw.SizedBox(
               height: 150,
               width: double.infinity,
@@ -404,6 +409,38 @@ class SpendingReport {
     ),
   );
 
+  /// Everything that arrived, which is what the shape divides.
+  pw.Widget _cameIn(ReportData data, pw.Font bold, pw.Font mono) => pw.Row(
+    crossAxisAlignment: pw.CrossAxisAlignment.end,
+    children: [
+      pw.Text(
+        _money(data.receivedMinor),
+        style: pw.TextStyle(
+          font: bold,
+          fontSize: 32,
+          color: _ink,
+          letterSpacing: -1.1,
+        ),
+      ),
+      pw.SizedBox(width: 9),
+      pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 5),
+        child: pw.Text(
+          data.receivedMinor > 0 ? 'came in' : 'came in this period',
+          style: pw.TextStyle(fontSize: 10, color: _muted),
+        ),
+      ),
+    ],
+  );
+
+  /// The two halves of what came in, and nothing else.
+  ///
+  /// There were three figures here, and the shape above has two branches.
+  /// The third -- money moved between the reader's own accounts -- is not a
+  /// branch of anything: it is a separate quantity that never touched the
+  /// split, so three numbers sat under a two-way figure and could not be
+  /// reconciled against it. What it was there to say, the footnote at the
+  /// foot of the page now says properly.
   pw.Widget _legend(ReportData data, pw.Font bold, pw.Font mono) => pw.Row(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: [
@@ -412,7 +449,7 @@ class SpendingReport {
           'Still yours',
           _money(data.keptMinor),
           data.receivedMinor > 0
-              ? '${_percent(data.keptMinor, data.receivedMinor)} of what came in'
+              ? '${_percent(data.keptMinor, data.receivedMinor)} of it'
               : 'nothing came in',
           _ink,
           bold,
@@ -423,23 +460,16 @@ class SpendingReport {
         child: _figure(
           'Gone',
           _money(data.spentMinor),
-          _percent(data.spentMinor, data.receivedMinor),
+          data.receivedMinor > 0
+              ? '${_percent(data.spentMinor, data.receivedMinor)} of it'
+              // Spending with nothing to measure it against is a real month,
+              // and a bare percentage of zero would be a made-up one.
+              : 'nothing came in to measure it against',
           _spend,
           bold,
           mono,
         ),
       ),
-      if (data.movedMinor > 0)
-        pw.Expanded(
-          child: _figure(
-            'Moved between your accounts',
-            _money(data.movedMinor),
-            'not counted as spending',
-            _mine,
-            bold,
-            mono,
-          ),
-        ),
     ],
   );
 
