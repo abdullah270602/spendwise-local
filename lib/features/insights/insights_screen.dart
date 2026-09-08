@@ -109,6 +109,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
                           child: FlowSpine(
                             buckets: analytics.buckets,
                             currency: analytics.currency,
+                            spendingOnly: category != null,
                           ),
                         ),
                         SliverPadding(
@@ -134,22 +135,8 @@ class _InsightsScreenState extends State<InsightsScreen> {
                                 const SizedBox(height: 24),
                               ],
                               Text(
-                                'Every ${_resolutionWord(resolution)} you have '
-                                'records for, in and out on one scale. Scroll '
-                                'the spine sideways to walk back through your '
-                                'whole history.',
-                                style: SpendWiseType.body.copyWith(
-                                  fontSize: 12.5,
-                                  color: SpendWiseColors.dim,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                'Calculated only from your local ledger. Moves '
-                                'between your own accounts are excluded from '
-                                'both spending and income, and so is money '
-                                'lent, borrowed or held for someone else — '
-                                'none of it was earned or spent.',
+                                'Excludes moves between your own accounts, '
+                                'and money lent, borrowed or held.',
                                 style: SpendWiseType.body.copyWith(
                                   fontSize: 12.5,
                                   color: SpendWiseColors.dim,
@@ -166,8 +153,6 @@ class _InsightsScreenState extends State<InsightsScreen> {
       );
     },
   );
-
-  static String _resolutionWord(AnalyticsResolution value) => value.cadence;
 }
 
 /// One category, chosen or not.
@@ -219,19 +204,33 @@ class FlowSpine extends StatelessWidget {
     required this.buckets,
     required this.currency,
     this.height = 252,
+    this.spendingOnly = false,
   });
 
   final List<AnalyticsBucket> buckets;
   final String currency;
   final double height;
 
+  /// True while a single category is being looked at.
+  ///
+  /// Income is not attributed to categories -- a salary is not "Groceries" --
+  /// so a filtered bucket carries no income at all. Drawing the usual net
+  /// figure from it would print `0 - spending`: a confident rust number that
+  /// says the day lost money, on a day the salary may well have landed. The
+  /// spine then shows the one thing it can honestly show, and says so.
+  final bool spendingOnly;
+
   @override
   Widget build(BuildContext context) {
     if (buckets.isEmpty) return SizedBox(height: height);
     final peak = buckets.fold<int>(
       1,
-      (best, bucket) =>
-          math.max(best, math.max(bucket.incomeMinor, bucket.spendingMinor)),
+      (best, bucket) => math.max(
+        best,
+        spendingOnly
+            ? bucket.spendingMinor
+            : math.max(bucket.incomeMinor, bucket.spendingMinor),
+      ),
     );
     // Wide enough that a column is readable, narrow enough that a year of
     // months does not need six swipes.
@@ -251,6 +250,7 @@ class FlowSpine extends StatelessWidget {
             peak: peak,
             width: columnWidth,
             latest: index == 0,
+            spendingOnly: spendingOnly,
           );
         },
       ),
@@ -264,12 +264,14 @@ class _SpineColumn extends StatelessWidget {
     required this.peak,
     required this.width,
     required this.latest,
+    required this.spendingOnly,
   });
 
   final AnalyticsBucket bucket;
   final int peak;
   final double width;
   final bool latest;
+  final bool spendingOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -277,14 +279,22 @@ class _SpineColumn extends StatelessWidget {
     // font that renders a hair taller than expected must clip a label rather
     // than overflow the spine.
     const armHeight = 84.0;
-    final inHeight = (bucket.incomeMinor / peak) * armHeight;
+    final inHeight = spendingOnly
+        ? 0.0
+        : (bucket.incomeMinor / peak) * armHeight;
     final outHeight = (bucket.spendingMinor / peak) * armHeight;
-    final net = bucket.incomeMinor - bucket.spendingMinor;
+    // Filtered, the only honest figure is what left. `income - spending` on a
+    // bucket that was never given any income is not a net; it is the spending
+    // with a minus sign in front of it.
+    final tick = spendingOnly
+        ? -bucket.spendingMinor
+        : bucket.incomeMinor - bucket.spendingMinor;
     return Semantics(
-      label:
-          '${bucket.label}: '
-          '${formatMinor(bucket.incomeMinor)} in, '
-          '${formatMinor(bucket.spendingMinor)} out',
+      label: spendingOnly
+          ? '${bucket.label}: ${formatMinor(bucket.spendingMinor)} out'
+          : '${bucket.label}: '
+                '${formatMinor(bucket.incomeMinor)} in, '
+                '${formatMinor(bucket.spendingMinor)} out',
       child: SizedBox(
         width: width,
         child: Column(
@@ -349,8 +359,8 @@ class _SpineColumn extends StatelessWidget {
             ),
             const SizedBox(height: 3),
             _Tick(
-              text: formatMinor(net, signed: true, cents: false),
-              color: net >= 0 ? SpendWiseColors.keep : SpendWiseColors.spend,
+              text: formatMinor(tick, signed: true, cents: false),
+              color: tick >= 0 ? SpendWiseColors.keep : SpendWiseColors.spend,
             ),
           ],
         ),
@@ -512,7 +522,10 @@ class _CategoryBreakdown extends StatelessWidget {
         style: SpendWiseType.body.copyWith(fontSize: 13),
       );
     }
-    final shown = analytics.categories.take(6).toList();
+    // Every category, not the biggest few. Home folds its tail into one
+    // line because it answers a glance; this screen is where someone comes
+    // to look at all of it.
+    final shown = analytics.categories;
     final total = shown.fold<int>(0, (sum, item) => sum + item.amountMinor);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -540,7 +553,7 @@ class _CategoryBreakdown extends StatelessWidget {
                 Container(
                   width: 9,
                   height: 9,
-                  color: colors[i % colors.length],
+                  color: SpendWiseColors.category(i),
                 ),
                 const SizedBox(width: 11),
                 Expanded(

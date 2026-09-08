@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'palette.dart';
@@ -49,8 +51,24 @@ abstract final class SpendWiseColors {
   /// object rather than a bag of highlighter pens.
   static List<Color> categoryRamp = SpendWisePalette.sage.ramp;
 
-  static Color category(int index) =>
-      categoryRamp[index.abs() % categoryRamp.length];
+  /// A tone for the nth category, distinct past the end of the ramp.
+  ///
+  /// The ramp is eight colours. Home only ever draws six, so wrapping was
+  /// unreachable there -- but Insights now draws every category a person has,
+  /// and a ledger with nine reached the ninth by handing it the first colour
+  /// again. Two categories drawn identically, distinguished only by their
+  /// position in a list, is the chart disagreeing with itself.
+  ///
+  /// Each lap past the ramp steps the tone down, so the ninth is the first at
+  /// reduced weight rather than the first over again. Floored, so a very long
+  /// list never fades into the ground it is drawn on.
+  static Color category(int index) {
+    final i = index.abs();
+    final base = categoryRamp[i % categoryRamp.length];
+    final lap = i ~/ categoryRamp.length;
+    if (lap == 0) return base;
+    return base.withValues(alpha: math.max(0.34, 1 - lap * 0.3));
+  }
 
   // ---- Legacy aliases -------------------------------------------------
   // Kept so screens still being migrated keep compiling; they resolve to the
