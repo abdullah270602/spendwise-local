@@ -341,7 +341,6 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('DETAIL'));
     await tester.pumpAndSettle();
 
     expect(find.text('Total tracked'), findsNothing);

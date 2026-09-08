@@ -4,10 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
 import '../../widgets/shape_kit.dart';
-import '../../widgets/spendwise_components.dart';
 import '../shell/spendwise_view_model.dart';
-import '../transactions/transaction_details_screen.dart';
-import 'river_view.dart';
 import 'spending_analytics.dart';
 
 class InsightsScreen extends StatefulWidget {
@@ -24,7 +21,6 @@ class _InsightsScreenState extends State<InsightsScreen> {
   /// so it is what the screen opens on.
   AnalyticsResolution resolution = AnalyticsResolution.last30Days;
   String? category;
-  _InsightsView view = _InsightsView.detail;
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
@@ -57,11 +53,19 @@ class _InsightsScreenState extends State<InsightsScreen> {
               child: Row(
                 children: [
                   Expanded(child: Text('Insights', style: SpendWiseType.title)),
+                  // The only choice left in the header is how far back to
+                  // look. There used to be a second toggle above it choosing
+                  // between three views, two of which drew the same numbers
+                  // as each other or as another screen.
                   ViewToggle(
-                    options: const ['River', 'Flow', 'Detail'],
-                    selected: view.index,
-                    onSelected: (index) =>
-                        setState(() => view = _InsightsView.values[index]),
+                    options: [
+                      for (final value in AnalyticsResolution.values)
+                        value.shortLabel,
+                    ],
+                    selected: AnalyticsResolution.values.indexOf(resolution),
+                    onSelected: (index) => setState(() {
+                      resolution = AnalyticsResolution.values[index];
+                    }),
                   ),
                 ],
               ),
@@ -77,151 +81,83 @@ class _InsightsScreenState extends State<InsightsScreen> {
                     )
                   : CustomScrollView(
                       slivers: [
-                        if (view != _InsightsView.river)
-                          SliverPadding(
-                            padding: const EdgeInsets.fromLTRB(
-                              SpendWiseTheme.gutter,
-                              0,
-                              SpendWiseTheme.gutter,
-                              10,
-                            ),
-                            sliver: SliverToBoxAdapter(
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: ViewToggle(
-                                  options: [
-                                    for (final value
-                                        in AnalyticsResolution.values)
-                                      value.shortLabel,
-                                  ],
-                                  selected: AnalyticsResolution.values.indexOf(
-                                    resolution,
-                                  ),
-                                  onSelected: (index) => setState(() {
-                                    resolution =
-                                        AnalyticsResolution.values[index];
-                                  }),
-                                ),
+                        SliverToBoxAdapter(
+                          child: SizedBox(
+                            height: 46,
+                            child: ListView.separated(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: SpendWiseTheme.gutter,
                               ),
+                              scrollDirection: Axis.horizontal,
+                              itemCount: categories.length + 1,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(width: 8),
+                              itemBuilder: (context, index) {
+                                final value = index == 0
+                                    ? null
+                                    : categories[index - 1];
+                                return _CategoryFilter(
+                                  label: value ?? 'All spending',
+                                  selected: category == value,
+                                  onTap: () => setState(() => category = value),
+                                );
+                              },
                             ),
                           ),
-                        if (view == _InsightsView.river) ...[
-                          SliverToBoxAdapter(
-                            child: RiverHeading(
-                              inTotal: analytics.totalIncomeMinor,
-                              outTotal: analytics.totalSpendingMinor,
-                            ),
+                        ),
+                        SliverToBoxAdapter(
+                          child: FlowSpine(
+                            buckets: analytics.buckets,
+                            currency: analytics.currency,
                           ),
-                          RiverView(
-                            transactions: widget.viewModel.transactions,
-                            onOpen: (item) => Navigator.push(
-                              context,
-                              MaterialPageRoute<void>(
-                                builder: (_) => TransactionDetailsScreen(
-                                  viewModel: widget.viewModel,
-                                  transaction: item,
-                                ),
-                              ),
-                            ),
+                        ),
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(
+                            SpendWiseTheme.gutter,
+                            18,
+                            SpendWiseTheme.gutter,
+                            36,
                           ),
-                        ] else if (view == _InsightsView.flow) ...[
-                          SliverToBoxAdapter(
-                            child: FlowSpine(
-                              buckets: analytics.buckets,
-                              currency: analytics.currency,
-                            ),
-                          ),
-                          SliverPadding(
-                            padding: const EdgeInsets.fromLTRB(
-                              SpendWiseTheme.gutter,
-                              20,
-                              SpendWiseTheme.gutter,
-                              36,
-                            ),
-                            sliver: SliverList.list(
-                              children: [
-                                _SummaryBand(analytics),
-                                const SizedBox(height: 22),
-                                Text(
-                                  'Every ${_resolutionWord(resolution)} you '
-                                  'have records for, in and out from one '
-                                  'spine. Scroll it sideways to walk back '
-                                  'through your whole history.',
-                                  style: SpendWiseType.body.copyWith(
-                                    fontSize: 12.5,
-                                  ),
-                                ),
+                          sliver: SliverList.list(
+                            children: [
+                              // No balances here. Insights is about what money
+                              // did over a period; what is left in each
+                              // account is what Accounts is for, and saying it
+                              // in both places let the two disagree in front
+                              // of the user.
+                              _SummaryBand(analytics, category: category),
+                              const SizedBox(height: 24),
+                              if (category == null) ...[
+                                const Eyebrow('Where your money went'),
+                                const SizedBox(height: 12),
+                                _CategoryBreakdown(analytics),
+                                const SizedBox(height: 24),
                               ],
-                            ),
-                          ),
-                        ] else ...[
-                          SliverToBoxAdapter(
-                            child: SizedBox(
-                              height: 46,
-                              child: ListView.separated(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: SpendWiseTheme.gutter,
+                              Text(
+                                'Every ${_resolutionWord(resolution)} you have '
+                                'records for, in and out on one scale. Scroll '
+                                'the spine sideways to walk back through your '
+                                'whole history.',
+                                style: SpendWiseType.body.copyWith(
+                                  fontSize: 12.5,
+                                  color: SpendWiseColors.dim,
                                 ),
-                                scrollDirection: Axis.horizontal,
-                                itemCount: categories.length + 1,
-                                separatorBuilder: (_, _) =>
-                                    const SizedBox(width: 8),
-                                itemBuilder: (context, index) {
-                                  final value = index == 0
-                                      ? null
-                                      : categories[index - 1];
-                                  return ChoiceChip(
-                                    label: Text(value ?? 'All spending'),
-                                    selected: category == value,
-                                    onSelected: (_) =>
-                                        setState(() => category = value),
-                                  );
-                                },
                               ),
-                            ),
-                          ),
-                          SliverPadding(
-                            padding: const EdgeInsets.fromLTRB(
-                              SpendWiseTheme.gutter,
-                              14,
-                              SpendWiseTheme.gutter,
-                              36,
-                            ),
-                            sliver: SliverList.list(
-                              children: [
-                                // No balances card here. Insights is about
-                                // what money did over a period; what is left
-                                // in each account is what Accounts is for,
-                                // and saying it in both places let the two
-                                // disagree in front of the user.
-                                _SummaryBand(analytics),
-                                const SizedBox(height: 22),
-                                Eyebrow(
-                                  category == null
-                                      ? 'Money moving over time'
-                                      : '$category spending over time',
+                              const SizedBox(height: 10),
+                              Text(
+                                'Calculated only from your local ledger. Moves '
+                                'between your own accounts are excluded from '
+                                'both spending and income, and so is money '
+                                'lent, borrowed or held for someone else — '
+                                'none of it was earned or spent.',
+                                style: SpendWiseType.body.copyWith(
+                                  fontSize: 12.5,
+                                  color: SpendWiseColors.dim,
                                 ),
-                                const SizedBox(height: 10),
-                                _TrendChart(analytics),
-                                const SizedBox(height: 22),
-                                if (category == null) ...[
-                                  const Eyebrow('Where your money went'),
-                                  const SizedBox(height: 10),
-                                  _CategoryBreakdown(analytics),
-                                  const SizedBox(height: 22),
-                                ],
-                                Text(
-                                  'Calculated only from your local ledger. '
-                                  'Moves between your own accounts are '
-                                  'excluded from both spending and income.',
-                                  style: SpendWiseType.body.copyWith(
-                                    fontSize: 12.5,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ],
                     ),
             ),
@@ -234,7 +170,44 @@ class _InsightsScreenState extends State<InsightsScreen> {
   static String _resolutionWord(AnalyticsResolution value) => value.cadence;
 }
 
-enum _InsightsView { river, flow, detail }
+/// One category, chosen or not.
+///
+/// A ChoiceChip sat here, which is Material's rounded, filled idiom and the
+/// only one of its kind on the screen -- beside a segmented ViewToggle making
+/// a structurally identical "pick one" choice a single row above it.
+class _CategoryFilter extends StatelessWidget {
+  const _CategoryFilter({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: selected ? SpendWiseColors.fg : SpendWiseColors.edge,
+          ),
+          color: selected ? SpendWiseColors.fg : Colors.transparent,
+        ),
+        child: Text(
+          label,
+          style: SpendWiseType.metaTight.copyWith(
+            color: selected ? SpendWiseColors.bg : SpendWiseColors.dim,
+          ),
+        ),
+      ),
+    ),
+  );
+}
 
 /// The in/out spine: one horizontal time axis with money in growing upward and
 /// money out growing downward, drawn to a shared scale so the two sides are
@@ -422,16 +395,21 @@ class _Tick extends StatelessWidget {
 }
 
 class _SummaryBand extends StatelessWidget {
-  const _SummaryBand(this.analytics);
+  const _SummaryBand(this.analytics, {this.category});
 
   final SpendingAnalytics analytics;
+
+  /// Named on the figure itself. The filter used to be stated only in an
+  /// eyebrow *below* this number, so anyone reading the big figure had
+  /// already passed the one line saying what it was filtered to.
+  final String? category;
 
   @override
   Widget build(BuildContext context) {
     final change = analytics.spendingChangePercent;
     final changeColor = change == null || change <= 0
-        ? SpendWiseColors.income
-        : SpendWiseColors.expense;
+        ? SpendWiseColors.keep
+        : SpendWiseColors.spend;
     final cadence = 'per ${analytics.resolution.cadence}';
     return Container(
       padding: const EdgeInsets.only(top: 14),
@@ -441,7 +419,9 @@ class _SummaryBand extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Eyebrow('Spent in this view'),
+          Eyebrow(
+            category == null ? 'Spent in this view' : 'Spent on $category',
+          ),
           const SizedBox(height: 6),
           Text(
             formatAmount(
@@ -507,356 +487,84 @@ class _SummaryItem extends StatelessWidget {
   );
 }
 
-class _TrendChart extends StatefulWidget {
-  const _TrendChart(this.analytics);
-
-  final SpendingAnalytics analytics;
-
-  @override
-  State<_TrendChart> createState() => _TrendChartState();
-}
-
-class _TrendChartState extends State<_TrendChart> {
-  int? selectedIndex;
-
-  @override
-  void didUpdateWidget(covariant _TrendChart oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.analytics.resolution != widget.analytics.resolution ||
-        oldWidget.analytics.category != widget.analytics.category) {
-      selectedIndex = null;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final analytics = widget.analytics;
-    final selected =
-        analytics.buckets[(selectedIndex ?? analytics.buckets.length - 1).clamp(
-          0,
-          analytics.buckets.length - 1,
-        )];
-    final maxValue = analytics.buckets.fold<int>(1, (maximum, bucket) {
-      final value = math.max(bucket.spendingMinor, bucket.incomeMinor);
-      return math.max(maximum, value);
-    });
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        selected.label,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        '${formatMoney(MoneyViewData(selected.spendingMinor, currency: analytics.currency))} spent',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
-                if (analytics.category == null)
-                  _LegendDot(label: 'Income', color: SpendWiseColors.income),
-                const SizedBox(width: 12),
-                _LegendDot(label: 'Spent', color: SpendWiseColors.expense),
-              ],
-            ),
-            const SizedBox(height: 18),
-            // Twelve bars fit a phone; thirty do not. Past that the chart
-            // scrolls at a readable bar width instead of squeezing every day
-            // into three pixels and dropping its label.
-            LayoutBuilder(
-              builder: (context, constraints) {
-                const minBarWidth = 26.0;
-                final count = analytics.buckets.length;
-                final scrolls = count * minBarWidth > constraints.maxWidth;
-                final bars = [
-                  for (var index = 0; index < count; index++)
-                    SizedBox(
-                      width: scrolls
-                          ? minBarWidth
-                          : constraints.maxWidth / count,
-                      child: _BarColumn(
-                        bucket: analytics.buckets[index],
-                        maxValue: maxValue,
-                        selected: index == (selectedIndex ?? count - 1),
-                        showIncome: analytics.category == null,
-                        currency: analytics.currency,
-                        onTap: () => setState(() => selectedIndex = index),
-                      ),
-                    ),
-                ];
-                final row = Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisSize: MainAxisSize.min,
-                  children: bars,
-                );
-                return SizedBox(
-                  height: 190,
-                  child: scrolls
-                      ? SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          reverse: true,
-                          child: row,
-                        )
-                      : row,
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _BarColumn extends StatelessWidget {
-  const _BarColumn({
-    required this.bucket,
-    required this.maxValue,
-    required this.selected,
-    required this.showIncome,
-    required this.currency,
-    required this.onTap,
-  });
-
-  final AnalyticsBucket bucket;
-  final int maxValue;
-  final bool selected;
-  final bool showIncome;
-  final String currency;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final spendHeight = bucket.spendingMinor == 0
-        ? 3.0
-        : 132 * bucket.spendingMinor / maxValue;
-    final incomeHeight = bucket.incomeMinor == 0
-        ? 3.0
-        : 132 * bucket.incomeMinor / maxValue;
-    final semantics =
-        '${bucket.label}: ${formatMoney(MoneyViewData(bucket.spendingMinor, currency: currency))} spent${showIncome ? ', ${formatMoney(MoneyViewData(bucket.incomeMinor, currency: currency))} income' : ''}';
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: semantics,
-      child: Tooltip(
-        message: semantics,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (showIncome)
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 420),
-                          curve: Curves.easeOutCubic,
-                          width: 5,
-                          height: incomeHeight,
-                          decoration: BoxDecoration(
-                            color: SpendWiseColors.income.withValues(
-                              alpha: selected ? 1 : .58,
-                            ),
-                            borderRadius: BorderRadius.circular(5),
-                          ),
-                        ),
-                      if (showIncome) const SizedBox(width: 2),
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 420),
-                        curve: Curves.easeOutCubic,
-                        width: showIncome ? 9 : 14,
-                        height: spendHeight,
-                        decoration: BoxDecoration(
-                          color: SpendWiseColors.expense.withValues(
-                            alpha: selected ? 1 : .62,
-                          ),
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 9),
-                Text(
-                  bucket.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.clip,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: selected
-                        ? Theme.of(context).colorScheme.onSurface
-                        : SpendWiseColors.textSecondary,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
-                    fontSize: analyticsLabelSize(bucket.label),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  static double analyticsLabelSize(String label) => label.length > 3 ? 9 : 10;
-}
-
-class _LegendDot extends StatelessWidget {
-  const _LegendDot({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Container(
-        width: 7,
-        height: 7,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      ),
-      const SizedBox(width: 5),
-      Text(label, style: Theme.of(context).textTheme.bodySmall),
-    ],
-  );
-}
-
+/// Where the money went, drawn the way Home draws it.
+///
+/// This was a donut beside a list of the same six categories -- the same
+/// numbers stated twice, once through arc length, which the eye reads worse
+/// than bar length, and once as text. The bar was also quietly dishonest: it
+/// trimmed every sweep by a fixed amount so the segments would separate,
+/// which could clip a small category to nothing while its row still printed
+/// a confident 1%.
 class _CategoryBreakdown extends StatelessWidget {
   const _CategoryBreakdown(this.analytics);
 
   final SpendingAnalytics analytics;
 
-  /// The one ramp, so the donut, the bar on Home and the category rows all
+  /// The one ramp, so this bar, the bar on Home and the category rows all
   /// agree about which colour a category is.
   static List<Color> get colors => SpendWiseColors.categoryRamp;
 
   @override
   Widget build(BuildContext context) {
     if (analytics.categories.isEmpty) {
-      return const Card(
-        child: Padding(
-          padding: EdgeInsets.all(18),
-          child: Text('Categorized spending will appear here.'),
-        ),
+      return Text(
+        'Categorised spending will appear here.',
+        style: SpendWiseType.body.copyWith(fontSize: 13),
       );
     }
     final shown = analytics.categories.take(6).toList();
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Semantics(
-              label:
-                  'Category spending chart. ${shown.map((item) => '${item.category} ${(item.fraction * 100).round()} percent').join(', ')}',
-              child: SizedBox(
-                width: 116,
-                height: 116,
-                child: CustomPaint(
-                  painter: _DonutPainter(
-                    fractions: shown.map((item) => item.fraction).toList(),
-                    colors: colors,
-                  ),
-                  child: Center(
-                    child: Text(
-                      '${analytics.categories.length}\ncategories',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
+    final total = shown.fold<int>(0, (sum, item) => sum + item.amountMinor);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Semantics(
+          label:
+              'Category spending. '
+              '${shown.map((item) => '${item.category} ${(item.fraction * 100).round()} percent').join(', ')}',
+          child: SegmentBar(
+            weights: [
+              for (final item in shown)
+                total == 0 ? 1 : item.amountMinor / total,
+            ],
+            colors: [
+              for (var i = 0; i < shown.length; i++) colors[i % colors.length],
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        for (var i = 0; i < shown.length; i++)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                Container(
+                  width: 9,
+                  height: 9,
+                  color: colors[i % colors.length],
+                ),
+                const SizedBox(width: 11),
+                Expanded(
+                  child: Text(
+                    shown[i].category,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: SpendWiseType.row,
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 18),
-            Expanded(
-              child: Column(
-                children: [
-                  for (var index = 0; index < shown.length; index++)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: colors[index % colors.length],
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              shown[index].category,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          Text(
-                            '${(shown[index].fraction * 100).round()}%',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
+                Text(
+                  formatAmount(
+                    MoneyViewData(
+                      shown[i].amountMinor,
+                      currency: analytics.currency,
                     ),
-                ],
-              ),
+                    cents: false,
+                  ),
+                  style: SpendWiseType.rowStrong,
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+      ],
     );
   }
-}
-
-class _DonutPainter extends CustomPainter {
-  const _DonutPainter({required this.fractions, required this.colors});
-
-  final List<double> fractions;
-  final List<Color> colors;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 15
-      ..strokeCap = StrokeCap.butt;
-    var start = -math.pi / 2;
-    for (var index = 0; index < fractions.length; index++) {
-      final sweep = math.pi * 2 * fractions[index];
-      paint.color = colors[index % colors.length];
-      canvas.drawArc(
-        rect.deflate(9),
-        start,
-        math.max(0, sweep - .025),
-        false,
-        paint,
-      );
-      start += sweep;
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DonutPainter oldDelegate) =>
-      oldDelegate.fractions != fractions || oldDelegate.colors != colors;
 }

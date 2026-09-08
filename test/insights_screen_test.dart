@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:spendwise/app/theme.dart';
 import 'package:spendwise/features/insights/insights_screen.dart';
 import 'package:spendwise/features/shell/spendwise_view_model.dart';
+import 'package:spendwise/widgets/shape_kit.dart';
 
 void main() {
   testWidgets('insights switches resolution and filters a category', (
@@ -17,12 +18,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Insights'), findsOneWidget);
-    // Detail is the default view now: thirty days of all spending is the
-    // question people arrive with.
-    expect(find.text('MONEY MOVING OVER TIME'), findsOneWidget);
+
+    // One view. There is no River/Flow/Detail toggle any more: River asked
+    // the question Ledger owns, and Flow drew the same buckets as Detail
+    // through a second chart widget.
+    expect(find.text('RIVER'), findsNothing);
+    expect(find.text('FLOW'), findsNothing);
+    expect(find.text('DETAIL'), findsNothing);
+
     // Balances are not repeated here. Insights is about what money did over
     // a period; what is left in each account is what Accounts is for.
     expect(find.text('Total tracked'), findsNothing);
+    expect(find.text('SPENT IN THIS VIEW'), findsOneWidget);
+
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
     await tester.pumpAndSettle();
     expect(find.text('WHERE YOUR MONEY WENT'), findsOneWidget);
@@ -33,11 +41,71 @@ void main() {
     await tester.tap(find.text('7 DAYS'));
     await tester.pumpAndSettle();
     expect(find.text('Average per day'), findsOneWidget);
+  });
 
-    await tester.tap(find.text('Entertainment'));
+  testWidgets('the headline figure says what it is filtered to', (
+    tester,
+  ) async {
+    // The filter used to be named only in an eyebrow *below* the figure, so
+    // anyone reading the big number had already passed the one line saying
+    // what it counted.
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: Scaffold(body: InsightsScreen(viewModel: _InsightsModel())),
+      ),
+    );
     await tester.pumpAndSettle();
-    expect(find.text('ENTERTAINMENT SPENDING OVER TIME'), findsOneWidget);
-    expect(find.text('WHERE YOUR MONEY WENT'), findsNothing);
+    expect(find.text('SPENT IN THIS VIEW'), findsOneWidget);
+
+    // The filter strip comes first in the tree; the same word also appears
+    // as a row in the breakdown below it.
+    await tester.tap(find.text('Entertainment').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('SPENT ON ENTERTAINMENT'), findsOneWidget);
+    expect(find.text('SPENT IN THIS VIEW'), findsNothing);
+    expect(
+      find.text('WHERE YOUR MONEY WENT'),
+      findsNothing,
+      reason: 'a breakdown of one category is that category',
+    );
+  });
+
+  testWidgets('what it leaves out is stated, all of it', (tester) async {
+    // Loans were excluded from the totals in silence. Lend a large sum and
+    // the figure is smaller than you remember with nothing saying why --
+    // which is the exact class of mismatch this app has been burned by.
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: Scaffold(body: InsightsScreen(viewModel: _InsightsModel())),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -900));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('between your own accounts'), findsOneWidget);
+    expect(find.textContaining('lent, borrowed or held'), findsOneWidget);
+  });
+
+  testWidgets('the breakdown is drawn the way Home draws it', (tester) async {
+    // A donut said the same six numbers the list beside it already stated,
+    // through a weaker channel, and trimmed each sweep by a fixed amount --
+    // which could clip a small category to nothing while its row printed 1%.
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: Scaffold(body: InsightsScreen(viewModel: _InsightsModel())),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SegmentBar), findsWidgets);
+    expect(find.textContaining('categories'), findsNothing);
   });
 }
 
