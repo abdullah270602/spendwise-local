@@ -123,6 +123,11 @@ class RibbonHero implements ReportHero {
     return [
       _eyebrow('What came in, and what happened to it', paper),
       pw.SizedBox(height: 10),
+      // The trunk of the ribbon below is this figure. It was never printed:
+      // it existed only as the denominator of two percentages, so the page
+      // showed the parts of a total it never named.
+      _cameIn(data, paper),
+      pw.SizedBox(height: 14),
       pw.SizedBox(
         height: 150,
         width: double.infinity,
@@ -169,16 +174,30 @@ class RibbonHero implements ReportHero {
     children: [
       pw.Expanded(child: _stillYours(data, paper)),
       pw.Expanded(child: _gone(data, paper)),
-      if (data.movedMinor > 0)
-        pw.Expanded(
-          child: _figure(
-            'Moved between your accounts',
-            paper.money(data.movedMinor),
-            'not counted as spending',
-            paper.mine,
-            paper,
-          ),
+    ],
+  );
+
+  /// Everything that arrived, which is what the ribbon divides.
+  pw.Widget _cameIn(ReportData data, ReportPaper paper) => pw.Row(
+    crossAxisAlignment: pw.CrossAxisAlignment.end,
+    children: [
+      pw.Text(
+        paper.money(data.receivedMinor),
+        style: pw.TextStyle(
+          font: paper.bold,
+          fontSize: 32,
+          color: paper.ink,
+          letterSpacing: -1.1,
         ),
+      ),
+      pw.SizedBox(width: 9),
+      pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 5),
+        child: pw.Text(
+          'came in',
+          style: pw.TextStyle(fontSize: 10, color: paper.muted),
+        ),
+      ),
     ],
   );
 
@@ -210,21 +229,21 @@ class RibbonHero implements ReportHero {
     return _figure(
       'Still yours',
       paper.money(data.keptMinor),
-      '${_percent(data.keptMinor, data.receivedMinor)} of what came in',
+      '${_percent(data.keptMinor, data.receivedMinor)} of it',
       paper.ink,
       paper,
     );
   }
 
   /// Unlike the kept fraction, "gone" is never clamped -- a period that spent
-  /// more than it received should read "128% of what came in", not a
-  /// silently capped 100%, because the overspend is exactly the fact this
-  /// figure exists to state.
+  /// more than it received should read "128% of it", not a silently capped
+  /// 100%, because the overspend is exactly the fact this figure exists to
+  /// state.
   pw.Widget _gone(ReportData data, ReportPaper paper) => _figure(
     'Gone',
     paper.money(data.spentMinor),
     data.receivedMinor > 0
-        ? '${_percent(data.spentMinor, data.receivedMinor)} of what came in'
+        ? '${_percent(data.spentMinor, data.receivedMinor)} of it'
         : 'nothing came in to measure it against',
     paper.spend,
     paper,
