@@ -16,7 +16,7 @@ abstract final class SpendWiseColors {
   static const fg = Color(0xFFE9E7E2);
 
   /// Secondary text, axis labels, metadata.
-  static const dim = Color(0xFF767C80);
+  static const dim = Color(0xFF7A8084);
 
   /// Hairline between rows -- barely there on purpose.
   static const line = Color(0xFF1C2023);
@@ -67,7 +67,19 @@ abstract final class SpendWiseColors {
     final base = categoryRamp[i % categoryRamp.length];
     final lap = i ~/ categoryRamp.length;
     if (lap == 0) return base;
-    return base.withValues(alpha: math.max(0.34, 1 - lap * 0.3));
+    // Each lap past the ramp fades a little and rotates the hue a little.
+    //
+    // Fading alone was the original scheme and it hit a floor: every slot
+    // from 24 upward was drawn at the same clamped alpha, so slot 32 came out
+    // byte-identical to slot 24 -- the exact collision the lap was added to
+    // prevent, moved eight places along rather than removed. Alpha and
+    // lightness both clamp; hue does not, it wraps. Measured distinct to 96
+    // slots across all five palettes, which is far past any plausible ledger.
+    final hsl = HSLColor.fromColor(base);
+    return hsl
+        .withHue((hsl.hue + lap * 10.8) % 360)
+        .toColor()
+        .withValues(alpha: math.max(0.48, 1 - lap * 0.16));
   }
 
   // ---- Legacy aliases -------------------------------------------------

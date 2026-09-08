@@ -182,15 +182,22 @@ class _Fake extends ChangeNotifier implements SpendWiseAdvancedViewModel {
   /// What a dismissal would hide, and what putting it back would restore.
   /// Two rows with different prior states, because restoring them all as
   /// "review" would quietly lose the ones that failed to parse.
+  ///
+  /// Kept as state rather than a constant because the screen now counts these
+  /// either side of an answer to find out what the answer really settled. A
+  /// fake that still reports two alerts waiting after both were dropped would
+  /// teach the screen that dropping does nothing.
+  Map<String, String> waiting = {'a1': 'review', 'a2': 'error'};
+
   @override
-  Map<String, String> unresolvedAlertStatuses(String? packageName) => const {
-    'a1': 'review',
-    'a2': 'error',
+  Map<String, String> unresolvedAlertStatuses(String? packageName) => {
+    ...waiting,
   };
 
   @override
   Future<void> restoreAlerts(Map<String, String> statuses) async {
     restored = statuses;
+    waiting = {...statuses};
   }
 
   @override
@@ -229,6 +236,7 @@ class _Fake extends ChangeNotifier implements SpendWiseAdvancedViewModel {
   @override
   Future<void> applyReviewDecision(ReviewDecision decision) async {
     applied.add(decision);
+    if (decision.kind == ReviewDecisionKind.dismissSource) waiting.clear();
   }
 
   @override

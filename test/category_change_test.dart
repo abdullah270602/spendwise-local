@@ -126,6 +126,44 @@ void main() {
     expect(analytics.totalSpendingMinor, 40000);
   });
 
+  test('a transaction dated in the future does not crash the screen', () {
+    // The manual entry sheet accepts tomorrow's date, so this is reachable by
+    // anyone filing an entry on New Year's Eve, or by a device whose clock ran
+    // fast while alerts were captured. The years view built its buckets by
+    // counting from the earliest transaction year up to the current one, which
+    // yields nothing at all when the earliest is in the future -- and the very
+    // next line took `starts.first`. The whole tab threw on open.
+    for (final resolution in AnalyticsResolution.values) {
+      expect(
+        () => SpendingAnalytics.calculate(
+          now: DateTime(2026, 12, 31),
+          resolution: resolution,
+          transactions: [spend('Groceries', 100000, DateTime(2027, 1, 1))],
+        ),
+        returnsNormally,
+        reason: '${resolution.name} threw on a future-dated ledger',
+      );
+    }
+  });
+
+  test('a future-dated transaction is not counted as this period', () {
+    // Not crashing is not the same as counting it. Money that has not been
+    // spent yet must not appear in a period that has already happened.
+    final analytics = SpendingAnalytics.calculate(
+      now: DateTime(2026, 12, 31),
+      resolution: AnalyticsResolution.years,
+      transactions: [
+        spend('Groceries', 40000, DateTime(2026, 6, 1)),
+        spend('Travel', 900000, DateTime(2027, 1, 1)),
+      ],
+    );
+    expect(analytics.totalSpendingMinor, 40000);
+    expect(
+      analytics.categories.map((item) => item.category),
+      isNot(contains('Travel')),
+    );
+  });
+
   test('filtering the screen does not narrow what changed', () {
     // The headline figure follows the filter; the breakdown of what moved
     // must not, or selecting one category would report every other category

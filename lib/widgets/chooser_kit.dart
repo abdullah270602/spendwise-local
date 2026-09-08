@@ -32,38 +32,116 @@ class ChooserScreen extends StatelessWidget {
 
   final List<Widget> children;
 
+  /// The most of the screen the pinned preview may claim.
+  ///
+  /// Pinning something means it cannot be scrolled away, which also means it
+  /// cannot be allowed to grow without limit: at twice the default text size
+  /// the preview wanted more height than a phone has and simply took it, and
+  /// the choices it exists to explain were pushed off the bottom of a Column
+  /// that had nowhere to put them. Half is the split that keeps both halves
+  /// usable.
+  static const _previewShareOfScreen = 0.5;
+
+  static const _previewPadding = EdgeInsets.fromLTRB(
+    SpendWiseTheme.gutter,
+    4,
+    SpendWiseTheme.gutter,
+    18,
+  );
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text(title)),
-    body: Column(
-      children: [
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.fromLTRB(
-            SpendWiseTheme.gutter,
-            4,
-            SpendWiseTheme.gutter,
-            18,
-          ),
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: SpendWiseColors.line)),
-          ),
-          child: preview,
-        ),
-        Expanded(
-          child: ListView(
-            padding: EdgeInsets.fromLTRB(
-              SpendWiseTheme.gutter,
-              20,
-              SpendWiseTheme.gutter,
-              32 + MediaQuery.viewPaddingOf(context).bottom,
+    body: LayoutBuilder(
+      builder: (context, constraints) => Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: _previewPadding,
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: SpendWiseColors.line)),
             ),
-            children: children,
+            child: _PinnedPreview(
+              maxHeight:
+                  constraints.maxHeight * _previewShareOfScreen -
+                  _previewPadding.vertical,
+              child: preview,
+            ),
           ),
-        ),
-      ],
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.fromLTRB(
+                SpendWiseTheme.gutter,
+                20,
+                SpendWiseTheme.gutter,
+                32 + MediaQuery.viewPaddingOf(context).bottom,
+              ),
+              children: children,
+            ),
+          ),
+        ],
+      ),
     ),
   );
+}
+
+/// The preview, held to a ceiling, and given a scroll view only once it has
+/// actually hit one.
+///
+/// The scroll view is withheld rather than always present because a second
+/// scrollable changes what "scroll this screen" means -- to a test harness,
+/// and to anyone driving the phone by switch or by voice, both of which have
+/// to be told which one they meant. At ordinary text sizes there is nothing
+/// to scroll and so nothing should be scrollable.
+class _PinnedPreview extends StatefulWidget {
+  const _PinnedPreview({required this.child, required this.maxHeight});
+
+  final Widget child;
+  final double maxHeight;
+
+  @override
+  State<_PinnedPreview> createState() => _PinnedPreviewState();
+}
+
+class _PinnedPreviewState extends State<_PinnedPreview> {
+  final GlobalKey _content = GlobalKey();
+  bool _tooTall = false;
+
+  /// Measured after the frame rather than predicted from the text scale.
+  /// What a preview costs depends on which chooser it belongs to and on how
+  /// many of its lines wrapped, and neither of those is knowable in advance.
+  void _remeasure(Duration _) {
+    if (!mounted) return;
+    final box = _content.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final tooTall = box.size.height > widget.maxHeight + 0.5;
+    if (tooTall != _tooTall) setState(() => _tooTall = tooTall);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback(_remeasure);
+    final content = KeyedSubtree(key: _content, child: widget.child);
+    if (_tooTall) {
+      return SizedBox(
+        height: widget.maxHeight,
+        child: SingleChildScrollView(child: content),
+      );
+    }
+    // Laid out at whatever height it asks for and then clipped to the
+    // ceiling, so the one frame before a too-tall preview is measured cuts it
+    // short instead of reporting an overflow. Under the ceiling this is the
+    // preview at exactly its own height, which is what it always was.
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: widget.maxHeight),
+      child: ConstraintsTransformBox(
+        constraintsTransform: ConstraintsTransformBox.maxHeightUnconstrained,
+        alignment: Alignment.topCenter,
+        clipBehavior: Clip.hardEdge,
+        child: content,
+      ),
+    );
+  }
 }
 
 /// A titled run of choices that answer one question.
@@ -143,12 +221,20 @@ class ChoiceRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mark = tone ?? SpendWiseColors.keep;
+    // AnimatedContainer does not consult the platform's reduced-motion flag
+    // by itself -- honouring it is opt-in, per widget -- so the border that
+    // thickens and takes the accent went on thickening for someone who had
+    // asked the whole system to stop moving. The choice still lands and still
+    // looks selected; it simply arrives rather than travels.
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 140);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: InkWell(
         onTap: onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
+          duration: duration,
           curve: Curves.easeOut,
           padding: const EdgeInsets.fromLTRB(13, 13, 14, 13),
           decoration: BoxDecoration(

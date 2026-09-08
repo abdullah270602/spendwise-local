@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spendwise/app/category_tones.dart';
+import 'package:spendwise/app/palette.dart';
 import 'package:spendwise/app/theme.dart';
 
 /// A category's colour used to be its position in whatever list was being
@@ -64,22 +65,44 @@ void main() {
   test(
     'every category in one view is drawn differently from its neighbours',
     () {
-      // The ramp is eight and steps down in weight past that, so a long list
-      // stays distinguishable rather than starting over.
+      // This asserted twenty and passed, while the real collision sat at
+      // thirty-two: fading alone clamped, so slot 32 came out byte-identical
+      // to slot 24. Twenty proved nothing about the scheme, only about the
+      // part of it nobody reaches. Sixty-four is past any plausible ledger,
+      // and past where every clamp used to bite.
       final tones = CategoryTones(
-        known: [for (var i = 0; i < 20; i++) 'Category $i'],
+        known: [for (var i = 0; i < 64; i++) 'Category $i'],
       );
-      final seen = <int>{};
-      for (var i = 0; i < 20; i++) {
-        final colour = tones.of('Category $i');
+      final seen = <int, int>{};
+      for (var i = 0; i < 64; i++) {
+        final colour = tones.of('Category $i').toARGB32();
         expect(
-          seen.add(colour.toARGB32()),
-          isTrue,
-          reason: 'Category $i repeats a tone already on screen',
+          seen.containsKey(colour),
+          isFalse,
+          reason: 'Category $i repeats the tone of Category ${seen[colour]}',
         );
+        seen[colour] = i;
       }
     },
   );
+
+  test('the ramp holds for every palette, not just the shipped one', () {
+    // The collision was found in sage. Nothing said the other four behaved.
+    for (final palette in SpendWisePalette.all) {
+      SpendWiseColors.apply(palette);
+      final seen = <int, int>{};
+      for (var i = 0; i < 64; i++) {
+        final colour = SpendWiseColors.category(i).toARGB32();
+        expect(
+          seen.containsKey(colour),
+          isFalse,
+          reason: '${palette.name}: slot $i repeats slot ${seen[colour]}',
+        );
+        seen[colour] = i;
+      }
+    }
+    SpendWiseColors.apply(SpendWisePalette.sage);
+  });
 
   test('channel numbers are one-based and stable', () {
     final tones = CategoryTones(known: known);

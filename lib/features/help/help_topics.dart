@@ -186,15 +186,20 @@ List<HelpTopic> helpTopics(SpendWiseViewModel viewModel) => [
         'way it failed, and it always offers the same three answers. Attach '
         'them to an account, for alerts that read as money but named a bank '
         'SpendWise does not know. File them as transactions, saying which way '
-        'the money went, for alerts it could not read at all — usually real '
-        'payments it read the amount of but not the direction. Or drop them, '
+        'the money went and which account it landed in, for alerts it could '
+        'not read at all — usually real payments it read the amount of but '
+        'not the direction. Or drop them, '
         'for the ones that were never transactions: a promotion, a balance '
         'notice, a delivery text.\n\n'
         'Dropping is the only answer with no other way back, so it is the one '
         'that offers Undo. The answer appears where the question was and '
         'waits a few seconds before clearing, which is your chance to take it '
         'back. Nothing is erased either way — a dropped alert is set aside, '
-        'not deleted.',
+        'not deleted.\n\n'
+        'What the answer reports is counted, not assumed. If some of the '
+        'alerts could not be read even after you said which way the money '
+        'went, it says so — "3 of 5 settled" — rather than clearing the list '
+        'and claiming all five.',
     body: () => [
       const HelpExample(
         framed: false,
@@ -285,7 +290,6 @@ List<HelpTopic> helpTopics(SpendWiseViewModel viewModel) => [
         'line saying so, because a balance is not a permission to spend. An '
         'app that carries several banks, such as your messages app, is never '
         'tied to one account: its alerts are filed by what each one says. '
-        'that carries several banks, such as your messages app, is never tied '
         'When a '
         'balance drifts from what the bank says, correcting it writes a '
         'Balance adjustment entry for the difference rather than quietly '

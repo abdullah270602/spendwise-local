@@ -5,6 +5,7 @@ import '../insights/river_view.dart';
 
 import '../../app/theme.dart';
 import '../../widgets/shape_kit.dart';
+import '../capture/capture_state.dart';
 import '../shell/spendwise_view_model.dart';
 import 'transaction_details_screen.dart';
 
@@ -191,10 +192,15 @@ class _LedgerScreenState extends State<LedgerScreen> {
                     ),
                     TextButton(
                       onPressed: _clearSearchAndFilters,
+                      // No padding, so the label still ends at the gutter,
+                      // but a full-size box behind it: this is the way out of
+                      // a filtered ledger and it was 30px tall.
                       style: TextButton.styleFrom(
                         padding: EdgeInsets.zero,
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        minimumSize: const Size(
+                          kMinInteractiveDimension,
+                          kMinInteractiveDimension,
+                        ),
                       ),
                       child: const Text('Clear'),
                     ),
@@ -213,14 +219,19 @@ class _LedgerScreenState extends State<LedgerScreen> {
                     ? 'Nothing recorded yet.'
                     : 'No transaction matches that.',
                 detail: all.isEmpty
-                    ? 'Bank alerts land here automatically once notification '
-                          'access is on. You can also add one by hand.'
+                    ? captureIsOff(widget.viewModel)
+                          ? captureOffDetail
+                          : 'Bank alerts land here automatically once '
+                                'notification access is on. You can also add '
+                                'one by hand.'
                     : scoped
                     ? 'Step back a month, or show every month.'
                     : allMonths
                     ? 'This is the whole ledger.'
                     : 'Try fewer words, or clear the filters.',
-                action: scoped && all.isNotEmpty
+                action: all.isEmpty && captureIsOff(widget.viewModel)
+                    ? ChooseSourcesButton(viewModel: widget.viewModel)
+                    : scoped && all.isNotEmpty
                     ? OutlinedButton(
                         onPressed: () => _stepMonth(-1),
                         child: Text(
@@ -282,77 +293,102 @@ class _LedgerScreenState extends State<LedgerScreen> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        // The month and the controls sit on one line where there is room for
+        // one, and stack where there is not. Five controls at the size a thumb
+        // needs come to 240px, which leaves a 360dp phone 76px for a month
+        // name that wants 112 -- and an ellipsised "Septemb..." is the header
+        // paying for its own tap targets out of the one word on it that says
+        // what you are looking at. Stacked, both lines start at the gutter:
+        // the month is a heading and the controls are a bar beneath it, which
+        // is what they look like anyway once they are no longer beside it.
+        OverflowBar(
+          alignment: MainAxisAlignment.spaceBetween,
+          overflowAlignment: OverflowBarAlignment.start,
+          overflowSpacing: 4,
           children: [
-            if (scoped) ...[
-              _Step(
-                icon: Icons.chevron_left_rounded,
-                tooltip: 'Previous month',
-                onPressed: () => _stepMonth(-1),
+            if (scoped)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _Step(
+                    icon: Icons.chevron_left_rounded,
+                    tooltip: 'Previous month',
+                    onPressed: () => _stepMonth(-1),
+                  ),
+                  // Flexible so a long month name yields to the controls
+                  // beside it rather than pushing them off the edge.
+                  Flexible(
+                    child: Text(
+                      DateFormat(_sameYear ? 'MMMM' : 'MMMM yyyy')
+                          .format(month),
+                      style: SpendWiseType.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  _Step(
+                    icon: Icons.chevron_right_rounded,
+                    tooltip: 'Next month',
+                    onPressed: _atCurrentMonth ? null : () => _stepMonth(1),
+                  ),
+                ],
+              )
+            else
+              Text(
+                allMonths ? 'All months' : 'Every match',
+                style: SpendWiseType.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(width: 2),
-              // Flexible so a long month name yields to the controls rather
-              // than pushing them off the edge -- "September 2024" plus four
-              // icons does not fit a narrow phone otherwise.
-              Flexible(
-                child: Text(
-                  DateFormat(_sameYear ? 'MMMM' : 'MMMM yyyy').format(month),
-                  style: SpendWiseType.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Only offered when a month is actually being enforced. While
+                // a search or filter is running the register is already
+                // showing the whole ledger, so the control would claim to
+                // change something it does not.
+                if (query.isEmpty &&
+                    kind == null &&
+                    accountId == null &&
+                    category == null)
+                  _Step(
+                    icon: allMonths
+                        ? Icons.calendar_month_rounded
+                        : Icons.all_inclusive_rounded,
+                    tooltip: allMonths
+                        ? 'Show one month at a time'
+                        : 'Show every month',
+                    onPressed: () => _setAllMonths(!allMonths),
+                    active: allMonths,
+                  ),
+                _Step(
+                  icon: Icons.search_rounded,
+                  tooltip: 'Search the ledger',
+                  onPressed: () => setState(() => searching = !searching),
+                  active: searching,
                 ),
-              ),
-              const SizedBox(width: 2),
-              _Step(
-                icon: Icons.chevron_right_rounded,
-                tooltip: 'Next month',
-                onPressed: _atCurrentMonth ? null : () => _stepMonth(1),
-              ),
-            ] else
-              Flexible(
-                child: Text(
-                  allMonths ? 'All months' : 'Every match',
-                  style: SpendWiseType.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                _Step(
+                  icon: Icons.tune_rounded,
+                  tooltip: 'Filter the ledger',
+                  onPressed: () => _showFilters(context),
+                  active: _activeFilterCount > 0,
                 ),
-              ),
-            const Spacer(),
-            // Only offered when a month is actually being enforced. While a
-            // search or filter is running the register is already showing the
-            // whole ledger, so the control would claim to change something it
-            // does not.
-            if (query.isEmpty &&
-                kind == null &&
-                accountId == null &&
-                category == null)
-              _Step(
-                icon: allMonths
-                    ? Icons.calendar_month_rounded
-                    : Icons.all_inclusive_rounded,
-                tooltip: allMonths
-                    ? 'Show one month at a time'
-                    : 'Show every month',
-                onPressed: () => _setAllMonths(!allMonths),
-                active: allMonths,
-              ),
-            _Step(
-              icon: Icons.search_rounded,
-              tooltip: 'Search the ledger',
-              onPressed: () => setState(() => searching = !searching),
-              active: searching,
-            ),
-            _Step(
-              icon: Icons.tune_rounded,
-              tooltip: 'Filter the ledger',
-              onPressed: () => _showFilters(context),
-              active: _activeFilterCount > 0,
+              ],
             ),
           ],
         ),
         const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
+        // The same arrangement, for the same reason: raise the system font
+        // and the toggle alone is most of the width, so the balance takes the
+        // next line rather than squeezing its label into 80px and scaling its
+        // figure down to fit -- which is what the Flexible here used to do,
+        // and what it did instead of yielding was run 68px off the edge.
+        OverflowBar(
+          alignment: scoped
+              ? MainAxisAlignment.spaceBetween
+              : MainAxisAlignment.end,
+          overflowAlignment: OverflowBarAlignment.end,
+          overflowSpacing: 8,
           children: [
             if (scoped)
               ViewToggle(
@@ -360,27 +396,24 @@ class _LedgerScreenState extends State<LedgerScreen> {
                 selected: view.index,
                 onSelected: _setView,
               ),
-            const Spacer(),
-            // A large balance and the toggle together are wider than a 360dp
-            // phone. Neither is worth clipping, so the number wraps its label
-            // and shrinks rather than running off the edge.
-            Flexible(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  const Eyebrow('Balance now'),
-                  const SizedBox(height: 3),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      formatMinor(_currentBalance),
-                      style: SpendWiseType.rowStrong.copyWith(fontSize: 19),
-                      maxLines: 1,
-                    ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const Eyebrow('Balance now'),
+                const SizedBox(height: 3),
+                // A balance long enough to fill the line on its own shrinks
+                // rather than clipping.
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    formatMinor(_currentBalance),
+                    style: SpendWiseType.rowStrong.copyWith(fontSize: 19),
+                    maxLines: 1,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ],
         ),
@@ -686,9 +719,14 @@ class _Step extends StatelessWidget {
   Widget build(BuildContext context) => IconButton(
     onPressed: onPressed,
     tooltip: tooltip,
-    visualDensity: VisualDensity.compact,
+    // These five are packed against each other, which is exactly where a
+    // target below the guideline costs you the wrong month or the wrong
+    // sheet. The icon is unchanged; the box behind it is not.
     padding: const EdgeInsets.all(6),
-    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+    constraints: const BoxConstraints(
+      minWidth: kMinInteractiveDimension,
+      minHeight: kMinInteractiveDimension,
+    ),
     icon: Icon(
       icon,
       size: 20,

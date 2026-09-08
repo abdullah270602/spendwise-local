@@ -92,50 +92,36 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
       children: [
         const SectionHeading('Home'),
         const SizedBox(height: 8),
-        Card(
-          child: Column(
-            children: [
-              _Entry(
-                icon: Icons.date_range_outlined,
-                title: 'How much time Home shows',
-                value: viewModel.uiHomePeriod.title,
-                onTap: () => _open(HomePeriodScreen(viewModel: viewModel)),
-              ),
-              const Divider(height: 1, indent: 56),
-              _Entry(
-                icon: Icons.savings_outlined,
-                title: 'Savings on Home',
-                value: _savingsSummary,
-                onTap: () => _open(HomeSavingsScreen(viewModel: viewModel)),
-              ),
-              const Divider(height: 1, indent: 56),
-              _Entry(
-                icon: Icons.donut_small_outlined,
-                title: 'Categories on Home',
-                value: HomeCategories.fromId(
-                  viewModel.uiViewPreference('home_categories'),
-                ).title,
-                onTap: () => _open(HomeCategoriesScreen(viewModel: viewModel)),
-              ),
-            ],
-          ),
+        SettingsRow(
+          title: 'How much time Home shows',
+          subtitle: viewModel.uiHomePeriod.title,
+          onTap: () => _open(HomePeriodScreen(viewModel: viewModel)),
+        ),
+        SettingsRow(
+          title: 'Savings on Home',
+          subtitle: _savingsSummary,
+          onTap: () => _open(HomeSavingsScreen(viewModel: viewModel)),
+        ),
+        SettingsRow(
+          title: 'Categories on Home',
+          subtitle: HomeCategories.fromId(
+            viewModel.uiViewPreference('home_categories'),
+          ).title,
+          onTap: () => _open(HomeCategoriesScreen(viewModel: viewModel)),
         ),
         const SizedBox(height: 22),
         const SectionHeading('Insights'),
         const SizedBox(height: 8),
-        Card(
-          child: _Entry(
-            icon: Icons.insights_rounded,
-            title: 'What Insights shows',
-            value: _insightsSummary,
-            onTap: () => _open(
-              InsightsSectionsScreen(
-                viewModel: viewModel,
-                // Settings has no period of its own to offer, so the previews
-                // are drawn for the month, which is what Insights itself
-                // opens on.
-                resolution: AnalyticsResolution.thisMonth,
-              ),
+        SettingsRow(
+          title: 'What Insights shows',
+          subtitle: _insightsSummary,
+          onTap: () => _open(
+            InsightsSectionsScreen(
+              viewModel: viewModel,
+              // Settings has no period of its own to offer, so the previews
+              // are drawn for the month, which is what Insights itself
+              // opens on.
+              resolution: AnalyticsResolution.thisMonth,
             ),
           ),
         ),
@@ -144,38 +130,19 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
         // in the Home section only because that was the section that existed.
         const SectionHeading('Everywhere'),
         const SizedBox(height: 8),
-        Card(
-          child: _Entry(
-            icon: Icons.palette_outlined,
-            title: 'Colour',
-            value: SpendWiseColors.palette.name,
-            onTap: () => _open(PaletteScreen(viewModel: viewModel)),
-          ),
+        SettingsRow(
+          title: 'Colour',
+          subtitle: SpendWiseColors.palette.name,
+          onTap: () => _open(PaletteScreen(viewModel: viewModel)),
         ),
       ],
     ),
   );
 }
 
-class _Entry extends StatelessWidget {
-  const _Entry({
-    required this.icon,
-    required this.title,
-    required this.value,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String value;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => ListTile(
-    leading: Icon(icon),
-    title: Text(title),
-    subtitle: Text(value),
-    trailing: const Icon(Icons.chevron_right_rounded),
-    onTap: onTap,
-  );
-}
+/// A choice-summary row: what the setting is, and the one line answering it,
+/// with the same hairline-and-nothing-else drawing every other row in the
+/// app uses. The old ListTile card gave every one of these a rounded, raised
+/// panel and a Material leading icon that no other settings row in this
+/// redraw carries -- dropped so this reads as one more row in the list Home,
+/// Ledger and Accounts already use, not a different product's screen.

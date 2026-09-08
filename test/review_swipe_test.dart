@@ -42,6 +42,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(model.confirmed, containsAll(['tx-1', 'tx-2', 'tx-3']));
+    // The answer is stated where the question was, and it states what the
+    // ledger did rather than what the button offered. The rest state waits
+    // its turn: the last answer is the one most worth reading, and it used to
+    // be swallowed by an empty screen the instant it landed.
+    expect(find.text('3 alerts settled.'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
     expect(find.text('Nothing needs you.'), findsOneWidget);
   });
 

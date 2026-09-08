@@ -25,10 +25,39 @@ class InsightsScreen extends StatefulWidget {
 }
 
 class _InsightsScreenState extends State<InsightsScreen> {
-  /// The month you are in, all spending, is the question people actually
-  /// arrive with, so it is what the screen opens on.
-  AnalyticsResolution resolution = AnalyticsResolution.thisMonth;
+  /// Remembered, like every other choice about how a screen is drawn.
+  ///
+  /// It was the one view preference the app forgot: `ledger_view`,
+  /// `ledger_span`, `home_period`, `home_savings` and the report template all
+  /// persist, and this reverted on every launch. Somebody who reads their
+  /// spending by year had to say so again every time they opened the tab.
+  ///
+  /// The month you are in, all spending, is the question people arrive with,
+  /// so it remains what an unset preference opens on.
+  late AnalyticsResolution resolution;
   String? category;
+
+  @override
+  void initState() {
+    super.initState();
+    resolution = _resolutionFromId(
+      widget.viewModel.uiViewPreference(InsightsPreference.period),
+    );
+  }
+
+  /// Stored by name rather than by index, so reordering the enum cannot
+  /// silently reinterpret somebody's saved choice as a different period.
+  static AnalyticsResolution _resolutionFromId(String? id) {
+    for (final value in AnalyticsResolution.values) {
+      if (value.name == id) return value;
+    }
+    return AnalyticsResolution.thisMonth;
+  }
+
+  void _chooseResolution(AnalyticsResolution value) {
+    setState(() => resolution = value);
+    widget.viewModel.uiSetViewPreference(InsightsPreference.period, value.name);
+  }
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
@@ -97,8 +126,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
                         builder: (_) => InsightsPeriodScreen(
                           viewModel: widget.viewModel,
                           selected: resolution,
-                          onSelected: (value) =>
-                              setState(() => resolution = value),
+                          onSelected: _chooseResolution,
                         ),
                       ),
                     ),

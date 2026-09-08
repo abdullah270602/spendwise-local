@@ -338,6 +338,14 @@ final class SpendingAnalytics {
     final years = transactions.map((item) => item.occurredAt.toLocal().year);
     if (years.isEmpty) return fallback;
     final earliest = years.reduce((a, b) => a < b ? a : b);
+    // Clamped at both ends. The lower bound keeps a very old import from
+    // drawing thirty near-empty columns. The upper bound stops a year that
+    // has not happened yet from starting the window: the loop that builds
+    // the buckets counts up to the current year, so an earliest year in the
+    // future produced no buckets at all and `starts.first` threw. The manual
+    // entry sheet accepts tomorrow's date, so this is reachable by anyone
+    // filing an entry on New Year's Eve, and it crashed the whole tab.
+    if (earliest > fallback) return fallback;
     return earliest < fallback - 5 ? fallback - 5 : earliest;
   }
 

@@ -36,6 +36,11 @@ actually invalidated. Say which ones you checked and which needed nothing;
 - **Tests** — a test asserting the old copy or the old contract is not "a
   test to fix"; it is the old contract, and it needs rewriting to state the
   new one deliberately. Never edit an assertion merely to make it pass.
+  Widget tests run at whatever size and font scale you give them and no
+  other: pin `tester.view.physicalSize` to a real phone (360dp wide) and set
+  `platformDispatcher.textScaleFactorTestValue` for anything that lays out
+  text. Both blind spots have shipped visible breakage — a header that
+  overflowed by 108px, and 43 overflows at twice the default font size.
 
 **Commits.** Do not add a `Co-Authored-By` trailer for Claude or any other
 assistant. This is a repository the user publishes as their own work, and the

@@ -4,17 +4,17 @@ Last updated: 2026-09-08
 
 ## Current release
 
-- Version: `0.9.15+30`
+- Version: `0.9.18+33`
 - Android package: `com.spendwise.app` — keep this stable so upgrades retain data.
 - Public repository: <https://github.com/abdullah270602/spendwise-local>
-- Latest release: <https://github.com/abdullah270602/spendwise-local/releases/tag/v0.9.15>
+- Latest release: <https://github.com/abdullah270602/spendwise-local/releases/tag/v0.9.18>
 - Shipped APK is the optimized split-per-ABI release build, not a Flutter debug
   build. Build with `flutter build apk --release --split-per-abi`; a plain
   `--release` writes only the universal APK and leaves the per-ABI files from
   the *previous* build sitting in the output directory, which is an easy way to
   install a stale binary and believe it is current. Check the APK's mtime
   against the commit before installing.
-- Split-per-ABI adds 2000 to the version code for arm64: `30` becomes `2030`.
+- Split-per-ABI adds 2000 to the version code for arm64: `33` becomes `2033`.
 - Installed on the connected Pixel 9 at this version, with `adb install -r`.
 
 ## Known reliability issues
@@ -201,6 +201,22 @@ in `AGENTS.md`. In particular:
   curation, and a plain `Page` does not clip -- a busy month could push content
   past the physical edge, invisible rather than ugly, on a document whose whole
   job is to be a record.
+- Settings, Appearance, Export and Notification sources are drawn in the app's
+  own flat hairline vocabulary rather than stock Material `Card`/`ListTile`
+  rows. `SettingsRow` in `lib/widgets/spendwise_components.dart` is the shared
+  row; there is no second surface colour and no rounded block anywhere.
+- The transaction details screen and the debt sheets follow the same rule, and
+  all three debt stories are offered where the record is made. Deleting from a
+  transaction's own screen offers the same Undo the Review inbox does, and
+  "Not a loan" — which discards a debt's whole history — asks first.
+- Both empty states say so when notification access is granted but every
+  source is switched off, and offer the way back.
+  `lib/features/capture/capture_state.dart` owns that fact, because Home and
+  the Ledger both report it and a second copy of the wording is a second
+  chance for them to disagree.
+- A register row prints a sign and carries one merged `Semantics` label, so a
+  screen reader hears whether money came in or went out. It had encoded that
+  in colour alone.
 - Local export, insights, notification-source health, demo-data controls, and
   Settings version/build display with a user-invoked GitHub link.
 
@@ -222,7 +238,7 @@ invalidation behavior when changing the shell/controller.
 
 ## Verification baseline
 
-At `0.9.15`, the analyzer is clean and all 582 tests pass. Before shipping:
+At `0.9.18`, the analyzer is clean and all 654 tests pass. Before shipping:
 
 1. Run `dart format` on changed Dart files.
 2. Run `flutter analyze --no-pub`.
@@ -273,6 +289,21 @@ current configured paths rather than assume another user's home directory.
   ledger knew all along -- `TransactionViewData.isLoanMovement` -- and the
   report simply never asked. When a figure excludes something the list beside
   it still shows, say so on the page; otherwise the two disagree in silence.
+- **A Container with an `alignment` and no width takes every pixel it is
+  offered.** Centring a segmented control's labels that way turned three
+  segments into three stacked full-width rows on a real phone. The test that
+  should have caught it asserted the control's *width*, which a full-width
+  block does not violate. Assert the dimension that can actually go wrong.
+- **Text scale is a test dimension, and it was never set.** The suite pinned
+  the screen size and let the font size default, so a whole class stayed
+  invisible: at `textScaleFactor` 2.0 the committed suites produced 43
+  overflows across seven widgets. `platformDispatcher.textScaleFactorTestValue`
+  turns the existing tests into the detector.
+- **A guideline is not a decision.** `ViewToggle` is knowingly under the 48dp
+  tap-target minimum: raised to 48 it read as a slab in a header, and the
+  owner reverted it on the device. The test now pins it *compact* and says
+  why, because a test asserting a guideline the product has deliberately
+  declined is a test that lies.
 - **Percentages rank the wrong things.** A category that went from 350 to 900
   has risen further in percent than one that rose by 6,500 rupees, and only
   one of those belongs at the top of a list. Order by money moved, and gate
@@ -280,6 +311,19 @@ current configured paths rather than assume another user's home directory.
 
 ## Open work
 
+- **The review receipt understates when alerts merge.** `fileAlerts` returns
+  a count that `applyReviewDecision` still discards, so the screen measures
+  the ledger either side of an answer instead. If reconciliation merges two
+  alerts into one entry the receipt says "1 of 2". It can never overstate,
+  which was the defect; closing it properly means widening
+  `applyReviewDecision` to `Future<int>` across the view model, the
+  controller and every test fake.
+- **Every write re-reads the whole ledger on the UI isolate.**
+  `SpendWiseController.transactions` runs a three-way SQLite join per
+  transaction, and the shell rebuilds every review rule inside an
+  `AnimatedBuilder` for a badge count. Filing one review costs roughly a
+  thousand queries. This is the 500-transaction question and it is not yet
+  answered.
 - **Two widget contracts are narrower than their designs.** The Chronograph's
   hub cannot name the period because the period is not passed to it, and the
   Mixing Desk cannot draw dead channels — a channel that exists with nothing

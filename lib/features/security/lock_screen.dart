@@ -100,7 +100,12 @@ class _LockScreenState extends State<LockScreen>
           checking = false;
           wrong = true;
         });
-        shake.forward(from: 0);
+        // A wrong PIN answers in four ways at once: a haptic, the dots
+        // turning, a line of text, and this shake. Only the shake is purely
+        // movement, so it is the only one reduced motion takes away -- the
+        // refusal is still unmistakable without it, which is the test for
+        // whether an animation was ever carrying the message on its own.
+        if (!MediaQuery.disableAnimationsOf(context)) shake.forward(from: 0);
         _armCountdown();
         await Future<void>.delayed(const Duration(milliseconds: 420));
         if (mounted) setState(() => entry = '');

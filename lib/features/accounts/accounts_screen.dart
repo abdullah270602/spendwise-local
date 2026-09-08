@@ -1161,9 +1161,18 @@ class _SavingsExplanation extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(12),
+    // Square, and an outline rather than a fill. The app's cards are
+    // square-cornered outlines by rule -- "the design reads as printed
+    // matter" -- and there is no second surface colour to tint this with;
+    // this box predated the rule and kept both.
+    // Not const: the accent is reassigned when the palette changes.
     decoration: BoxDecoration(
-      color: SpendWiseColors.accentMuted,
-      borderRadius: BorderRadius.circular(12),
+      border: Border(
+        left: BorderSide(color: SpendWiseColors.accent, width: 2),
+        top: const BorderSide(color: SpendWiseColors.edge),
+        right: const BorderSide(color: SpendWiseColors.edge),
+        bottom: const BorderSide(color: SpendWiseColors.edge),
+      ),
     ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,

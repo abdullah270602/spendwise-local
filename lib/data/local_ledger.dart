@@ -1124,9 +1124,17 @@ final class LocalLedger {
   ///
   /// The direction is a hint, not an override: an alert whose wording is
   /// already clear keeps the reading it had, and the parser still supplies
-  /// the amount, counterparty and reference. Returns how many became
-  /// transactions, which is not always all of them — an alert with no
-  /// readable amount cannot be rescued this way.
+  /// the amount, counterparty and reference. The account is the same shape of
+  /// answer: it stands in only where the alert never found one of its own, so
+  /// answering for a mixed batch cannot re-home the half that was never in
+  /// doubt.
+  ///
+  /// Returns how many became transactions, which is not always all of them —
+  /// an alert with no readable amount cannot be rescued this way, and neither
+  /// can one that still reached no account, because an entry has to belong
+  /// somewhere before it can reach a balance. That number is the only honest
+  /// thing a caller can put on screen, so it is what a caller must report and
+  /// not the size of the batch it asked about.
   int fileAlerts(
     Iterable<String> observationIds, {
     required EntryDirection direction,
@@ -1141,7 +1149,12 @@ final class LocalLedger {
     );
     var filed = 0;
     for (final row in rows) {
-      final raw = _rawFromRow(row, accountOverride: accountId);
+      // An alert that already knows its account keeps it; the user's answer
+      // fills the hole for the ones that never had one.
+      final raw = _rawFromRow(
+        row,
+        accountOverride: (row['account_id'] as String?) ?? accountId,
+      );
       if (raw.accountId == null) continue;
       final result = const NotificationParser().parseDetailed(
         raw,

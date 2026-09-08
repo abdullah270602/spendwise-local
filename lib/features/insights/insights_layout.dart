@@ -133,4 +133,5 @@ abstract final class InsightsPreference {
   static const share = 'insights_share';
   static const change = 'insights_change';
   static const gateSensitivity = 'insights_gate_sensitivity';
+  static const period = 'insights_period';
 }

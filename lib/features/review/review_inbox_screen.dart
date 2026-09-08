@@ -10,6 +10,10 @@ import '../shell/spendwise_view_model.dart';
 import '../transactions/transaction_details_screen.dart';
 import 'review_rules.dart';
 
+/// What the ledger held at one moment: how many entries it has, and how much
+/// of the question being answered was still open.
+typedef _Reading = ({int entries, int waiting});
+
 /// Review asks questions, not permissions. Fourteen uncertain alerts are not
 /// fourteen decisions — they are usually two, and answering one settles the
 /// whole group. One-by-one is still there for anyone who wants it.
@@ -37,7 +41,12 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
   /// user has scrolled. The answer is now stated where the question was.
   ReviewRule? settled;
   String? settledId;
+
+  /// What the answer settled, and how much it was asked to settle. Two numbers
+  /// because they are allowed to differ, and the difference is the user's to
+  /// see: an answer that reached only half the pile has to say half.
   int settledCount = 0;
+  int settledOf = 0;
 
   /// What "drop" hid, so it can be put back. Null for answers that are not
   /// destructive: filing and attaching are undone by editing the entry they
@@ -62,6 +71,12 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
     final shown = answered == null || rules.any((r) => r.id == answered.id)
         ? rules
         : [...rules, answered];
+    // The rest state waits until the answer has been read. An answer that
+    // clears the last question used to be replaced instantly by "Nothing
+    // needs you", which is the one moment the user most needs to be told what
+    // just happened -- and if the answer settled less than it was asked to,
+    // an empty screen is the app claiming otherwise.
+    final resting = shown.isEmpty;
 
     return SafeArea(
       bottom: false,
@@ -94,7 +109,7 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
                     ),
             ),
           ),
-          if (rules.isEmpty)
+          if (resting)
             const SliverFillRemaining(
               hasScrollBody: false,
               child: RestState(
@@ -117,6 +132,7 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
                   if (rule.id == settledId) {
                     return _SettledBlock(
                       count: settledCount,
+                      of: settledOf,
                       onUndo: undoStatuses == null ? null : _undo,
                       onDone: _clearSettled,
                     );
@@ -131,30 +147,31 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
                 },
               ),
             ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  SpendWiseTheme.gutter,
-                  22,
-                  SpendWiseTheme.gutter,
-                  96 + MediaQuery.viewPaddingOf(context).bottom,
-                ),
-                child: Container(
-                  padding: const EdgeInsets.only(top: 13),
-                  decoration: const BoxDecoration(
-                    border: Border(
-                      top: BorderSide(color: SpendWiseColors.line),
-                    ),
+            if (rules.isNotEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    SpendWiseTheme.gutter,
+                    22,
+                    SpendWiseTheme.gutter,
+                    96 + MediaQuery.viewPaddingOf(context).bottom,
                   ),
-                  child: Text(
-                    rules.length == 1
-                        ? 'Answering it clears the inbox.'
-                        : 'Answering all ${rules.length} clears the inbox.',
-                    style: SpendWiseType.body.copyWith(fontSize: 12.5),
+                  child: Container(
+                    padding: const EdgeInsets.only(top: 13),
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        top: BorderSide(color: SpendWiseColors.line),
+                      ),
+                    ),
+                    child: Text(
+                      rules.length == 1
+                          ? 'Answering it clears the inbox.'
+                          : 'Answering all ${rules.length} clears the inbox.',
+                      style: SpendWiseType.body.copyWith(fontSize: 12.5),
+                    ),
                   ),
                 ),
               ),
-            ),
           ],
         ],
       ),
@@ -164,36 +181,25 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
   Future<void> _apply(ReviewRule rule, ReviewAction action) async {
     var decision = action.decision;
 
+    // Asked one after another rather than one instead of another: filing needs
+    // both the account and the direction, and collecting only the direction
+    // was how the answer came to be applied with nothing to apply it to. The
+    // account goes first because it is the question that can turn out to have
+    // no answer at all, and finding that out afterwards wastes the other one.
+    if (action.needsAccount) {
+      final accountId = await _pickAccount();
+      if (accountId == null || !mounted) return;
+      decision = _answered(decision, accountId: accountId);
+    }
     if (action.needsDirection) {
       final expense = await _askDirection(rule);
-      if (expense == null) return;
-      decision = ReviewDecision(
-        kind: decision.kind,
-        transactionIds: decision.transactionIds,
-        alertIds: decision.alertIds,
-        packageName: decision.packageName,
-        expense: expense,
-      );
-    } else if (action.needsAccount) {
-      final accountId = await _pickAccount();
-      if (accountId == null) return;
-      decision = ReviewDecision(
-        kind: decision.kind,
-        transactionIds: decision.transactionIds,
-        alertIds: decision.alertIds,
-        // Carried through so the ledger can widen an empty id list to every
-        // stuck alert the app has, the way filing and dropping already do.
-        packageName: decision.packageName,
-        accountId: accountId,
-      );
-    } else if (action.needsCategory) {
+      if (expense == null || !mounted) return;
+      decision = _answered(decision, expense: expense);
+    }
+    if (action.needsCategory) {
       final category = await _pickCategory();
-      if (category == null) return;
-      decision = ReviewDecision(
-        kind: ReviewDecisionKind.categorize,
-        transactionIds: decision.transactionIds,
-        category: category,
-      );
+      if (category == null || !mounted) return;
+      decision = _answered(decision, category: category);
     }
 
     // Captured before the change, because afterwards there is no query that
@@ -201,6 +207,15 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
     final undo = decision.kind == ReviewDecisionKind.dismissSource
         ? widget.viewModel.uiUnresolvedAlertStatuses(decision.packageName)
         : null;
+
+    // What the rule covers is what the answer is meant to settle; what the
+    // ledger managed is a different number, and it is the one the user is
+    // owed. Filing cannot rescue an alert with no readable amount, and an
+    // answer about an app names the app rather than a list of rows, so the
+    // size of the job is not knowable until it has run. Reading the ledger on
+    // either side of the answer is the only figure that is a fact rather than
+    // an expectation, and this screen exists to print facts.
+    final before = _read(decision);
 
     setState(() {
       applying = rule.id;
@@ -212,7 +227,8 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
       setState(() {
         settled = rule;
         settledId = rule.id;
-        settledCount = rule.count;
+        settledCount = _settledBetween(decision, before, _read(decision));
+        settledOf = before.waiting;
         undoStatuses = undo != null && undo.isNotEmpty ? undo : null;
       });
     } catch (error) {
@@ -229,6 +245,62 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
       }
     }
   }
+
+  /// One question answered, folded back into the decision. Every other field
+  /// is carried through: a rule that needs two answers would otherwise lose
+  /// the first one to the second, and an alert answer that loses its package
+  /// name stops naming the alerts it is about.
+  ReviewDecision _answered(
+    ReviewDecision decision, {
+    String? accountId,
+    bool? expense,
+    String? category,
+  }) => ReviewDecision(
+    kind: decision.kind,
+    transactionIds: decision.transactionIds,
+    alertIds: decision.alertIds,
+    packageName: decision.packageName,
+    accountId: accountId ?? decision.accountId,
+    expense: expense ?? decision.expense,
+    category: category ?? decision.category,
+  );
+
+  /// One reading of the ledger. Taken either side of an answer, the difference
+  /// between two of them is what the answer did, which is not always what it
+  /// was asked to do.
+  _Reading _read(ReviewDecision decision) => (
+    entries: widget.viewModel.transactions.length,
+    waiting: switch (decision.kind) {
+      ReviewDecisionKind.fileAlerts ||
+      ReviewDecisionKind.routeAlerts ||
+      ReviewDecisionKind.dismissSource =>
+        widget.viewModel.uiUnresolvedAlertStatuses(decision.packageName).length,
+      _ =>
+        widget.viewModel.transactions
+            .where(
+              (item) =>
+                  decision.transactionIds.contains(item.id) && !item.isReviewed,
+            )
+            .length,
+    },
+  );
+
+  /// What an answer settled, in the terms that answer was given in.
+  ///
+  /// Filing and attaching are judged by what they wrote, not by how much of
+  /// the inbox they emptied: an alert whose amount is still unreadable is
+  /// marked read-and-ignored rather than left waiting, so an inbox that empties
+  /// is no evidence at all that anything reached the ledger. Everything else
+  /// settles by leaving the queue, which is exactly what it promised to do.
+  int _settledBetween(
+    ReviewDecision decision,
+    _Reading before,
+    _Reading after,
+  ) => switch (decision.kind) {
+    ReviewDecisionKind.fileAlerts || ReviewDecisionKind.routeAlerts =>
+      (after.entries - before.entries).clamp(0, before.waiting),
+    _ => (before.waiting - after.waiting).clamp(0, before.waiting),
+  };
 
   void _clearSettled() {
     if (!mounted) return;
@@ -884,11 +956,18 @@ class _RuleBlock extends StatelessWidget {
 class _SettledBlock extends StatefulWidget {
   const _SettledBlock({
     required this.count,
+    required this.of,
     required this.onUndo,
     required this.onDone,
   });
 
+  /// What the ledger settled, counted rather than assumed.
   final int count;
+
+  /// What the question covered. Equal to [count] most of the time; when it is
+  /// not, the shortfall is stated instead of rounded up, and the question
+  /// comes back underneath for whatever is left of it.
+  final int of;
   final Future<void> Function()? onUndo;
   final VoidCallback onDone;
 
@@ -928,6 +1007,19 @@ class _SettledBlockState extends State<_SettledBlock> {
     });
   }
 
+  /// The whole point of the line. An answer that reached nothing says so, and
+  /// one that reached part of the pile names the part, because the alternative
+  /// is a receipt for work the ledger never did.
+  String get _receipt {
+    if (widget.count == 0) return 'Nothing settled.';
+    if (widget.count < widget.of) {
+      return '${widget.count} of ${widget.of} alerts settled.';
+    }
+    return widget.count == 1
+        ? '1 alert settled.'
+        : '${widget.count} alerts settled.';
+  }
+
   @override
   Widget build(BuildContext context) {
     final reduce = MediaQuery.disableAnimationsOf(context);
@@ -950,9 +1042,7 @@ class _SettledBlockState extends State<_SettledBlock> {
                   ),
                   Expanded(
                     child: Text(
-                      widget.count == 1
-                          ? '1 alert settled.'
-                          : '${widget.count} alerts settled.',
+                      _receipt,
                       style: SpendWiseType.body.copyWith(fontSize: 13.5),
                     ),
                   ),

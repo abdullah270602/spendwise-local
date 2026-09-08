@@ -17,8 +17,17 @@ Widget buildHome(String? choice) => DashboardScreen(
 );
 
 void main() {
-  Future<void> pumpHome(WidgetTester tester, String? choice) async {
-    tester.view.physicalSize = const Size(1080, 2400);
+  /// [height] in logical pixels. The counting tests ask for a screen tall
+  /// enough to hold every row, because the breakdown is a lazy sliver: a row
+  /// that has not been built is not a row that is missing, and now that each
+  /// one is 48px rather than 35 a phone-sized viewport stops building before
+  /// the eighth.
+  Future<void> pumpHome(
+    WidgetTester tester,
+    String? choice, {
+    double height = 800,
+  }) async {
+    tester.view.physicalSize = Size(360 * 3, height * 3);
     tester.view.devicePixelRatio = 3.0;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
@@ -106,7 +115,7 @@ void main() {
   });
 
   testWidgets('every category means every category', (tester) async {
-    await pumpHome(tester, 'all');
+    await pumpHome(tester, 'all', height: 1600);
     expect(rowsOn(tester), 8);
   });
 
@@ -130,7 +139,7 @@ void main() {
   });
 
   testWidgets('an unset choice draws everything', (tester) async {
-    await pumpHome(tester, null);
+    await pumpHome(tester, null, height: 1600);
     expect(rowsOn(tester), 8);
   });
 
@@ -142,7 +151,7 @@ void main() {
       ('top', topCategoryCount + 1),
       ('off', 0),
     ]) {
-      await pumpHome(tester, choice);
+      await pumpHome(tester, choice, height: 1600);
       final rows = tester
           .widgetList<CategoryRow>(find.byType(CategoryRow))
           .toList();

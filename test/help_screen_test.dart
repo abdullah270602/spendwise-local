@@ -33,6 +33,32 @@ void main() {
     }
   });
 
+  test('no chapter repeats a run of its own words', () {
+    // The Accounts chapter shipped a copy-paste fragment mid-sentence -- "its
+    // alerts are filed by what each one says. that carries several banks,
+    // such as your messages app, is never tied When a balance drifts..." --
+    // and nothing caught it, because a garbled brief still renders. That text
+    // is also what the copy-a-prompt button hands to a model as fact.
+    for (final topic in helpTopics(_Stub())) {
+      final words = topic.brief
+          .toLowerCase()
+          .replaceAll(RegExp(r'[^a-z ]'), ' ')
+          .split(RegExp(r'\s+'))
+          .where((word) => word.isNotEmpty)
+          .toList();
+      final runs = <String>{};
+      const span = 8;
+      for (var i = 0; i + span <= words.length; i++) {
+        final run = words.sublist(i, i + span).join(' ');
+        expect(
+          runs.add(run),
+          isTrue,
+          reason: '"${topic.title}" says this twice: "$run"',
+        );
+      }
+    }
+  });
+
   testWidgets('the index lists the chapters in reading order', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

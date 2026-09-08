@@ -5,7 +5,15 @@ import '../../app/theme.dart';
 import '../../widgets/shape_kit.dart';
 import '../shell/spendwise_view_model.dart';
 
-Color _toneFor(DebtKind kind) => switch (kind) {
+/// The colour a debt kind is drawn in, wherever one is drawn.
+///
+/// Public rather than a private helper of this file: the transaction the
+/// debt hangs off of is shown on a different screen, and that screen used to
+/// guess at the colour with its own two-way lent/spend ternary -- which had
+/// no way to spell "held", so held money got painted as spending. One
+/// function, used everywhere a debt's tone is needed, is the only way that
+/// stays impossible to get wrong twice.
+Color toneForDebtKind(DebtKind kind) => switch (kind) {
   DebtKind.lent => SpendWiseColors.keep,
   DebtKind.borrowed => SpendWiseColors.spend,
   DebtKind.holding => SpendWiseColors.dim,
@@ -20,6 +28,11 @@ Future<bool> markAsLoan(
   BuildContext context, {
   required SpendWiseViewModel viewModel,
   required TransactionViewData transaction,
+  // Which of the three stories the sheet opens onto. Left to guess from the
+  // transaction's direction where the caller has no better idea -- but the
+  // caller now offers all three up front, so most calls pass the one the
+  // person actually tapped rather than leaning on this guess.
+  DebtKind? initialKind,
 }) async {
   final outgoing = transaction.kind != TransactionKind.income;
   final result = await showModalBottomSheet<bool>(
@@ -30,7 +43,7 @@ Future<bool> markAsLoan(
     builder: (sheetContext) => _MarkLoanSheet(
       viewModel: viewModel,
       transaction: transaction,
-      kind: outgoing ? DebtKind.lent : DebtKind.borrowed,
+      kind: initialKind ?? (outgoing ? DebtKind.lent : DebtKind.borrowed),
     ),
   );
   return result ?? false;
@@ -154,7 +167,7 @@ class _MarkLoanSheetState extends State<_MarkLoanSheet> {
                 Text(
                   formatAmount(widget.transaction.amount),
                   style: SpendWiseType.rowStrong.copyWith(
-                    color: _toneFor(kind),
+                    color: toneForDebtKind(kind),
                   ),
                 ),
               ],
@@ -207,7 +220,7 @@ class _KindRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tone = _toneFor(kind);
+    final tone = toneForDebtKind(kind);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: InkWell(
@@ -313,7 +326,7 @@ class _DebtSheetState extends State<_DebtSheet> {
   @override
   Widget build(BuildContext context) {
     final current = debt;
-    final tone = current.lent ? SpendWiseColors.keep : SpendWiseColors.spend;
+    final tone = toneForDebtKind(current.kind);
     return Padding(
       padding: EdgeInsets.fromLTRB(
         SpendWiseTheme.gutter,
@@ -463,31 +476,34 @@ class _DebtSheetState extends State<_DebtSheet> {
                     : () => _refile(option),
               ),
             const SizedBox(height: 14),
-            Row(
-              children: [
-                if (!current.isSettled)
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: working ? null : _close,
-                      child: const Text('Call it settled'),
-                    ),
-                  )
-                else
-                  Expanded(
-                    child: Text(
-                      'Settled${current.closedAt == null ? '' : ' on ${DateFormat('d MMM yyyy').format(current.closedAt!)}'}.',
-                      style: SpendWiseType.body.copyWith(fontSize: 13),
-                    ),
-                  ),
-                const SizedBox(width: 10),
-                OutlinedButton(
-                  onPressed: working ? null : _forget,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: SpendWiseColors.spend,
-                  ),
-                  child: const Text('Not a loan'),
+            if (!current.isSettled)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: working ? null : _close,
+                  child: const Text('Call it settled'),
                 ),
-              ],
+              )
+            else
+              Text(
+                'Settled${current.closedAt == null ? '' : ' on ${DateFormat('d MMM yyyy').format(current.closedAt!)}'}.',
+                style: SpendWiseType.body.copyWith(fontSize: 13),
+              ),
+            const SizedBox(height: 16),
+            // Deliberately smaller and lower than "Call it settled": that one
+            // is a correction you can walk back by re-filing or recording a
+            // repayment, this one throws the counterparty, note and
+            // repayment history away and hands the amount back to ordinary
+            // income or spending. Equal weight would have told the eye they
+            // were equally safe to tap.
+            Center(
+              child: TextButton(
+                onPressed: working ? null : _forget,
+                style: TextButton.styleFrom(
+                  foregroundColor: SpendWiseColors.spend,
+                ),
+                child: const Text('Not a loan'),
+              ),
             ),
           ],
         ),
@@ -533,8 +549,39 @@ class _DebtSheetState extends State<_DebtSheet> {
 
   Future<void> _close() => _run(() => widget.viewModel.uiCloseDebt(debt.id));
 
-  Future<void> _forget() =>
-      _run(() => widget.viewModel.uiRemoveDebt(debt.id), closeAfter: true);
+  Future<void> _forget() async {
+    // One tap used to be enough to discard a counterparty, a note and a
+    // whole repayment history, and to move a figure on Home, with nothing to
+    // undo it. A question first is the cheapest possible defence against a
+    // slip of the thumb landing beside "Call it settled".
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('This was never a loan?'),
+        content: Text(
+          'The record of ${debt.counterparty} and any repayments logged '
+          'against it are dropped, and the amount counts as ordinary '
+          'spending or income again, whichever way it moved. This cannot '
+          'be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: SpendWiseColors.spend,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Not a loan'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _run(() => widget.viewModel.uiRemoveDebt(debt.id), closeAfter: true);
+  }
 
   Future<void> _run(
     Future<void> Function() action, {

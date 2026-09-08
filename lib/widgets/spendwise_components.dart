@@ -194,3 +194,78 @@ class PrivacyBanner extends StatelessWidget {
     ),
   );
 }
+
+/// One tappable line in a list of settings.
+///
+/// Flat, hairline-bottomed, no leading icon, no Material card behind it -- the
+/// vocabulary every other screen in the app is drawn in. Shared because three
+/// screens needed the same row and each had built its own, which is three
+/// chances for them to drift apart by a couple of pixels.
+class SettingsRow extends StatelessWidget {
+  const SettingsRow({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.trailing,
+    this.onTap,
+    this.titleColor,
+  });
+
+  final String title;
+
+  /// One short line, or none. A settings row states what it does; it does
+  /// not explain itself in a paragraph.
+  final String? subtitle;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+  final Color? titleColor;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    child: Container(
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: SpendWiseColors.line)),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 13),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: SpendWiseType.row.copyWith(color: titleColor),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle!,
+                    style: SpendWiseType.body.copyWith(fontSize: 12.5),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (trailing != null) ...[
+            const SizedBox(width: 12),
+            trailing!,
+          ] else if (onTap != null) ...[
+            const SizedBox(width: 8),
+            const Text(
+              '›',
+              style: TextStyle(
+                fontSize: 20,
+                height: 1,
+                color: SpendWiseColors.dim,
+              ),
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
+}

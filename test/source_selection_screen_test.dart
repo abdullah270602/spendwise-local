@@ -18,7 +18,7 @@ void main() {
 
     expect(find.text('Meezan Mobile'), findsOneWidget);
     expect(find.text('Google Messages'), findsOneWidget);
-    await tester.enterText(find.byType(SearchBar), 'meezan');
+    await tester.enterText(find.byType(TextField), 'meezan');
     await tester.pump();
     expect(find.text('Meezan Mobile'), findsOneWidget);
     expect(find.text('Google Messages'), findsNothing);
@@ -27,6 +27,32 @@ void main() {
     await tester.pump();
     expect(model.lastPackage, 'pk.com.meezanbank');
     expect(model.sources.first.enabled, isTrue);
+  });
+
+  // A 108px header overflow shipped once because every widget test ran at
+  // the 800x600 default -- this screen's own match-count row packed two
+  // Text widgets straight into a Row with no way to shrink, so it is the one
+  // most likely to repeat that mistake at a narrow width and a doubled font.
+  testWidgets('the match-count row survives 360px and 2x text', (tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      tester.platformDispatcher.clearTextScaleFactorTestValue();
+    });
+
+    final model = _SourceModel();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: SourceSelectionScreen(viewModel: model),
+      ),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
   });
 }
 

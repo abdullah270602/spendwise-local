@@ -112,6 +112,29 @@ void main() {
     });
   });
 
+  group('the chosen period', () {
+    testWidgets('opens on the month when nothing is stored', (tester) async {
+      await pump(tester, {}, scroll: false);
+      expect(find.text('THIS MONTH'), findsOneWidget);
+    });
+
+    testWidgets('is honoured when one is stored', (tester) async {
+      // It was the one view preference the app forgot, so somebody who reads
+      // their spending by year said so again on every launch.
+      await pump(tester, {InsightsPreference.period: 'years'}, scroll: false);
+      expect(find.text('YEARS'), findsOneWidget);
+    });
+
+    testWidgets('a stored value that no longer exists falls back', (
+      tester,
+    ) async {
+      await pump(tester, {
+        InsightsPreference.period: 'fortnight',
+      }, scroll: false);
+      expect(find.text('THIS MONTH'), findsOneWidget);
+    });
+  });
+
   testWidgets('every section can be off at once without breaking', (
     tester,
   ) async {

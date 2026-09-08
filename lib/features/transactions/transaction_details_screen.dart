@@ -51,105 +51,84 @@ class TransactionDetailsScreen extends StatelessWidget {
           48,
         ),
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(22),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: .12),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      transaction.kind == TransactionKind.transfer
-                          ? Icons.swap_horiz_rounded
-                          : transaction.kind == TransactionKind.income
-                          ? Icons.south_west_rounded
-                          : Icons.north_east_rounded,
-                      color: color,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    transaction.title,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    formatMoney(
-                      transaction.amount,
-                      signed: transaction.kind != TransactionKind.transfer,
-                    ),
-                    style: Theme.of(context).textTheme.displaySmall
-                        ?.copyWith(color: color),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    transaction.subtitle,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
+          // No card, no icon-in-a-tinted-circle: every other screen states a
+          // figure as an eyebrow, a title and a number set straight on the
+          // background, and this one drew a raised panel around the same
+          // three facts instead of trusting them to carry the page.
+          Eyebrow(transaction.kind.name, color: color),
+          const SizedBox(height: 8),
+          Text(
+            transaction.title,
+            style: Theme.of(context).textTheme.titleLarge,
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 10),
+          Text(
+            formatMoney(
+              transaction.amount,
+              signed: transaction.kind != TransactionKind.transfer,
+            ),
+            style: Theme.of(context).textTheme.displaySmall
+                ?.copyWith(color: color),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            transaction.subtitle,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 24),
           const SectionHeading('Details'),
           const SizedBox(height: 8),
-          Card(
-            child: Column(
-              children: [
-                _Detail('Type', titleCase(transaction.kind.name)),
-                _Detail('Category', transaction.category),
-                _Detail(
-                  'Account',
-                  transaction.accountName.isEmpty
-                      ? 'Unassigned'
-                      : transaction.accountName,
-                ),
-                _Detail(
-                  'Date',
-                  '${transaction.occurredAt.day}/${transaction.occurredAt.month}/${transaction.occurredAt.year} · ${transaction.occurredAt.hour.toString().padLeft(2, '0')}:${transaction.occurredAt.minute.toString().padLeft(2, '0')}',
-                ),
-                if (transaction.note.isNotEmpty)
-                  _Detail('Note', transaction.note),
-              ],
-            ),
+          Column(
+            children: [
+              _Detail('Type', titleCase(transaction.kind.name)),
+              _Detail('Category', transaction.category),
+              _Detail(
+                'Account',
+                transaction.accountName.isEmpty
+                    ? 'Unassigned'
+                    : transaction.accountName,
+              ),
+              _Detail(
+                'Date',
+                '${transaction.occurredAt.day}/${transaction.occurredAt.month}/${transaction.occurredAt.year} · ${transaction.occurredAt.hour.toString().padLeft(2, '0')}:${transaction.occurredAt.minute.toString().padLeft(2, '0')}',
+              ),
+              if (transaction.note.isNotEmpty)
+                _Detail('Note', transaction.note),
+            ],
           ),
           const SizedBox(height: 18),
           _LoanSection(viewModel: viewModel, transaction: transaction),
           const SectionHeading('Source evidence'),
           const SizedBox(height: 8),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Icon(Icons.layers_outlined, color: SpendWiseColors.accent),
-                  const SizedBox(width: 13),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          transaction.evidenceCount == 0
-                              ? 'No linked evidence'
-                              : '${transaction.evidenceCount} evidence ${transaction.evidenceCount == 1 ? 'item' : 'items'}',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(switch (transaction.evidenceCount) {
-                          0 => 'Manual and older transactions may not have a linked notification or import.',
-                          1 => 'One notification or import supports this transaction.',
-                          _ =>
-                            'Multiple observations support this transaction.',
-                        }, style: Theme.of(context).textTheme.bodySmall),
-                      ],
-                    ),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border.all(color: SpendWiseColors.edge),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.layers_outlined, color: SpendWiseColors.accent),
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        transaction.evidenceCount == 0
+                            ? 'No linked evidence'
+                            : '${transaction.evidenceCount} evidence ${transaction.evidenceCount == 1 ? 'item' : 'items'}',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(switch (transaction.evidenceCount) {
+                        0 => 'Manual and older transactions may not have a linked notification or import.',
+                        1 => 'One notification or import supports this transaction.',
+                        _ => 'Multiple observations support this transaction.',
+                      }, style: Theme.of(context).textTheme.bodySmall),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
           if (transaction.evidence.isNotEmpty) ...[
@@ -189,8 +168,34 @@ class TransactionDetailsScreen extends StatelessWidget {
       ),
     );
     if (confirmed != true) return;
-    await viewModel.deleteTransaction(transaction.id);
-    if (context.mounted) Navigator.pop(context);
+    if (!context.mounted) return;
+    // Grabbed before the pop below: once this screen is gone its own
+    // Scaffold is gone with it, and the messenger and navigator this screen
+    // sat inside are what stay -- the same reason the review inbox grabs
+    // both before it pops the sheet it deletes from.
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final id = transaction.id;
+    try {
+      await viewModel.deleteTransaction(id);
+    } catch (error) {
+      if (context.mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Could not delete: $error')),
+        );
+      }
+      return;
+    }
+    navigator.pop();
+    messenger.showSnackBar(
+      SnackBar(
+        content: const Text('Transaction deleted'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () => viewModel.restoreTransaction(id),
+        ),
+      ),
+    );
   }
 
   Future<void> _showCorrection(BuildContext context) async {
@@ -431,96 +436,187 @@ class TransactionDetailsScreen extends StatelessWidget {
   }
 }
 
-class _EvidenceCard extends StatelessWidget {
+/// One piece of evidence, collapsed to its source and confidence until
+/// tapped open.
+///
+/// Built from a plain bordered block and a hand-rolled disclosure rather
+/// than [ExpansionTile]: the stock tile ships its own chevron rotation and
+/// expand animation, on a duration this app never chose and with no way to
+/// honour reduced motion short of reaching past the widget to silence it --
+/// which is exactly the gap that let this screen's disclosures keep moving
+/// after every other animation in the app had been told to stop.
+class _EvidenceCard extends StatefulWidget {
   const _EvidenceCard({required this.item, required this.isLast});
   final EvidenceViewData item;
   final bool isLast;
+
   @override
-  Widget build(BuildContext context) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      SizedBox(
-        width: 28,
-        child: Column(
-          children: [
-            Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                color: SpendWiseColors.accent,
-                shape: BoxShape.circle,
+  State<_EvidenceCard> createState() => _EvidenceCardState();
+}
+
+class _EvidenceCardState extends State<_EvidenceCard> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
+    // 220ms is the short end of the app's own range: a chevron and a detail
+    // panel are the smallest motion this screen makes, so they take the
+    // smallest number already in use rather than inventing a new one.
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 220);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 28,
+          child: Column(
+            children: [
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: SpendWiseColors.accent,
+                  shape: BoxShape.circle,
+                ),
               ),
-            ),
-            if (!isLast)
-              Container(width: 1, height: 128, color: SpendWiseColors.border),
-          ],
+              if (!widget.isLast)
+                Container(width: 1, height: 128, color: SpendWiseColors.border),
+            ],
+          ),
         ),
-      ),
-      Expanded(
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Card(
-            child: ExpansionTile(
-              tilePadding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 2,
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border.all(color: SpendWiseColors.edge),
               ),
-              title: Text(
-                item.sourceLabel,
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-              subtitle: Text(
-                '${_stateLabel(item.state)} · ${(item.confidence * 100).round()}% confidence',
-              ),
-              childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-              children: [
-                if (item.title.isNotEmpty || item.body.isNotEmpty)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: SpendWiseColors.background,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      [
-                        item.title,
-                        item.body,
-                      ].where((value) => value.isNotEmpty).join('\n'),
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                const SizedBox(height: 10),
-                _Meta('Source reader', item.parserId),
-                if (item.ruleId.isNotEmpty) _Meta('Matching rule', item.ruleId),
-                _Meta('Observed', _dateTime(item.observedAt)),
-                if (item.reasons.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'WHY IT MATCHED',
-                      style: Theme.of(context).textTheme.bodySmall
-                          ?.copyWith(fontSize: 10, letterSpacing: 1.2),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  for (final reason in item.reasons)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        '• ${reason.replaceAll('_', ' ')}',
-                        style: Theme.of(context).textTheme.bodySmall,
+              child: Column(
+                children: [
+                  Semantics(
+                    button: true,
+                    expanded: _open,
+                    child: InkWell(
+                      onTap: () => setState(() => _open = !_open),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item.sourceLabel,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${_stateLabel(item.state)} · ${(item.confidence * 100).round()}% confidence',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            AnimatedRotation(
+                              turns: _open ? .5 : 0,
+                              duration: duration,
+                              curve: Curves.easeOutQuint,
+                              child: const Icon(
+                                Icons.expand_more_rounded,
+                                size: 18,
+                                color: SpendWiseColors.dim,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
+                  ),
+                  AnimatedSize(
+                    duration: duration,
+                    curve: Curves.easeOutQuint,
+                    alignment: Alignment.topCenter,
+                    child: !_open
+                        ? const SizedBox(width: double.infinity)
+                        : Padding(
+                            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (item.title.isNotEmpty ||
+                                    item.body.isNotEmpty)
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: SpendWiseColors.background,
+                                      border: Border.all(
+                                        color: SpendWiseColors.line,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      [item.title, item.body]
+                                          .where((value) => value.isNotEmpty)
+                                          .join('\n'),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall,
+                                    ),
+                                  ),
+                                const SizedBox(height: 10),
+                                _Meta('Source reader', item.parserId),
+                                if (item.ruleId.isNotEmpty)
+                                  _Meta('Matching rule', item.ruleId),
+                                _Meta('Observed', _dateTime(item.observedAt)),
+                                if (item.reasons.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      'WHY IT MATCHED',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            fontSize: 10,
+                                            letterSpacing: 1.2,
+                                          ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  for (final reason in item.reasons)
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        '• ${reason.replaceAll('_', ' ')}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall,
+                                      ),
+                                    ),
+                                ],
+                              ],
+                            ),
+                          ),
+                  ),
                 ],
-              ],
+              ),
             ),
           ),
         ),
-      ),
-    ],
-  );
+      ],
+    );
+  }
 
   static String _stateLabel(EvidenceState state) => switch (state) {
     EvidenceState.accepted => 'Supporting evidence',
@@ -564,12 +660,18 @@ extension<T> on Iterable<T> {
   T? get firstOrNull => isEmpty ? null : first;
 }
 
+/// One label-value pair. Draws its own hairline underneath rather than
+/// sitting inside a bordered box -- the same rule as [RegisterRow]: a group
+/// of facts is a run of rows separated by hairlines, never a panel.
 class _Detail extends StatelessWidget {
   const _Detail(this.label, this.value);
   final String label, value;
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(vertical: 13),
+    decoration: const BoxDecoration(
+      border: Border(bottom: BorderSide(color: SpendWiseColors.line)),
+    ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -613,37 +715,43 @@ class _LoanSection extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionHeading('Was this a loan?'),
+          const SectionHeading('Whose money was this?'),
           const SizedBox(height: 8),
           Text(
-            transaction.kind == TransactionKind.income
-                ? 'If somebody lent you this, it is not income — it goes back.'
-                : 'If you lent this out, it is not spending — it comes back.',
+            'A bank alert cannot tell lending, borrowing and holding apart '
+            '— only you know which one this was.',
             style: SpendWiseType.body.copyWith(fontSize: 13),
           ),
           const SizedBox(height: 12),
-          OutlinedButton(
-            onPressed: () => debt_sheets.markAsLoan(
-              context,
-              viewModel: viewModel,
-              transaction: transaction,
+          // All three stories, not the two most likely -- an entry point
+          // that only offered lending and borrowing was the reason holding
+          // was only ever reached by picking one of those first and
+          // correcting it inside the sheet.
+          for (final kind in DebtKind.values) ...[
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => debt_sheets.markAsLoan(
+                  context,
+                  viewModel: viewModel,
+                  transaction: transaction,
+                  initialKind: kind,
+                ),
+                child: Text(kind.title),
+              ),
             ),
-            child: Text(
-              transaction.kind == TransactionKind.income
-                  ? 'I borrowed this'
-                  : 'I lent this out',
-            ),
-          ),
-          const SizedBox(height: 18),
+            const SizedBox(height: 8),
+          ],
+          const SizedBox(height: 10),
         ],
       );
     }
 
-    final tone = debt.lent ? SpendWiseColors.keep : SpendWiseColors.spend;
+    final tone = debt_sheets.toneForDebtKind(debt.kind);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeading(debt.lent ? 'Lent out' : 'Borrowed'),
+        SectionHeading(debt.kind.categoryName),
         const SizedBox(height: 8),
         InkWell(
           onTap: () =>

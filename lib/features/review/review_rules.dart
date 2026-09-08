@@ -369,6 +369,14 @@ List<ReviewRule> buildReviewRules({
             // Verb first, and the two follow-ups are the same shape so they
             // can share a row without one looking like the important one.
             label: one ? 'File it' : 'File all $count',
+            // Filing writes an entry, and an entry that belongs to no account
+            // reaches no balance -- the ledger will not store one. So when any
+            // of these alerts never found an account, the direction alone is
+            // half an answer: the ledger skipped every one of them and the
+            // screen still said they were settled. Asked only when it is
+            // genuinely missing, because the alerts of an app that already has
+            // an account need no second question.
+            needsAccount: stuck.isNotEmpty,
             needsDirection: true,
             decision: ReviewDecision(
               kind: ReviewDecisionKind.fileAlerts,

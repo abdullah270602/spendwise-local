@@ -69,44 +69,81 @@ class ViewToggle extends StatelessWidget {
   final ValueChanged<int> onSelected;
 
   @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(border: Border.all(color: SpendWiseColors.edge)),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (var i = 0; i < options.length; i++)
-          Semantics(
-            selected: i == selected,
-            button: true,
-            child: InkWell(
-              onTap: i == selected ? null : () => onSelected(i),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 120),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 11,
-                  vertical: 7,
-                ),
-                color: i == selected ? SpendWiseColors.fg : Colors.transparent,
-                child: Text(
-                  options[i].toUpperCase(),
-                  style: TextStyle(
-                    fontFamily: SpendWiseType.sans,
-                    fontSize: 10,
-                    letterSpacing: 1.2,
-                    fontWeight: i == selected
-                        ? FontWeight.w700
-                        : FontWeight.w500,
-                    color: i == selected
-                        ? SpendWiseColors.bg
-                        : SpendWiseColors.dim,
+  Widget build(BuildContext context) {
+    // AnimatedContainer does not consult the platform's reduced-motion flag
+    // by itself -- honouring it is opt-in, per widget -- so the fill sliding
+    // from one segment to the other kept sliding for someone who had asked
+    // the whole system to stop moving. Every other implicit animation in the
+    // app already gates its duration on this; these two segments were the
+    // only ones that opted out by saying nothing.
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 120);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: SpendWiseColors.edge),
+      ),
+      // Wraps rather than overflows. Three segments named honestly at twice
+      // the default text size are wider than a 360dp phone on their own, and
+      // a Row's answer to that is the yellow-and-black stripe. The screen
+      // that hit it first could only shrink the whole control from outside,
+      // which fixed the overflow by taking the tap targets back below the
+      // minimum -- the fault has to be fixed here, where the layout is.
+      child: Wrap(
+        children: [
+          for (var i = 0; i < options.length; i++)
+            Semantics(
+              selected: i == selected,
+              button: true,
+              child: InkWell(
+                onTap: i == selected ? null : () => onSelected(i),
+                child: AnimatedContainer(
+                  duration: duration,
+                  // Deliberately compact, and deliberately under the 48dp
+                  // Android tap-target guideline.
+                  //
+                  // Raising it to 48 was tried and reverted: it is a control
+                  // in a header beside a screen title, and at 48 it reads as
+                  // a slab rather than a switch. The owner made that call
+                  // knowing the guideline. Do not raise it again without
+                  // asking -- and if it is raised, the segments must be
+                  // centred with an Align, never with the Container's own
+                  // `alignment`, which makes a Container with no explicit
+                  // width expand to every pixel it is offered: that turned
+                  // three segments into three stacked full-width rows.
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 11,
+                    vertical: 7,
+                  ),
+                  color: i == selected
+                      ? SpendWiseColors.fg
+                      : Colors.transparent,
+                  child: Align(
+                    alignment: Alignment.center,
+                    widthFactor: 1,
+                    heightFactor: 1,
+                    child: Text(
+                      options[i].toUpperCase(),
+                      style: TextStyle(
+                        fontFamily: SpendWiseType.sans,
+                        fontSize: 10,
+                        letterSpacing: 1.2,
+                        fontWeight: i == selected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: i == selected
+                            ? SpendWiseColors.bg
+                            : SpendWiseColors.dim,
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
 /// The Home screen in one object: a bar of everything that came in, splitting
@@ -840,8 +877,29 @@ class RegisterDay extends StatelessWidget {
   );
 }
 
+/// Which way the money went, for the one row that has to say so.
+enum RegisterDirection {
+  /// It arrived: the register's income.
+  incoming,
+
+  /// It left: the register's spending.
+  outgoing,
+
+  /// It only crossed between two accounts the same person already owns, so it
+  /// neither arrived nor left.
+  ownTransfer,
+}
+
 /// One dense register row: name over metadata on the left, amount right, one
 /// hairline underneath and no other ornament.
+///
+/// Direction used to be carried by [amountColor] and by nothing else, so
+/// income and expense printed the identical glyphs and differed only in a
+/// hue. That is unreadable twice over -- to a screen reader, which cannot see
+/// a colour at all, and to anyone who cannot separate sage from clay -- and
+/// this row is both the ledger and the review inbox, the densest surface in
+/// the app. It now states the direction in a sign, and once again in words
+/// for the reader who is being read to.
 class RegisterRow extends StatelessWidget {
   const RegisterRow({
     super.key,
@@ -862,70 +920,162 @@ class RegisterRow extends StatelessWidget {
   final bool pending;
   final VoidCallback? onTap;
 
+  /// A leading sign, in any of the forms the app writes one.
+  static const _signs = ['+', '−', '-'];
+
+  /// Which way the money went, read back out of [amountColor].
+  ///
+  /// Every caller already derives that colour from the transaction's kind
+  /// against the palette's three semantic tones, so the fact was always here
+  /// -- it was simply being stated in the one form a screen reader cannot
+  /// repeat. Reading it back is what lets the row say it properly without
+  /// five call sites having to remember a new argument. A colour from outside
+  /// the three means the caller is not talking about direction at all, and
+  /// the row then says nothing about it rather than guessing.
+  RegisterDirection? get _direction {
+    if (ownTransfer || amountColor == SpendWiseColors.mine) {
+      return RegisterDirection.ownTransfer;
+    }
+    if (amountColor == SpendWiseColors.keep) return RegisterDirection.incoming;
+    if (amountColor == SpendWiseColors.spend) {
+      return RegisterDirection.outgoing;
+    }
+    return null;
+  }
+
+  /// [amount] with its leading sign stripped, whoever put it there.
+  String get _magnitude => amount.isNotEmpty && _signs.contains(amount[0])
+      ? amount.substring(1)
+      : amount;
+
+  /// The figure as printed.
+  ///
+  /// Callers hand over a bare magnitude because `formatAmount` is unsigned
+  /// everywhere else in the app, and making it signed by default would put a
+  /// `+` in front of every debt balance and every category total. The sign
+  /// belongs to the row that knows which way the money went. A caller that
+  /// already signed its own figure -- the help and onboarding examples write
+  /// theirs out by hand -- keeps exactly what it wrote.
+  String get _printedAmount {
+    if (amount.isEmpty || _signs.contains(amount[0])) return amount;
+    return switch (_direction) {
+      RegisterDirection.incoming => '+$amount',
+      RegisterDirection.outgoing => '−$amount',
+      // Money crossing between a person's own accounts neither arrived nor
+      // left, so either sign would be a claim that is not true. The ⇄ before
+      // the name is what marks it.
+      RegisterDirection.ownTransfer || null => amount,
+    };
+  }
+
+  /// What one row sounds like: what it was, which way the money went, how
+  /// much, and whether it is still waiting to be confirmed.
+  ///
+  /// The direction is spoken as a word rather than left to the sign, because
+  /// a screen reader meeting `−` either says "minus" or skips it, and neither
+  /// of those is the sentence. The metadata is spoken as it was given, not as
+  /// it is drawn, because the row draws it in capitals and a capitalised word
+  /// is liable to be spelled out letter by letter.
+  String get _semanticLabel {
+    final amountSpoken = switch (_direction) {
+      RegisterDirection.incoming => '$_magnitude in',
+      RegisterDirection.outgoing => '$_magnitude out',
+      RegisterDirection.ownTransfer =>
+        '$_magnitude moved between your own accounts',
+      null => _magnitude,
+    };
+    return [
+      name,
+      amountSpoken,
+      if (meta.isNotEmpty) meta,
+      // The pending mark is a five-pixel dot with no text anywhere near it,
+      // so this sentence is the only way anyone hears that the row is still
+      // an alert waiting to be confirmed rather than a settled entry.
+      if (pending) 'Not confirmed yet',
+    ].join('. ');
+  }
+
   @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    child: Container(
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: SpendWiseColors.line)),
-      ),
-      padding: const EdgeInsets.symmetric(vertical: 9),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
+  Widget build(BuildContext context) => MergeSemantics(
+    child: Semantics(
+      label: _semanticLabel,
+      button: onTap != null,
+      // The row's own Text nodes are dropped rather than merged into the
+      // label above them: read out as they are drawn they would shout the
+      // metadata in capitals, give the amount without saying which way it
+      // went, and say nothing whatsoever about the pending dot.
+      child: InkWell(
+        onTap: onTap,
+        child: ExcludeSemantics(
+          child: Container(
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: SpendWiseColors.line)),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 9),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    if (ownTransfer)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 5),
-                        child: Text(
-                          '⇄',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: SpendWiseColors.mine,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          if (ownTransfer)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 5),
+                              child: Text(
+                                '⇄',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: SpendWiseColors.mine,
+                                ),
+                              ),
+                            ),
+                          Flexible(
+                            child: Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: SpendWiseType.row,
+                            ),
                           ),
-                        ),
+                          if (pending)
+                            Container(
+                              margin: const EdgeInsets.only(left: 6),
+                              width: 5,
+                              height: 5,
+                              decoration: BoxDecoration(
+                                color: SpendWiseColors.spend,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                        ],
                       ),
-                    Flexible(
-                      child: Text(
-                        name,
+                      const SizedBox(height: 2),
+                      Text(
+                        meta.toUpperCase(),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: SpendWiseType.row,
+                        style: SpendWiseType.metaTight,
                       ),
-                    ),
-                    if (pending)
-                      Container(
-                        margin: const EdgeInsets.only(left: 6),
-                        width: 5,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          color: SpendWiseColors.spend,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(width: 10),
+                // Deliberately not flexible. It is laid out at its natural
+                // width first and the name takes whatever is left, because a
+                // figure is the one thing on this row that must never be
+                // abbreviated -- an ellipsised amount is a wrong amount,
+                // while a clipped shop name is still the same shop.
                 Text(
-                  meta.toUpperCase(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: SpendWiseType.metaTight,
+                  _printedAmount,
+                  style: SpendWiseType.rowStrong.copyWith(color: amountColor),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 10),
-          Text(
-            amount,
-            style: SpendWiseType.rowStrong.copyWith(color: amountColor),
-          ),
-        ],
+        ),
       ),
     ),
   );

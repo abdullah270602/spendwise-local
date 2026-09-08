@@ -4,6 +4,7 @@ import '../../app/category_tones.dart';
 import '../../app/theme.dart';
 import '../../main.dart';
 import '../../widgets/shape_kit.dart';
+import '../capture/capture_state.dart';
 import '../settings/settings_screen.dart';
 import '../tour/spotlight.dart';
 import '../shell/spendwise_view_model.dart';
@@ -106,7 +107,7 @@ class DashboardScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(
                 SpendWiseTheme.gutter,
                 14,
-                SpendWiseTheme.gutter - 8,
+                SpendWiseTheme.gutter - 12,
                 0,
               ),
               child: Row(
@@ -114,6 +115,10 @@ class DashboardScreen extends StatelessWidget {
                   // The month alone. "What happened to it" was a caption on a
                   // picture that already says so.
                   Expanded(child: Eyebrow(month)),
+                  // Full size rather than compact: the icon stays where it
+                  // always sat -- the gutter beside it is trimmed by the four
+                  // pixels the button grew -- and the box behind it is now big
+                  // enough to aim at.
                   IconButton(
                     onPressed: () => Navigator.push(
                       context,
@@ -122,7 +127,6 @@ class DashboardScreen extends StatelessWidget {
                       ),
                     ),
                     tooltip: 'Settings and privacy',
-                    visualDensity: VisualDensity.compact,
                     icon: const Icon(
                       Icons.tune_rounded,
                       size: 19,
@@ -147,17 +151,25 @@ class DashboardScreen extends StatelessWidget {
             SliverToBoxAdapter(
               child: RestState(
                 headline: 'Nothing has moved in $month yet.',
-                detail: viewModel.notificationAccessGranted
-                    ? 'The moment a bank alert arrives, this becomes the shape '
-                          'of your month.'
-                    : 'Turn on notification access and SpendWise will start '
-                          'reading your bank alerts.',
-                action: viewModel.notificationAccessGranted
-                    ? null
-                    : OutlinedButton(
+                // The promise underneath is only worth making when something
+                // is actually being read. Made in the one state where it is
+                // false, it reads as the app working and the month being
+                // quiet, which is the opposite of what is happening.
+                detail: !viewModel.notificationAccessGranted
+                    ? 'Turn on notification access and SpendWise will start '
+                          'reading your bank alerts.'
+                    : captureIsOff(viewModel)
+                    ? captureOffDetail
+                    : 'The moment a bank alert arrives, this becomes the shape '
+                          'of your month.',
+                action: !viewModel.notificationAccessGranted
+                    ? OutlinedButton(
                         onPressed: viewModel.requestNotificationAccess,
                         child: const Text('Turn on notification access'),
-                      ),
+                      )
+                    : captureIsOff(viewModel)
+                    ? ChooseSourcesButton(viewModel: viewModel)
+                    : null,
               ),
             )
           else ...[
@@ -324,7 +336,11 @@ class DashboardScreen extends StatelessWidget {
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.end,
-                children: [if (anything) _TrayScan(viewModel: viewModel)],
+                // Offered whether or not anything was captured. It is the
+                // recovery for Android dropping alerts before the listener
+                // wakes, so it was missing from the one screen that state
+                // produces -- including a new user's first hour.
+                children: [_TrayScan(viewModel: viewModel)],
               ),
             ),
           ),
@@ -382,6 +398,10 @@ class MonthLegend extends StatelessWidget {
   Widget build(BuildContext context) {
     final aside = setsSavingAside && savedMinor > 0 ? savedMinor : 0;
     final headline = kept - aside;
+    // Every entry is flexible, including the last. "Gone" used to take its
+    // intrinsic width before the others were measured, so at a large text
+    // scale it pushed the row 101px past the edge of a 360dp phone -- the
+    // figure a person raising the system font is most likely to be reading.
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -413,13 +433,15 @@ class MonthLegend extends StatelessWidget {
               ),
             ),
           ),
-        _LegendEntry(
-          large: large,
-          label: 'Gone',
-          minor: spent,
-          note: DashboardScreen._percent(spent, received),
-          color: SpendWiseColors.spend,
-          alignRight: true,
+        Expanded(
+          child: _LegendEntry(
+            large: large,
+            label: 'Gone',
+            minor: spent,
+            note: DashboardScreen._percent(spent, received),
+            color: SpendWiseColors.spend,
+            alignRight: true,
+          ),
         ),
       ],
     );
@@ -451,12 +473,18 @@ class _LegendEntry extends StatelessWidget {
     children: [
       Eyebrow(label),
       const SizedBox(height: 4),
-      AnimatedMinor(
-        minor,
-        cents: false,
-        style: SpendWiseType.amount.copyWith(
-          color: color,
-          fontSize: large ? 30 : null,
+      // The label and the note wrap at their spaces; a figure has none, so
+      // its only way of fitting a third of a narrow screen is to shrink.
+      FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: alignRight ? Alignment.centerRight : Alignment.centerLeft,
+        child: AnimatedMinor(
+          minor,
+          cents: false,
+          style: SpendWiseType.amount.copyWith(
+            color: color,
+            fontSize: large ? 30 : null,
+          ),
         ),
       ),
       const SizedBox(height: 2),
@@ -489,25 +517,31 @@ class CategoryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => InkWell(
     onTap: onTap,
-    child: Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Container(width: 9, height: 9, color: color),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Text(
-              item.category,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: SpendWiseType.row,
+    // The row drew at 35px, so two of them stacked came to less than one
+    // control ought to be on its own. The type and the spacing are unchanged;
+    // only the box around them is now the size a thumb needs.
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: kMinInteractiveDimension),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Container(width: 9, height: 9, color: color),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Text(
+                item.category,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: SpendWiseType.row,
+              ),
             ),
-          ),
-          Text(
-            formatAmount(item.amount, cents: false),
-            style: SpendWiseType.rowStrong,
-          ),
-        ],
+            Text(
+              formatAmount(item.amount, cents: false),
+              style: SpendWiseType.rowStrong,
+            ),
+          ],
+        ),
       ),
     ),
   );
@@ -846,6 +880,9 @@ class _TrayScanState extends State<_TrayScan> {
       child: InkWell(
         onTap: running ? null : _scan,
         child: Container(
+          constraints: const BoxConstraints(
+            minHeight: kMinInteractiveDimension,
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           decoration: BoxDecoration(
             border: Border.all(color: SpendWiseColors.line),
@@ -959,8 +996,11 @@ class _TourOffer extends StatelessWidget {
         Expanded(
           child: InkWell(
             onTap: () => walkthroughRequested.value++,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 7),
+            child: Container(
+              alignment: Alignment.centerLeft,
+              constraints: const BoxConstraints(
+                minHeight: kMinInteractiveDimension,
+              ),
               child: Text(
                 'New here? Show me around',
                 style: SpendWiseType.body.copyWith(
@@ -971,10 +1011,13 @@ class _TourOffer extends StatelessWidget {
             ),
           ),
         ),
+        // The dismissal sits hard against the offer it dismisses, so of the
+        // two it is the one a thumb is likeliest to miss.
         InkWell(
           onTap: () => viewModel.uiSetViewPreference('tour_seen', 'true'),
-          child: const Padding(
-            padding: EdgeInsets.all(7),
+          child: const SizedBox(
+            width: kMinInteractiveDimension,
+            height: kMinInteractiveDimension,
             child: Icon(
               Icons.close_rounded,
               size: 14,
