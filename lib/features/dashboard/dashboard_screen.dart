@@ -60,9 +60,14 @@ class DashboardScreen extends StatelessWidget {
         MediaQuery.sizeOf(context).height -
         MediaQuery.viewPaddingOf(context).vertical -
         96;
+    // Both cases scale with the screen; the breakdown simply gets a smaller
+    // share, because the rows beneath it need somewhere to be. A fixed 168
+    // meant the ribbon shrank as a proportion of every larger phone -- 21% of
+    // a Pixel, 18% of a tall one -- until it read as squashed under its own
+    // figures.
     final ribbonHeight = categoryStyle == HomeCategories.off
         ? (usableHeight * 0.36).clamp(190.0, 300.0)
-        : 168.0;
+        : (usableHeight * 0.32).clamp(168.0, 260.0);
     // One fold, read by both the bar and the rows, so the picture and the
     // list can never disagree about what is on screen.
     final categories = categoriesForHome(data.categorySpending, categoryStyle);

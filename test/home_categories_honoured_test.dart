@@ -77,6 +77,16 @@ void main() {
     // there was to fall through.
     await pumpHome(tester, 'all');
 
+    // With every category drawn the page now runs past the fold, so the
+    // button is genuinely below it rather than pinned -- exactly the
+    // behaviour asked for. Reach it the way a person would.
+    await tester.scrollUntilVisible(
+      find.textContaining('SCAN THE TRAY'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
     final button = tester.getRect(
       find.ancestor(
         of: find.textContaining('SCAN THE TRAY'),

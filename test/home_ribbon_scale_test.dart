@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spendwise/app/theme.dart';
+import 'package:spendwise/features/dashboard/dashboard_screen.dart';
 import 'package:spendwise/widgets/shape_kit.dart';
 
 import 'home_categories_honoured_test.dart' as home;
@@ -66,17 +67,41 @@ void main() {
     }
   });
 
-  testWidgets('the breakdown still gets its room when it is drawn', (
+  testWidgets('the breakdown gets a smaller share, not a fixed height', (
     tester,
   ) async {
-    // Scaling applies only where the space is genuinely free. With every
-    // category listed the ribbon goes back to its ordinary size so the rows
-    // beneath it are not pushed off the fold.
+    // Both cases scale with the screen; the breakdown simply gets less of it,
+    // because the rows beneath need somewhere to be. It used to be pinned at
+    // 168 whatever the phone, so the ribbon shrank as a proportion of every
+    // larger screen until it read as squashed under its own figures.
     final bare = await shapeOn(tester, 360, 800, categories: 'off');
     final full = await shapeOn(tester, 360, 800, categories: 'all');
-
-    expect(full.height, 168);
     expect(bare.height, greaterThan(full.height));
+
+    final tallFull = await shapeOn(tester, 412, 915, categories: 'all');
+    expect(
+      tallFull.height,
+      greaterThan(full.height),
+      reason: 'a taller phone gets a taller ribbon here too',
+    );
+  });
+
+  testWidgets('and the breakdown is still readable without scrolling', (
+    tester,
+  ) async {
+    // The ribbon may take more room, but not so much that the rows it
+    // introduces are pushed off the first screen -- that would make the
+    // setting that draws them pointless.
+    await shapeOn(tester, 360, 800, categories: 'all');
+    final rows = tester.widgetList<CategoryRow>(find.byType(CategoryRow));
+    final onScreen = rows
+        .where((row) => tester.getRect(find.byWidget(row)).bottom <= 800)
+        .length;
+    expect(
+      onScreen,
+      greaterThanOrEqualTo(4),
+      reason: 'a breakdown you have to scroll to find is not a breakdown',
+    );
   });
 
   testWidgets('a short screen is not given a ribbon it cannot afford', (
