@@ -65,10 +65,7 @@ final class HomeWidgetSnapshot {
   /// shape too; "Saving gets its own branch" leaves the figure alone and
   /// instead divides the branch, the same way [FlowShape]'s own
   /// `SavedTreatment.branch` divides it on Home.
-  factory HomeWidgetSnapshot.from(
-    HomeFigures figures,
-    HomeSavingsStyle style,
-  ) {
+  factory HomeWidgetSnapshot.from(HomeFigures figures, HomeSavingsStyle style) {
     // A share of nothing is not a share -- Home never draws a confident
     // split before anything has actually arrived, and the widget does not
     // either.
@@ -86,7 +83,8 @@ final class HomeWidgetSnapshot {
     // guard `FlowShape` applies to `widget.saved` before it ever reaches the
     // painter, kept here so a month with nothing put away draws the plain
     // two-branch split even when "siblings" is the chosen style.
-    final hasSavedBranch = style == HomeSavingsStyle.siblings &&
+    final hasSavedBranch =
+        style == HomeSavingsStyle.siblings &&
         figures.saved > 0 &&
         figures.kept.abs() != 0;
     final savedOfKept = hasSavedBranch

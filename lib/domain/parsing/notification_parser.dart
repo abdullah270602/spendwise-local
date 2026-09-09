@@ -30,6 +30,41 @@ final class NotificationParser {
     r'stamp\s+duty)\b[^0-9]{0,12}$',
     caseSensitive: false,
   );
+
+  /// Money leaving an account to become notes in a pocket, rather than to
+  /// buy anything.
+  ///
+  /// Deliberately hard to satisfy. Calling a card payment a withdrawal turns
+  /// money that was genuinely spent into money the owner believes is still in
+  /// their pocket -- it inflates what the app says is available and hides the
+  /// spending underneath. Failing to spot a real withdrawal only leaves the
+  /// old behaviour, which is recoverable by hand. So this asks for two
+  /// independent signals close together and refuses anything that also smells
+  /// of a merchant.
+  ///
+  /// The signals are structural rather than any one bank's template: banks do
+  /// not publish those, and a regex written against a guessed format is a
+  /// regex that misfiles real money. Widen it when a real message proves it
+  /// too narrow, never in anticipation.
+  static bool _looksLikeCash(RawObservation observation) {
+    final text = '${observation.title} ${observation.body}'.toLowerCase();
+    final withdrawal = RegExp(r'\bwithdraw(?:n|al|als|s)?\b').firstMatch(text);
+    if (withdrawal == null) return false;
+    // "Cash" or "ATM" has to be near the verb, not merely somewhere in a long
+    // message that ends in a marketing line about ATM services.
+    final around = text.substring(
+      (withdrawal.start - 24).clamp(0, text.length),
+      (withdrawal.end + 24).clamp(0, text.length),
+    );
+    if (!RegExp(r'\b(?:cash|atm)\b').hasMatch(around)) return false;
+    // A named merchant, a card terminal or an online purchase means the money
+    // bought something, whatever verb the bank chose to describe it with.
+    return !RegExp(
+      r'\b(?:pos|point\s+of\s+sale|merchant|online|e-?commerce|'
+      r'purchase\s+at|paid\s+to)\b',
+    ).hasMatch(text);
+  }
+
   static final RegExp _debitWords = RegExp(
     r'\b(?:debit(?:ed)?|paid|sent|spent|purchase(?:d)?|withdrawn?|withdrawal|'
     r'deducted|charged|transfer(?:red)?\s+to|used\s+(?:at|for|on)|'
@@ -165,7 +200,53 @@ final class NotificationParser {
   /// so a person answering "money out" in Review supplies the missing half
   /// and the parser still contributes the amount, the counterparty and the
   /// reference it did manage to read.
+  /// Parses, then asks one further question of whatever came back: was this
+  /// money leaving to become notes in a pocket?
+  ///
+  /// Asked here rather than inside each parser because there are several --
+  /// a bank-specific definition, the generic fallback -- and a rule that only
+  /// some of them apply is a rule that holds for some banks and not others.
   ParserResult parseDetailed(
+    RawObservation observation, {
+    EntryDirection? assumeDirection,
+  }) {
+    final result = _parse(observation, assumeDirection: assumeDirection);
+    final candidate = result.candidate;
+    if (candidate == null ||
+        candidate.direction != EntryDirection.debit ||
+        candidate.type == CandidateType.cashWithdrawal ||
+        !_looksLikeCash(observation)) {
+      return result;
+    }
+    return ParserResult(
+      status: result.status,
+      parserId: result.parserId,
+      parserVersion: result.parserVersion,
+      confidence: result.confidence,
+      reasons: [
+        ...result.reasons,
+        'Reads as money withdrawn as cash, not money spent.',
+      ],
+      candidate: EventCandidate(
+        id: candidate.id,
+        observation: candidate.observation,
+        accountId: candidate.accountId,
+        amount: candidate.amount,
+        direction: candidate.direction,
+        occurredAt: candidate.occurredAt,
+        counterparty: candidate.counterparty,
+        reference: candidate.reference,
+        description: candidate.description,
+        confidence: candidate.confidence,
+        type: CandidateType.cashWithdrawal,
+        parserId: candidate.parserId,
+        parserVersion: candidate.parserVersion,
+        reasons: candidate.reasons,
+      ),
+    );
+  }
+
+  ParserResult _parse(
     RawObservation observation, {
     EntryDirection? assumeDirection,
   }) {

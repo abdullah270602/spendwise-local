@@ -361,6 +361,25 @@ final class LocalLedger {
   }
 
   void _migrate() {
+    _migrateSchema();
+    // Cash exists from the moment setup is done, rather than appearing when
+    // the first withdrawal arrives. Notes in a pocket are money somebody has
+    // whether or not a bank has mentioned them lately, and waiting meant the
+    // one place to record cash spending did not exist until an ATM said so.
+    //
+    // Not before setup, though. Seven places in the app ask whether the owner
+    // has any accounts yet -- onboarding's "add your first one" among them --
+    // and a cash bucket present from the first launch makes every one of
+    // those answers "yes" forever, so a new arrival would never be asked for
+    // their bank at all.
+    //
+    // Creating it changes no figure: an account with nothing in it holds
+    // nothing. What decides whether history is rewritten is the routing
+    // stamp, which is deliberately a separate thing.
+    if (_onboardingComplete()) _ensureCashAccount();
+  }
+
+  void _migrateSchema() {
     _db.execute('''
       CREATE TABLE IF NOT EXISTS accounts (
         id TEXT PRIMARY KEY,
@@ -1257,6 +1276,14 @@ final class LocalLedger {
     _db.execute(
       "INSERT OR REPLACE INTO app_settings(key, value) VALUES ('onboarding_complete', 'true')",
     );
+    _ensureCashAccount();
+  }
+
+  bool _onboardingComplete() {
+    final rows = _db.select(
+      "SELECT value FROM app_settings WHERE key = 'onboarding_complete'",
+    );
+    return rows.isNotEmpty && rows.first['value'] == 'true';
   }
 
   List<StoredCategory> categories() => _db
@@ -2407,7 +2434,13 @@ final class LocalLedger {
 
   List<AccountProfile> _accountProfiles() => _db
       .select(
-        'SELECT id, name, institution_name, account_suffix FROM accounts WHERE archived = 0',
+        // Cash is never a candidate. It has no app and no account number, so
+        // it can only ever be matched by its name -- and the moment one
+        // exists, every message containing the word "cash" routes to it,
+        // starting with "cash withdrawn", which is the one message that
+        // must reach the bank account it actually left.
+        "SELECT id, name, institution_name, account_suffix FROM accounts "
+        "WHERE archived = 0 AND type != 'cash'",
       )
       .map(
         (row) => AccountProfile(
@@ -2714,6 +2747,93 @@ final class LocalLedger {
       "INSERT OR REPLACE INTO app_settings(key,value) VALUES ('own_names_json',?)",
       [jsonEncode(cleaned)],
     );
+  }
+
+  /// The moment this ledger began treating withdrawals as cash.
+  ///
+  /// Stamped once, the first time reconciliation runs after the feature
+  /// arrived, and never moved again. It cannot be the cash account's own
+  /// creation time: that account is made while reconciling the very
+  /// withdrawal that calls for it, so its timestamp is always a fraction of a
+  /// second later than the alert, and the withdrawal that created it would
+  /// forever fall on the wrong side of its own cutoff.
+  ///
+  /// Anchoring it to a moment rather than to a transaction is also what keeps
+  /// history intact. Reconciliation rebuilds automatic transactions from
+  /// stored evidence every time it runs, so everything already in the ledger
+  /// is re-derived on the first run after an upgrade -- and all of it is
+  /// older than this stamp, so all of it keeps the meaning it was filed with.
+  DateTime _cashRoutingFrom() {
+    final rows = _db.select(
+      "SELECT value FROM app_settings WHERE key = 'cash_routing_from'",
+    );
+    if (rows.isNotEmpty) {
+      return DateTime.fromMillisecondsSinceEpoch(
+        int.parse(rows.first['value'] as String),
+      );
+    }
+    final now = DateTime.now();
+    _db.execute(
+      "INSERT OR REPLACE INTO app_settings(key,value) "
+      "VALUES ('cash_routing_from',?)",
+      ['${now.millisecondsSinceEpoch}'],
+    );
+    return now;
+  }
+
+  /// The cash account, if the owner has one. Never creates it.
+  _CashAccount? _existingCashAccount() {
+    final rows = _db.select(
+      "SELECT id, created_at FROM accounts WHERE type = 'cash' "
+      'AND archived = 0 ORDER BY created_at LIMIT 1',
+    );
+    if (rows.isEmpty) return null;
+    return _CashAccount(
+      id: rows.first['id'] as String,
+      createdAt: DateTime.fromMillisecondsSinceEpoch(
+        rows.first['created_at'] as int,
+      ),
+    );
+  }
+
+  /// The cash account, made if it is not there yet.
+  ///
+  /// Its creation time is the cutoff the reconciler uses. Reconciliation
+  /// rebuilds automatic transactions from stored evidence, so without one the
+  /// first run after cash arrived would reach back through every withdrawal
+  /// ever made and call the lot of it money still in a pocket. The account
+  /// starts the day it starts.
+  _CashAccount _ensureCashAccount() {
+    final existing = _existingCashAccount();
+    if (existing != null) return existing;
+    final id = _ids.v4();
+    final now = DateTime.now();
+    _db.execute(
+      '''
+      INSERT INTO accounts(
+        id,name,type,currency,source_package,institution_name,account_suffix,
+        opening_balance_minor,archived,created_at,updated_at
+      ) VALUES (?,?,?,?,NULL,NULL,NULL,0,0,?,?)
+      ''',
+      [
+        id,
+        'Cash',
+        AccountType.cash.name,
+        _defaultCurrency(),
+        now.millisecondsSinceEpoch,
+        now.millisecondsSinceEpoch,
+      ],
+    );
+    return _CashAccount(id: id, createdAt: now);
+  }
+
+  /// Whatever the rest of the ledger is denominated in, so a cash account
+  /// does not arrive in a currency nothing else uses.
+  String _defaultCurrency() {
+    final rows = _db.select(
+      'SELECT currency FROM accounts WHERE archived = 0 LIMIT 1',
+    );
+    return rows.isEmpty ? 'PKR' : rows.first['currency'] as String;
   }
 
   OwnIdentity _ownIdentity() {
@@ -3394,8 +3514,18 @@ final class LocalLedger {
         )
         .map((row) => _transactionFromRow(row, evidence: lockedEvidence))
         .toList();
-    final result = Reconciler(ownIdentity: _ownIdentity())
-        .reconcile(candidates, existing: existingLocked);
+    // A cash account is made the moment the first withdrawal is seen, and
+    // never before: somebody who only ever pays by card should not find an
+    // account they did not ask for sitting in their list.
+    final wantsCash = candidates.any(
+      (item) => item.type == CandidateType.cashWithdrawal,
+    );
+    final cash = wantsCash ? _ensureCashAccount() : _existingCashAccount();
+    final result = Reconciler(
+      ownIdentity: _ownIdentity(),
+      cashAccountId: cash?.id,
+      cashRoutingFrom: _cashRoutingFrom(),
+    ).reconcile(candidates, existing: existingLocked);
     // Everything the user has already thrown away. Reconcile is free to
     // re-derive these from evidence that is still on file; it is not free to
     // put them back.
@@ -3631,4 +3761,14 @@ final class LocalLedger {
 
 extension on Iterable<Object?> {
   Object? get firstOrNull => isEmpty ? null : first;
+}
+
+/// The cash account and the day it began, which is also the day cash routing
+/// begins. Held together because using one without the other is the bug this
+/// pair exists to prevent.
+class _CashAccount {
+  const _CashAccount({required this.id, required this.createdAt});
+
+  final String id;
+  final DateTime createdAt;
 }

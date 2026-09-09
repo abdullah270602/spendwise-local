@@ -23,7 +23,11 @@ void main() {
         kind: TransactionKind.income,
         amountMinor: minor,
         occurredAt: DateTime.utc(2026, 9, 2, 12),
-        accountId: ledger.snapshot().accounts.single.id,
+        accountId: ledger
+            .snapshot()
+            .accounts
+            .firstWhere((a) => a.type != AccountType.cash)
+            .id,
         description: from,
       );
 
@@ -32,7 +36,11 @@ void main() {
         kind: TransactionKind.expense,
         amountMinor: minor,
         occurredAt: DateTime.utc(2026, 9, 7, 12),
-        accountId: ledger.snapshot().accounts.single.id,
+        accountId: ledger
+            .snapshot()
+            .accounts
+            .firstWhere((a) => a.type != AccountType.cash)
+            .id,
         description: to,
       );
 

@@ -187,120 +187,120 @@ void main() {
 
     expect(calls, isNotEmpty);
     final published = calls.last;
-    expect(published.arguments['keepColor'], SpendWisePalette.byId('slate').keep.toARGB32());
-    expect(published.arguments['spendColor'], SpendWisePalette.byId('slate').spend.toARGB32());
+    expect(
+      published.arguments['keepColor'],
+      SpendWisePalette.byId('slate').keep.toARGB32(),
+    );
+    expect(
+      published.arguments['spendColor'],
+      SpendWisePalette.byId('slate').spend.toARGB32(),
+    );
   });
 
-  test(
-    'switching Home to "saving gets its own branch" republishes a third '
-    'branch, sized against what was actually put away, in the palette\'s '
-    '"mine" tone -- the same setting Home\'s own screen reads, not one the '
-    'widget keeps of its own',
-    () async {
-      final ledger = LocalLedger.openInMemoryForTests();
-      addTearDown(ledger.close);
-      final controller = SpendWiseController.forTests(ledger);
-      addTearDown(controller.dispose);
-      final bank = ledger.addAccount(
-        name: 'Daily',
-        type: domain.AccountType.bank,
-        openingBalanceMinor: 0,
-      );
-      final savings = ledger.addAccount(
-        name: 'Savings',
-        type: domain.AccountType.savings,
-        openingBalanceMinor: 0,
-      );
-      await controller.saveManualTransaction(
-        ManualTransactionDraft(
-          title: 'Salary',
-          amount: const MoneyViewData(400000),
-          kind: TransactionKind.income,
-          accountId: bank,
-          category: 'Salary',
-          occurredAt: DateTime.now(),
-        ),
-      );
-      await controller.saveManualTransaction(
-        ManualTransactionDraft(
-          title: 'Put away',
-          amount: const MoneyViewData(100000),
-          kind: TransactionKind.transfer,
-          accountId: bank,
-          toAccountId: savings,
-          category: 'Transfer',
-          occurredAt: DateTime.now(),
-        ),
-      );
-      await settle();
-      calls.clear();
+  test('switching Home to "saving gets its own branch" republishes a third '
+      'branch, sized against what was actually put away, in the palette\'s '
+      '"mine" tone -- the same setting Home\'s own screen reads, not one the '
+      'widget keeps of its own', () async {
+    final ledger = LocalLedger.openInMemoryForTests();
+    addTearDown(ledger.close);
+    final controller = SpendWiseController.forTests(ledger);
+    addTearDown(controller.dispose);
+    final bank = ledger.addAccount(
+      name: 'Daily',
+      type: domain.AccountType.bank,
+      openingBalanceMinor: 0,
+    );
+    final savings = ledger.addAccount(
+      name: 'Savings',
+      type: domain.AccountType.savings,
+      openingBalanceMinor: 0,
+    );
+    await controller.saveManualTransaction(
+      ManualTransactionDraft(
+        title: 'Salary',
+        amount: const MoneyViewData(400000),
+        kind: TransactionKind.income,
+        accountId: bank,
+        category: 'Salary',
+        occurredAt: DateTime.now(),
+      ),
+    );
+    await controller.saveManualTransaction(
+      ManualTransactionDraft(
+        title: 'Put away',
+        amount: const MoneyViewData(100000),
+        kind: TransactionKind.transfer,
+        accountId: bank,
+        toAccountId: savings,
+        category: 'Transfer',
+        occurredAt: DateTime.now(),
+      ),
+    );
+    await settle();
+    calls.clear();
 
-      controller.setViewPreference('home_savings', 'siblings');
-      await settle();
+    controller.setViewPreference('home_savings', 'siblings');
+    await settle();
 
-      expect(calls, isNotEmpty);
-      final published = calls.last;
-      expect(published.arguments['hasSavedBranch'], isTrue);
-      expect(
-        published.arguments['savedFraction'],
-        closeTo(100000 / 400000, 1e-9),
-      );
-      expect(
-        published.arguments['mineColor'],
-        SpendWisePalette.sage.mine.toARGB32(),
-      );
-    },
-  );
+    expect(calls, isNotEmpty);
+    final published = calls.last;
+    expect(published.arguments['hasSavedBranch'], isTrue);
+    expect(
+      published.arguments['savedFraction'],
+      closeTo(100000 / 400000, 1e-9),
+    );
+    expect(
+      published.arguments['mineColor'],
+      SpendWisePalette.sage.mine.toARGB32(),
+    );
+  });
 
-  test(
-    'moving off "siblings" republishes the plain two-branch snapshot -- '
-    'the branch was Home\'s choice, not a fact this widget remembers on its '
-    'own once the setting moves on',
-    () async {
-      final ledger = LocalLedger.openInMemoryForTests();
-      addTearDown(ledger.close);
-      final controller = SpendWiseController.forTests(ledger);
-      addTearDown(controller.dispose);
-      final bank = ledger.addAccount(
-        name: 'Daily',
-        type: domain.AccountType.bank,
-        openingBalanceMinor: 0,
-      );
-      final savings = ledger.addAccount(
-        name: 'Savings',
-        type: domain.AccountType.savings,
-        openingBalanceMinor: 0,
-      );
-      await controller.saveManualTransaction(
-        ManualTransactionDraft(
-          title: 'Salary',
-          amount: const MoneyViewData(400000),
-          kind: TransactionKind.income,
-          accountId: bank,
-          category: 'Salary',
-          occurredAt: DateTime.now(),
-        ),
-      );
-      await controller.saveManualTransaction(
-        ManualTransactionDraft(
-          title: 'Put away',
-          amount: const MoneyViewData(100000),
-          kind: TransactionKind.transfer,
-          accountId: bank,
-          toAccountId: savings,
-          category: 'Transfer',
-          occurredAt: DateTime.now(),
-        ),
-      );
-      controller.setViewPreference('home_savings', 'siblings');
-      await settle();
-      calls.clear();
+  test('moving off "siblings" republishes the plain two-branch snapshot -- '
+      'the branch was Home\'s choice, not a fact this widget remembers on its '
+      'own once the setting moves on', () async {
+    final ledger = LocalLedger.openInMemoryForTests();
+    addTearDown(ledger.close);
+    final controller = SpendWiseController.forTests(ledger);
+    addTearDown(controller.dispose);
+    final bank = ledger.addAccount(
+      name: 'Daily',
+      type: domain.AccountType.bank,
+      openingBalanceMinor: 0,
+    );
+    final savings = ledger.addAccount(
+      name: 'Savings',
+      type: domain.AccountType.savings,
+      openingBalanceMinor: 0,
+    );
+    await controller.saveManualTransaction(
+      ManualTransactionDraft(
+        title: 'Salary',
+        amount: const MoneyViewData(400000),
+        kind: TransactionKind.income,
+        accountId: bank,
+        category: 'Salary',
+        occurredAt: DateTime.now(),
+      ),
+    );
+    await controller.saveManualTransaction(
+      ManualTransactionDraft(
+        title: 'Put away',
+        amount: const MoneyViewData(100000),
+        kind: TransactionKind.transfer,
+        accountId: bank,
+        toAccountId: savings,
+        category: 'Transfer',
+        occurredAt: DateTime.now(),
+      ),
+    );
+    controller.setViewPreference('home_savings', 'siblings');
+    await settle();
+    calls.clear();
 
-      controller.setViewPreference('home_savings', 'off');
-      await settle();
+    controller.setViewPreference('home_savings', 'off');
+    await settle();
 
-      expect(calls, isNotEmpty);
-      expect(calls.last.arguments['hasSavedBranch'], isFalse);
-    },
-  );
+    expect(calls, isNotEmpty);
+    expect(calls.last.arguments['hasSavedBranch'], isFalse);
+  });
 }

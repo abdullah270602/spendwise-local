@@ -18,72 +18,65 @@ import 'package:flutter_test/flutter_test.dart';
 /// if the numbers disagree, nobody finds out from a screenshot six months
 /// from now.
 void main() {
-  test(
-    'the widget renderer\'s constants match shape_kit.dart\'s, name for name',
-    () {
-      final dartFile = File('lib/widgets/shape_kit.dart');
-      final kotlinFile = File(
-        'android/app/src/main/kotlin/com/spendwise/app/'
-        'SpendWiseHomeWidgetRenderer.kt',
+  test('the widget renderer\'s constants match shape_kit.dart\'s, name for name', () {
+    final dartFile = File('lib/widgets/shape_kit.dart');
+    final kotlinFile = File(
+      'android/app/src/main/kotlin/com/spendwise/app/'
+      'SpendWiseHomeWidgetRenderer.kt',
+    );
+    expect(dartFile.existsSync(), isTrue, reason: dartFile.path);
+    expect(kotlinFile.existsSync(), isTrue, reason: kotlinFile.path);
+
+    final dartSource = dartFile.readAsStringSync();
+    final kotlinSource = kotlinFile.readAsStringSync();
+
+    double dartConst(String name) {
+      final match = RegExp('const $name = ([\\d.]+);').firstMatch(dartSource);
+      expect(
+        match,
+        isNotNull,
+        reason: 'expected `const $name = ...;` in ${dartFile.path}',
       );
-      expect(dartFile.existsSync(), isTrue, reason: dartFile.path);
-      expect(kotlinFile.existsSync(), isTrue, reason: kotlinFile.path);
+      return double.parse(match!.group(1)!);
+    }
 
-      final dartSource = dartFile.readAsStringSync();
-      final kotlinSource = kotlinFile.readAsStringSync();
+    double kotlinConst(String name) {
+      final match = RegExp('$name = ([\\d.]+)f').firstMatch(kotlinSource);
+      expect(
+        match,
+        isNotNull,
+        reason: 'expected `$name = ...f` in ${kotlinFile.path}',
+      );
+      return double.parse(match!.group(1)!);
+    }
 
-      double dartConst(String name) {
-        final match = RegExp(
-          'const $name = ([\\d.]+);',
-        ).firstMatch(dartSource);
-        expect(
-          match,
-          isNotNull,
-          reason: 'expected `const $name = ...;` in ${dartFile.path}',
-        );
-        return double.parse(match!.group(1)!);
-      }
+    // (Dart name, Kotlin name) pairs -- see the comment above
+    // `_buildFlowGeometry` in shape_kit.dart and the class comment on
+    // SpendWiseHomeWidgetRenderer for why these seven, and only these
+    // seven, are the geometry's whole contract. `siblingGapDp` joined the
+    // other six when the widget took on drawing the "siblings" style's
+    // third branch -- the gap between the kept and saved footings is as
+    // much a part of "the same shape" as the curve itself.
+    const pairs = {
+      'barH': 'BAR_HEIGHT_DP',
+      'topY': 'TOP_Y_DP',
+      'topWidthFraction': 'TOP_WIDTH_FRACTION',
+      'marginFraction': 'MARGIN_FRACTION',
+      'control1Fraction': 'CONTROL_1_FRACTION',
+      'control2Fraction': 'CONTROL_2_FRACTION',
+      'siblingGapDp': 'SIBLING_GAP_DP',
+    };
 
-      double kotlinConst(String name) {
-        final match = RegExp(
-          '$name = ([\\d.]+)f',
-        ).firstMatch(kotlinSource);
-        expect(
-          match,
-          isNotNull,
-          reason: 'expected `$name = ...f` in ${kotlinFile.path}',
-        );
-        return double.parse(match!.group(1)!);
-      }
-
-      // (Dart name, Kotlin name) pairs -- see the comment above
-      // `_buildFlowGeometry` in shape_kit.dart and the class comment on
-      // SpendWiseHomeWidgetRenderer for why these seven, and only these
-      // seven, are the geometry's whole contract. `siblingGapDp` joined the
-      // other six when the widget took on drawing the "siblings" style's
-      // third branch -- the gap between the kept and saved footings is as
-      // much a part of "the same shape" as the curve itself.
-      const pairs = {
-        'barH': 'BAR_HEIGHT_DP',
-        'topY': 'TOP_Y_DP',
-        'topWidthFraction': 'TOP_WIDTH_FRACTION',
-        'marginFraction': 'MARGIN_FRACTION',
-        'control1Fraction': 'CONTROL_1_FRACTION',
-        'control2Fraction': 'CONTROL_2_FRACTION',
-        'siblingGapDp': 'SIBLING_GAP_DP',
-      };
-
-      for (final entry in pairs.entries) {
-        expect(
-          kotlinConst(entry.value),
-          dartConst(entry.key),
-          reason:
-              'shape_kit.dart\'s `${entry.key}` and SpendWiseHomeWidgetRenderer.kt\'s '
-              '`${entry.value}` have to be the same number -- one is the '
-              'geometry Home actually draws, the other is the widget\'s copy '
-              'of it.',
-        );
-      }
-    },
-  );
+    for (final entry in pairs.entries) {
+      expect(
+        kotlinConst(entry.value),
+        dartConst(entry.key),
+        reason:
+            'shape_kit.dart\'s `${entry.key}` and SpendWiseHomeWidgetRenderer.kt\'s '
+            '`${entry.value}` have to be the same number -- one is the '
+            'geometry Home actually draws, the other is the widget\'s copy '
+            'of it.',
+      );
+    }
+  });
 }

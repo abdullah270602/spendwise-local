@@ -4,17 +4,17 @@ Last updated: 2026-09-08
 
 ## Current release
 
-- Version: `0.9.23+38`
+- Version: `0.9.25+40`
 - Android package: `com.spendwise.app` — keep this stable so upgrades retain data.
 - Public repository: <https://github.com/abdullah270602/spendwise-local>
-- Latest release: <https://github.com/abdullah270602/spendwise-local/releases/tag/v0.9.21>
+- Latest release: <https://github.com/abdullah270602/spendwise-local/releases/tag/v0.9.25>
 - Shipped APK is the optimized split-per-ABI release build, not a Flutter debug
   build. Build with `flutter build apk --release --split-per-abi`; a plain
   `--release` writes only the universal APK and leaves the per-ABI files from
   the *previous* build sitting in the output directory, which is an easy way to
   install a stale binary and believe it is current. Check the APK's mtime
   against the commit before installing.
-- Split-per-ABI adds 2000 to the version code for arm64: `38` becomes `2038`.
+- Split-per-ABI adds 2000 to the version code for arm64: `40` becomes `2040`.
 - Installed on the connected Pixel 9 at this version, with `adb install -r`.
 
 ## Known reliability issues
@@ -232,6 +232,14 @@ in `AGENTS.md`. In particular:
   two-tone hairline, because a dark outline vanishes on a black wallpaper and
   a light one vanishes on white, and both are drawn on every edge so whichever
   ring loses contrast locally the other holds the boundary.
+- Cash is an account. A withdrawal is recognised structurally -- a withdrawal
+  verb and a cash or ATM marker close together, and nothing that reads as a
+  merchant -- and becomes a transfer from the bank into a cash bucket rather
+  than an expense, so the money is only spent when the owner records what it
+  bought. Nothing automatic ever takes money out of cash. The bucket is made
+  when setup finishes, or on the first withdrawal if setup was skipped, and a
+  `cash_routing_from` stamp keeps every withdrawal made before the feature
+  existed exactly as it was filed.
 - Local export, insights, notification-source health, demo-data controls, and
   Settings version/build display with a user-invoked GitHub link.
 
@@ -253,7 +261,7 @@ invalidation behavior when changing the shell/controller.
 
 ## Verification baseline
 
-At `0.9.23`, the analyzer is clean and all 693 tests pass. Before shipping:
+At `0.9.25`, the analyzer is clean and all 709 tests pass. Before shipping:
 
 1. Run `dart format` on changed Dart files.
 2. Run `flutter analyze --no-pub`.
@@ -319,6 +327,21 @@ current configured paths rather than assume another user's home directory.
   owner reverted it on the device. The test now pins it *compact* and says
   why, because a test asserting a guideline the product has deliberately
   declined is a test that lies.
+- **Naming a thing can rewire the app around it.** Creating an account called
+  "Cash" made `AccountRouter` match the word "cash" in "cash withdrawn" and
+  attribute the withdrawal to the cash account itself rather than the bank it
+  left. Anything matched by name has to be asked whether it should be
+  matchable at all.
+- **A row that always exists is a row that can never be absent.** Seven places
+  ask `accounts.isEmpty` to decide whether the owner has set anything up --
+  onboarding's "add your first account" among them. A cash bucket present
+  from the first launch answers all seven "yes" forever, and a new arrival is
+  never asked for their bank. Found by a Review test looking for a message
+  that had quietly stopped appearing.
+- **The escape sequence is not the escape sequence.** A Dart regex written
+  through a shell heredoc turned every `\b` into a literal backspace byte.
+  The pattern compiled and matched nothing. This is written in the project's
+  own notes and was walked into anyway: write the script to a file.
 - **A consistency finding is not automatically a defect.** Four screens using
   a different vocabulary from the rest of the app reads as an oversight and
   was reported as one; unified, it turned out the owner preferred the

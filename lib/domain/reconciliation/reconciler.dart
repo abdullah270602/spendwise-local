@@ -20,6 +20,8 @@ final class Reconciler {
     this.duplicateWindow = const Duration(minutes: 3),
     this.transferWindow = const Duration(minutes: 10),
     this.ownIdentity = const OwnIdentity(),
+    this.cashAccountId,
+    this.cashRoutingFrom,
     this.ownAccountTransferWindow = const Duration(hours: 48),
   });
 
@@ -36,6 +38,35 @@ final class Reconciler {
   /// self-directed without saying where the money landed, so it raises
   /// confidence within the normal window only.
   final OwnIdentity ownIdentity;
+
+  /// Where withdrawn cash lands, when the ledger keeps a cash account.
+  ///
+  /// Null means the owner has no cash account, and a withdrawal stays what it
+  /// has always been: an expense. Nothing here creates one -- the reconciler
+  /// reads a ledger, it does not shape it.
+  final String? cashAccountId;
+
+  /// The moment cash started being tracked, and the reason this is not simply
+  /// "route every withdrawal".
+  ///
+  /// Reconciliation rebuilds automatic transactions from stored evidence, so
+  /// without a cutoff the first run after this feature arrived would reach
+  /// back through every withdrawal the owner had ever made and declare the
+  /// lot of it cash still in their pocket. Months of money already spent
+  /// would reappear as money available to spend. A withdrawal older than this
+  /// keeps the meaning it had when it was filed.
+  final DateTime? cashRoutingFrom;
+
+  bool _routesToCash(EventCandidate item) {
+    final cash = cashAccountId;
+    final from = cashRoutingFrom;
+    if (cash == null || from == null) return false;
+    if (item.type != CandidateType.cashWithdrawal) return false;
+    // Cash withdrawn from the cash account itself is not a movement.
+    if (item.accountId == cash) return false;
+    return !item.occurredAt.isBefore(from);
+  }
+
   final Duration ownAccountTransferWindow;
 
   ReconciliationResult reconcile(
@@ -256,6 +287,31 @@ final class Reconciler {
 
   CanonicalTransaction _single(_Leg leg, {required bool needsReview}) {
     final item = leg.primary;
+    // Money withdrawn as cash did not leave the owner, it changed pocket. It
+    // is the one transfer the app asserts from a single alert rather than by
+    // pairing two: a wallet full of notes never sends a notification, so the
+    // opposing leg cannot exist and waiting for it would mean waiting
+    // forever.
+    if (_routesToCash(item)) {
+      return CanonicalTransaction(
+        id: _stableId('cash', [
+          item.accountId,
+          '${item.amount.minorUnits}',
+          _identity(leg),
+        ]),
+        kind: TransactionKind.transfer,
+        amount: item.amount,
+        occurredAt: _earliest(leg.candidates),
+        evidenceIds: leg.evidenceIds,
+        fromAccountId: item.accountId,
+        toAccountId: cashAccountId,
+        description: item.description,
+        needsReview: needsReview || item.confidence < 0.8,
+        reconciliationState: needsReview || item.confidence < 0.8
+            ? ReconciliationState.needsReview
+            : ReconciliationState.probable,
+      );
+    }
     return CanonicalTransaction(
       id: _stableId('single', [
         item.accountId,

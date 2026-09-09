@@ -79,14 +79,25 @@ void main() {
 
     ledger.archiveAccount(account);
 
-    expect(ledger.snapshot().accounts, isEmpty);
+    expect(
+      ledger.snapshot().accounts.where(
+        (account) => account.type != AccountType.cash,
+      ),
+      isEmpty,
+      reason: 'the cash bucket is part of every ledger, not user data',
+    );
     expect(ledger.sources(accountId: account), hasLength(1));
     expect(ledger.snapshot().transactions, hasLength(1));
     expect(ledger.latestArchivedAccount()?.id, account);
 
     ledger.restoreAccount(account);
 
-    expect(ledger.snapshot().accounts, hasLength(1));
+    expect(
+      ledger.snapshot().accounts.where(
+        (account) => account.type != AccountType.cash,
+      ),
+      hasLength(1),
+    );
     expect(ledger.sources(accountId: account), hasLength(1));
     expect(ledger.snapshot().transactions, hasLength(1));
   });

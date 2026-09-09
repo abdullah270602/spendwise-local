@@ -130,7 +130,11 @@ void main() {
     // Manual rows are not rebuilt by reconcile, so they must not acquire a
     // tombstone that outlives them.
     final ledger = openLedger();
-    final accountId = ledger.snapshot().accounts.single.id;
+    final accountId = ledger
+        .snapshot()
+        .accounts
+        .firstWhere((a) => a.type != AccountType.cash)
+        .id;
     final id = ledger.addManualTransaction(
       kind: TransactionKind.expense,
       amountMinor: 2500,
