@@ -3,4 +3,8 @@
     <color name="spendwise_background">#0F1113</color>
     <color name="spendwise_keep">#9FB2AC</color>
     <color name="spendwise_spend">#C97A5A</color>
+    <!-- The default palette's "mine" tone — the fallback used only for the
+         first draw before the app has ever published a colour of its own,
+         the same reason spendwise_keep and spendwise_spend above exist. -->
+    <color name="spendwise_mine">#6E8496</color>
 </resources>

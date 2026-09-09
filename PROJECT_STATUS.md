@@ -4,7 +4,7 @@ Last updated: 2026-09-08
 
 ## Current release
 
-- Version: `0.9.21+36`
+- Version: `0.9.23+38`
 - Android package: `com.spendwise.app` — keep this stable so upgrades retain data.
 - Public repository: <https://github.com/abdullah270602/spendwise-local>
 - Latest release: <https://github.com/abdullah270602/spendwise-local/releases/tag/v0.9.21>
@@ -14,7 +14,7 @@ Last updated: 2026-09-08
   the *previous* build sitting in the output directory, which is an easy way to
   install a stale binary and believe it is current. Check the APK's mtime
   against the commit before installing.
-- Split-per-ABI adds 2000 to the version code for arm64: `36` becomes `2036`.
+- Split-per-ABI adds 2000 to the version code for arm64: `38` becomes `2038`.
 - Installed on the connected Pixel 9 at this version, with `adb install -r`.
 
 ## Known reliability issues
@@ -224,6 +224,14 @@ in `AGENTS.md`. In particular:
   and a thirty-second countdown that leaving the screen or closing the app
   cancels. A pending erase is never resumed on next launch: that would take
   the data of somebody who had already changed their mind.
+- An Android home-screen widget draws the ribbon and nothing else: no digits,
+  no percentage, no words. It follows Home's own savings style, so the two
+  objects cannot disagree about the same shape, and it is resizable, falling
+  back to a flat proportional bar where a cell is too short for a curve to
+  read as one. The background is transparent; every filled shape carries a
+  two-tone hairline, because a dark outline vanishes on a black wallpaper and
+  a light one vanishes on white, and both are drawn on every edge so whichever
+  ring loses contrast locally the other holds the boundary.
 - Local export, insights, notification-source health, demo-data controls, and
   Settings version/build display with a user-invoked GitHub link.
 
@@ -245,7 +253,7 @@ invalidation behavior when changing the shell/controller.
 
 ## Verification baseline
 
-At `0.9.21`, the analyzer is clean and all 668 tests pass. Before shipping:
+At `0.9.23`, the analyzer is clean and all 693 tests pass. Before shipping:
 
 1. Run `dart format` on changed Dart files.
 2. Run `flutter analyze --no-pub`.

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  One ImageView, no card behind it. There used to be a fixed near-black
+  background here on purpose: the palette's `keep` and `spend` tones are
+  chosen to read against the app's own dark ground, and a widget that
+  chameleoned onto whatever the launcher was showing would need a second,
+  unverified set of tones to still contrast against a light one. That
+  reasoning did not change; what changed is the answer to it. The owner
+  wants this floating on his own wallpaper, so the card is gone, and the
+  contrast problem it was guarding against is now solved in the drawing
+  itself: SpendWiseHomeWidgetRenderer.kt haloes every filled shape in a
+  two-tone keyline (near-black ring, near-white ring) rather than in a
+  background only one of those two could ever have matched. See that file's
+  `drawHalo` for the mechanism: everything on screen here is still one
+  bitmap, this layout just no longer paints anything behind it.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/spendwise_home_widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/transparent">
+
+    <ImageView
+        android:id="@+id/spendwise_home_widget_shape"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitCenter"
+        android:contentDescription="@string/home_widget_description" />
+
+</FrameLayout>

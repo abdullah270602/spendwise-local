@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  updatePeriodMillis is 0, deliberately: Android's own polling clock is the
+  battery cost this widget refuses. Nothing here wakes the device to redraw a
+  shape that has not changed — the app pushes a new one only when the ledger
+  actually produces a different fraction (SpendWiseController.notifyListeners
+  in the Flutter side), and onUpdate below otherwise just redraws whatever was
+  last published. See SpendWiseHomeWidgetProvider.kt.
+
+  resizeMode covers both axes because the widget has two honest drawings, not
+  one squashed to fit: a flat two-tone bar at the smallest sizes, where a
+  curve would have no room to read as a shape, and the full ribbon once there
+  is height enough for one. onAppWidgetOptionsChanged picks between them.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="90dp"
+    android:minHeight="40dp"
+    android:minResizeWidth="60dp"
+    android:minResizeHeight="40dp"
+    android:maxResizeWidth="360dp"
+    android:maxResizeHeight="220dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="1"
+    android:updatePeriodMillis="0"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:initialLayout="@layout/spendwise_home_widget"
+    android:previewImage="@mipmap/ic_launcher"
+    android:description="@string/home_widget_description" />

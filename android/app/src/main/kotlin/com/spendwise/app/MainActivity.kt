@@ -40,6 +40,12 @@ class MainActivity : FlutterFragmentActivity() {
             StandardMethodCodec.INSTANCE,
             taskQueue,
         ).setMethodCallHandler(::handleNotificationMethod)
+
+        // No background queue here: a publish is a SharedPreferences write
+        // plus drawing a small bitmap, nowhere near the SQLite and
+        // PackageManager work above that justified moving off the main
+        // thread.
+        MethodChannel(messenger, WIDGET_CHANNEL).setMethodCallHandler(::handleWidgetMethod)
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
@@ -48,7 +54,31 @@ class MainActivity : FlutterFragmentActivity() {
             NOTIFICATION_CHANNEL,
         ).setMethodCallHandler(null)
         notificationTaskQueue = null
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, WIDGET_CHANNEL)
+            .setMethodCallHandler(null)
         super.cleanUpFlutterEngine(flutterEngine)
+    }
+
+    /// The only thing this channel is for: handing the Home-screen widget
+    /// its next picture. See `SpendWiseHomeWidgetProvider` for what is done
+    /// with the fields below and why nothing else is ever asked for.
+    private fun handleWidgetMethod(call: MethodCall, result: MethodChannel.Result) {
+        when (call.method) {
+            "publish" -> {
+                SpendWiseHomeWidgetProvider.publish(
+                    applicationContext,
+                    hasData = call.argument<Boolean>("hasData") ?: false,
+                    keptFraction = (call.argument<Number>("keptFraction") ?: 0).toFloat(),
+                    hasSavedBranch = call.argument<Boolean>("hasSavedBranch") ?: false,
+                    savedFraction = (call.argument<Number>("savedFraction") ?: 0).toFloat(),
+                    keepColor = (call.argument<Number>("keepColor") ?: 0).toInt(),
+                    spendColor = (call.argument<Number>("spendColor") ?: 0).toInt(),
+                    mineColor = (call.argument<Number>("mineColor") ?: 0).toInt(),
+                )
+                result.success(true)
+            }
+            else -> result.notImplemented()
+        }
     }
 
     private fun handleNotificationMethod(call: MethodCall, result: MethodChannel.Result) {
@@ -286,6 +316,7 @@ class MainActivity : FlutterFragmentActivity() {
 
     companion object {
         const val NOTIFICATION_CHANNEL = "com.spendwise.app/notifications"
+        const val WIDGET_CHANNEL = "com.spendwise.app/home_widget"
         private const val ICON_SIZE_PX = 64
     }
 }

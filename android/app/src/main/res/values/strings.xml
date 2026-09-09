@@ -1,4 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">SpendWise</string>
+
+    <!-- Shown in the launcher's widget picker, under the preview. Read for a
+         person choosing whether to add the widget, not for the widget's own
+         canvas — the widget itself never draws a word. -->
+    <string name="home_widget_label">SpendWise: this month\'s shape</string>
+    <!-- The widget's own accessibility announcement. It names what the
+         picture is about without stating what it says — the same
+         distinction a sighted glance already makes between seeing a shape
+         and reading a number off it. -->
+    <string name="home_widget_description">This month\'s shape: what came in, split into what stayed and what went. Open SpendWise for the numbers.</string>
 </resources>

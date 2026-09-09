@@ -11,8 +11,13 @@ import '../core/source_label.dart';
 import '../data/ledger_exporter.dart';
 import '../data/local_ledger.dart';
 import '../domain/domain.dart' as domain;
+import '../features/dashboard/home_savings.dart';
+import '../features/dashboard/home_widget_snapshot.dart';
 import '../features/shell/spendwise_view_model.dart';
 import '../platform/notification_bridge.dart';
+import '../platform/widget_bridge.dart';
+import 'palette.dart';
+import 'theme.dart';
 
 final class SpendWiseController extends ChangeNotifier
     with WidgetsBindingObserver
@@ -29,7 +34,16 @@ final class SpendWiseController extends ChangeNotifier
 
   LocalLedger _ledger;
   final NotificationBridge _bridge;
+  final WidgetBridge _widgetBridge = const WidgetBridge();
   LedgerSnapshot _snapshot;
+  // What the Home-screen widget was last told, so a notify that changed
+  // nothing it draws -- a scroll position, an unrelated preference -- costs
+  // nothing beyond this comparison: no channel call, no waking the widget
+  // host, no battery spent redrawing a shape that already matches.
+  HomeWidgetSnapshot? _lastPublishedWidgetSnapshot;
+  int? _lastPublishedKeepColor;
+  int? _lastPublishedSpendColor;
+  int? _lastPublishedMineColor;
   bool _notificationAccess = false;
   List<NotificationSource> _nativeSources = const [];
   NotificationIngestionHealth? _ingestionHealth;
@@ -53,6 +67,29 @@ final class SpendWiseController extends ChangeNotifier
       const NotificationBridge(),
       ledger.snapshot(),
     );
+    // `main.dart` applies this same preference to `SpendWiseColors` right
+    // after `create` returns, "before the first frame, so the app never
+    // flashes the default" -- but `_publishWidgetSnapshot` below reads
+    // those same static colours immediately, not after `main.dart` gets a
+    // turn. Applying the palette here first, rather than trusting whatever
+    // `SpendWiseColors` already happened to hold, is what keeps a widget's
+    // very first picture in the colours the person actually chose instead
+    // of the default palette that is only ever true before anyone has
+    // looked at their preference; `main.dart`'s own apply call immediately
+    // afterwards then just repeats the same value.
+    SpendWiseColors.apply(
+      SpendWisePalette.byId(controller.viewPreference('palette')),
+    );
+    // A widget can be sitting on the home screen before the app has ever
+    // been opened, and a fresh install's first launch is the only chance it
+    // gets to stop being empty without the person also having to touch the
+    // ledger. Publishing straight off the snapshot already opened above,
+    // rather than waiting for `_refreshPlatform` below, is what makes that
+    // one launch enough: `_refreshPlatform`'s notification-bridge calls can
+    // throw on a device that is briefly rejecting package queries, and
+    // until now that swallowed the widget publish that happened to sit at
+    // the end of the same method along with everything else in it.
+    controller._publishWidgetSnapshot();
     WidgetsBinding.instance.addObserver(controller);
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => unawaited(controller._refreshPlatform()),
@@ -67,9 +104,89 @@ final class SpendWiseController extends ChangeNotifier
     super.dispose();
   }
 
+  /// Every screen that reads this controller learns of a change here -- see
+  /// the comment on [setViewPreference] for why that is already the app's
+  /// one signal for "something a screen draws is different now". The
+  /// Home-screen widget is one more such screen, just one that cannot be
+  /// handed a `Listenable` because it runs in another process. Piggybacking
+  /// on the same signal, rather than hunting down every call site that
+  /// changes a figure or a palette, is what keeps the widget from quietly
+  /// going stale the next time a new one is added.
+  @override
+  void notifyListeners() {
+    super.notifyListeners();
+    _publishWidgetSnapshot();
+  }
+
+  /// Sends the widget the one thing it draws: the kept fraction, the saved
+  /// fraction the one branching style needs, and the three tones the ribbon
+  /// is currently painted in. Never the ledger, never an amount -- see
+  /// [WidgetBridge.publish] for exactly what crosses.
+  ///
+  /// The style itself is read from `home_savings` -- the same preference
+  /// Home's own screen reads -- rather than a setting of the widget's own.
+  /// A widget with its own picker would let two objects claiming to draw
+  /// "this month's shape" disagree about what shape that is, and would need
+  /// a stored choice per placed widget rather than one choice the whole app
+  /// already keeps; reading Home's is what keeps them the same object.
+  ///
+  /// [SpendWiseColors] is read directly rather than through this view
+  /// model's own interface because the palette was never routed through it
+  /// either -- it is process-wide mutable state that every screen already
+  /// reads the same way, `main.dart` applies it before the first frame, and
+  /// giving the widget a second path to the same colours would be a second
+  /// place for them to disagree.
+  void _publishWidgetSnapshot() {
+    final snapshot = HomeWidgetSnapshot.from(
+      homeFigures(this),
+      HomeSavingsStyle.fromId(viewPreference('home_savings')),
+    );
+    final keepColor = SpendWiseColors.keep.toARGB32();
+    final spendColor = SpendWiseColors.spend.toARGB32();
+    final mineColor = SpendWiseColors.mine.toARGB32();
+    if (snapshot == _lastPublishedWidgetSnapshot &&
+        keepColor == _lastPublishedKeepColor &&
+        spendColor == _lastPublishedSpendColor &&
+        mineColor == _lastPublishedMineColor) {
+      return;
+    }
+    _lastPublishedWidgetSnapshot = snapshot;
+    _lastPublishedKeepColor = keepColor;
+    _lastPublishedSpendColor = spendColor;
+    _lastPublishedMineColor = mineColor;
+    unawaited(
+      _widgetBridge
+          .publish(
+            hasData: snapshot.hasData,
+            keptFraction: snapshot.keptFraction,
+            hasSavedBranch: snapshot.hasSavedBranch,
+            savedFraction: snapshot.savedOfKept,
+            keepColor: keepColor,
+            spendColor: spendColor,
+            mineColor: mineColor,
+          )
+          .catchError(
+            // Tests and non-Android hosts have nothing on the other end of
+            // this channel -- none of that is a reason to fail whatever
+            // change just happened to the ledger.
+            (Object _) {},
+            test: (error) =>
+                error is MissingPluginException || error is PlatformException,
+          ),
+    );
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _refreshPlatform();
+    if (state != AppLifecycleState.resumed) return;
+    // Explicit and unconditional, for the same reason `create` publishes
+    // before `_refreshPlatform` runs rather than only after it succeeds: a
+    // widget added while the app was closed gets its first chance to catch
+    // up right here, and that chance should not depend on the notification
+    // bridge -- an unrelated system -- happening to answer cleanly on this
+    // particular resume.
+    _publishWidgetSnapshot();
+    _refreshPlatform();
   }
 
   Future<void> _refreshPlatform() async {

@@ -467,15 +467,34 @@ _FlowGeometry _buildFlowGeometry({
 }) {
   final w = size.width;
   final h = size.height;
+  // Named rather than inlined because the Home-screen widget draws this same
+  // static shape (reveal at 1, no wobble, no saved branch) again in Kotlin --
+  // the ledger cannot be reached from a widget's process, so there is no way
+  // to hand it a live Flutter render, only these numbers. That is a second
+  // implementation of one geometry, which drifts the moment someone tunes a
+  // curve here and forgets the other file exists. `flow_shape_geometry_ports_test.dart`
+  // reads both files' constants back out as text and fails the moment they
+  // stop matching, which is the only reason it is safe to keep two copies at
+  // all. See `android/app/src/main/kotlin/com/spendwise/app/SpendWiseHomeWidgetRenderer.kt`.
   const barH = 10.0;
+  const topY = 6.0;
+  const topWidthFraction = .46;
+  const marginFraction = .075;
+  const control1Fraction = .42;
+  const control2Fraction = .60;
+  // The seventh geometry constant the widget's renderer has to mirror --
+  // named, like the six above, because the Home-screen widget also draws the
+  // three-branch "siblings" split, and a gap tuned here without a matching
+  // change there is exactly the silent drift `flow_shape_geometry_ports_test.dart`
+  // exists to catch.
+  const siblingGapDp = 6.0;
 
   // The source bar is deliberately narrower than the canvas so the ribbon has
   // room to fan outward -- the widening is what reads as "this became these".
-  final topW = w * .46;
+  final topW = w * topWidthFraction;
   final topX = (w - topW) / 2;
-  const topY = 6.0;
   final botY = h - barH - 2;
-  final margin = w * .075;
+  final margin = w * marginFraction;
 
   final keptW = topW * keptFraction;
   final spentW = topW - keptW;
@@ -486,8 +505,8 @@ _FlowGeometry _buildFlowGeometry({
   final spentBotX = spentBotRight - spentW;
 
   final splitX = topX + keptW;
-  final c1 = topY + barH + (botY - topY - barH) * .42;
-  final c2 = topY + barH + (botY - topY - barH) * .60;
+  final c1 = topY + barH + (botY - topY - barH) * control1Fraction;
+  final c2 = topY + barH + (botY - topY - barH) * control2Fraction;
   final yTop = topY + barH;
 
   Path ribbon(double aTop, double bTop, double aBot, double bBot) => Path()
@@ -504,7 +523,7 @@ _FlowGeometry _buildFlowGeometry({
   final savedTopW = asBranch ? keptW * savedOfKept : 0.0;
   final liveKeptW = keptW - savedTopW;
   final savedBotW = asBranch ? keptW * savedOfKept : 0.0;
-  final gap = (asBranch && savedBotW > 0) ? 6.0 * reveal : 0.0;
+  final gap = (asBranch && savedBotW > 0) ? siblingGapDp * reveal : 0.0;
 
   final kept = <_FlowPiece>[
     _FlowPiece(
