@@ -238,30 +238,23 @@ class RibbonHero implements ReportHero {
     return _figure(
       'Still yours',
       paper.money(data.keptMinor),
-      '${_percent(data.keptMinor, data.receivedMinor)} of it',
+      // No share. The trunk above is everything that came in, and these two
+      // branches stopped adding up to it the moment money could go out on a
+      // loan without being spent -- so a percentage of it was a claim the
+      // drawing did not support. The figures say what they are.
+      null,
       paper.ink,
       paper,
     );
   }
 
-  /// Unlike the kept fraction, "gone" is never clamped -- a period that spent
-  /// more than it received should read "128% of it", not a silently capped
-  /// 100%, because the overspend is exactly the fact this figure exists to
-  /// state.
-  pw.Widget _gone(ReportData data, ReportPaper paper) => _figure(
-    'Gone',
-    paper.money(data.spentMinor),
-    data.receivedMinor > 0
-        ? '${_percent(data.spentMinor, data.receivedMinor)} of it'
-        : 'nothing came in to measure it against',
-    paper.spend,
-    paper,
-  );
+  pw.Widget _gone(ReportData data, ReportPaper paper) =>
+      _figure('Gone', paper.money(data.spentMinor), null, paper.spend, paper);
 
   pw.Widget _figure(
     String label,
     String value,
-    String note,
+    String? note,
     PdfColor tone,
     ReportPaper paper,
   ) => pw.Column(
@@ -278,19 +271,12 @@ class RibbonHero implements ReportHero {
           letterSpacing: -.6,
         ),
       ),
-      pw.SizedBox(height: 2),
-      pw.Text(note, style: pw.TextStyle(fontSize: 8.5, color: paper.muted)),
+      if (note != null) ...[
+        pw.SizedBox(height: 2),
+        pw.Text(note, style: pw.TextStyle(fontSize: 8.5, color: paper.muted)),
+      ],
     ],
   );
-
-  /// Deliberately unclamped past 100 -- see [_gone].
-  static String _percent(int part, int whole) {
-    if (whole <= 0) return '0%';
-    final value = (part / whole) * 100;
-    return value < 10 && value > 0
-        ? '${value.toStringAsFixed(1)}%'
-        : '${value.round()}%';
-  }
 }
 
 /// Paints the ribbon proper.

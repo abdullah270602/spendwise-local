@@ -383,7 +383,7 @@ void main() {
       );
     });
 
-    test('"gone" is allowed past 100% rather than being silently capped', () {
+    test('no share is claimed beside the ribbon at all', () {
       final data = _dataFrom([
         _entry(
           id: 'salary',
@@ -401,7 +401,17 @@ void main() {
         ),
       ]);
       final texts = _collectText(const RibbonHero().build(_paperFor(data)));
-      expect(texts.any((t) => t.contains('250%')), isTrue);
+      // This used to assert "250%", to prove an overspend was never silently
+      // capped at 100. The percentages are gone entirely now: the trunk is
+      // everything that came in, and the two branches stopped adding up to it
+      // once money could leave on a loan without being spent, so any share of
+      // it was a claim the drawing did not support. The guarantee that
+      // mattered survives above -- an overspend is still stated in words.
+      expect(
+        texts.any((t) => t.contains('%')),
+        isFalse,
+        reason: 'a proportion the picture does not draw must not be printed',
+      );
     });
   });
 

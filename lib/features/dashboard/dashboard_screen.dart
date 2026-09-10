@@ -357,12 +357,6 @@ class DashboardScreen extends StatelessWidget {
       ),
     );
   }
-
-  static String _percent(int part, int whole) {
-    if (whole <= 0) return '0%';
-    final value = (part / whole) * 100;
-    return '${value < 10 ? value.toStringAsFixed(1) : value.round()}%';
-  }
 }
 
 /// The figures under the month's shape.
@@ -433,9 +427,6 @@ class MonthLegend extends StatelessWidget {
                 ? 'Available'
                 : 'Still yours',
             minor: headline,
-            note: received > 0
-                ? '${DashboardScreen._percent(headline.abs(), received)} of what came in'
-                : 'nothing came in this month',
             color: headline < 0 ? SpendWiseColors.spend : SpendWiseColors.fg,
           ),
         ),
@@ -447,7 +438,6 @@ class MonthLegend extends StatelessWidget {
                 large: large,
                 label: 'Saved',
                 minor: aside,
-                note: DashboardScreen._percent(aside, received),
                 color: SpendWiseColors.mine,
               ),
             ),
@@ -457,7 +447,6 @@ class MonthLegend extends StatelessWidget {
             large: large,
             label: 'Gone',
             minor: spent,
-            note: DashboardScreen._percent(spent, received),
             color: SpendWiseColors.spend,
             alignRight: true,
           ),
@@ -471,7 +460,6 @@ class _LegendEntry extends StatelessWidget {
   const _LegendEntry({
     required this.label,
     required this.minor,
-    required this.note,
     required this.color,
     this.alignRight = false,
     this.large = false,
@@ -479,7 +467,6 @@ class _LegendEntry extends StatelessWidget {
 
   final String label;
   final int minor;
-  final String note;
   final Color color;
   final bool alignRight;
   final bool large;
@@ -506,8 +493,6 @@ class _LegendEntry extends StatelessWidget {
           ),
         ),
       ),
-      const SizedBox(height: 2),
-      Text(note, style: SpendWiseType.body.copyWith(fontSize: 12.5)),
     ],
   );
 }
