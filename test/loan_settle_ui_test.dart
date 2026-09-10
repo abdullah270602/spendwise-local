@@ -340,6 +340,105 @@ void main() {
       reason: 'otherwise the loan counts the same money twice over',
     );
   });
+
+  testWidgets('a loan written off still offers the entry that repaid it', (
+    tester,
+  ) async {
+    // "Call it settled" recorded nothing and touched no entry, so a
+    // repayment that arrived in an account went on counting as income while
+    // the loan claimed to be done -- and because the loan read settled,
+    // nothing offered a way back. It is named for what it does now, and a
+    // written-off loan still shows what looks like its money.
+    phoneSized(tester);
+    final repayment = entry();
+    final writtenOff = DebtViewData(
+      id: 'loan',
+      kind: DebtKind.lent,
+      counterparty: 'Sana',
+      principal: const MoneyViewData(5000000),
+      settled: const MoneyViewData(0),
+      outstanding: const MoneyViewData(5000000),
+      openedAt: opened,
+      isSettled: true,
+      closedAt: opened.add(const Duration(days: 20)),
+    );
+    final model = _Fake(debts: [writtenOff], transactions: [repayment]);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () => debt_sheets.openDebt(
+                  context,
+                  viewModel: model,
+                  debt: writtenOff,
+                ),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('Written off'),
+      findsOneWidget,
+      reason: 'calling it settled was the whole misunderstanding',
+    );
+    expect(find.text('THIS ENTRY COULD BE IT'), findsOneWidget);
+
+    await tester.tap(find.text('From Sana'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Record it'));
+    await tester.pumpAndSettle();
+
+    expect(model.settled.single.transactionId, 'back');
+    expect(
+      model.settled.single.replacingByHand,
+      isFalse,
+      reason: 'nothing was recorded by hand, so there is nothing to replace',
+    );
+  });
+
+  testWidgets('the write-off says it records nothing coming back', (
+    tester,
+  ) async {
+    phoneSized(tester);
+    final model = _Fake(debts: [loan()], transactions: const []);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () => debt_sheets.openDebt(
+                  context,
+                  viewModel: model,
+                  debt: loan(),
+                ),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Write it off'), findsOneWidget);
+    expect(find.text('Call it settled'), findsNothing);
+    expect(
+      find.textContaining('without recording any money coming back'),
+      findsOneWidget,
+    );
+  });
 }
 
 /// Only what these screens read. `noSuchMethod` covers the rest so growing

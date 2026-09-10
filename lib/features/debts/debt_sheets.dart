@@ -488,21 +488,36 @@ class _DebtSheetState extends State<_DebtSheet> {
                     : () => _refile(option),
               ),
             const SizedBox(height: 14),
-            if (!current.isSettled)
+            // It used to say "Call it settled", which reads as "mark this
+            // repaid" and does nothing of the sort: it records no money
+            // coming back and touches no entry, so a repayment that arrived
+            // in an account goes on being counted as income while the loan
+            // claims to be done. Naming it for what it does is the whole
+            // fix -- somebody who wants the other thing wants the entry
+            // above, or the amount box.
+            if (!current.isSettled) ...[
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
                   onPressed: working ? null : _close,
-                  child: const Text('Call it settled'),
+                  child: const Text('Write it off'),
                 ),
-              )
-            else
+              ),
+              const SizedBox(height: 6),
               Text(
-                'Settled${current.closedAt == null ? '' : ' on ${DateFormat('d MMM yyyy').format(current.closedAt!)}'}.',
+                'Stops tracking it without recording any money coming back. '
+                'What went out stays out.',
+                style: SpendWiseType.body.copyWith(fontSize: 12),
+              ),
+            ] else
+              Text(
+                current.outstanding.minorUnits > 0
+                    ? 'Written off${current.closedAt == null ? '' : ' on ${DateFormat('d MMM yyyy').format(current.closedAt!)}'}, with ${formatAmount(current.outstanding, cents: false)} never recorded as coming back.'
+                    : 'Settled${current.closedAt == null ? '' : ' on ${DateFormat('d MMM yyyy').format(current.closedAt!)}'}.',
                 style: SpendWiseType.body.copyWith(fontSize: 13),
               ),
             const SizedBox(height: 16),
-            // Deliberately smaller and lower than "Call it settled": that one
+            // Deliberately smaller and lower than "Write it off": that one
             // is a correction you can walk back by re-filing or recording a
             // repayment, this one throws the counterparty, note and
             // repayment history away and hands the amount back to ordinary
@@ -565,7 +580,7 @@ class _DebtSheetState extends State<_DebtSheet> {
     // One tap used to be enough to discard a counterparty, a note and a
     // whole repayment history, and to move a figure on Home, with nothing to
     // undo it. A question first is the cheapest possible defence against a
-    // slip of the thumb landing beside "Call it settled".
+    // slip of the thumb landing beside "Write it off".
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
