@@ -166,6 +166,12 @@ class _FakeReviewViewModel extends ChangeNotifier
   @override
   String? get errorMessage => null;
 
+  /// Review asks about loans coming home before it asks anything else, so
+  /// it reads the open ones. None here: these tests are about the alert
+  /// questions, and a loan question would claim their entries.
+  @override
+  List<DebtViewData> get debts => const [];
+
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 

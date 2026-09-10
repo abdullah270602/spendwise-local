@@ -963,6 +963,26 @@ final class SpendWiseController extends ChangeNotifier
         switch (decision.kind) {
           case ReviewDecisionKind.confirm:
             _ledger.confirmTransactions(decision.transactionIds);
+          case ReviewDecisionKind.settleLoan:
+            final debtId = decision.debtId;
+            if (debtId == null) {
+              throw ArgumentError('Settling needs a loan');
+            }
+            // Each entry goes onto the loan for its own full amount. The
+            // ledger takes an entry out of the month by its debt_id and
+            // nothing else, so recording a smaller figure than the entry
+            // carries would still exclude the whole of it.
+            for (final id in decision.transactionIds) {
+              final entry = _snapshot.transactions
+                  .where((item) => item.id == id)
+                  .firstOrNull;
+              if (entry == null) continue;
+              _ledger.settleDebt(
+                debtId: debtId,
+                amountMinor: entry.amount.minorUnits.abs(),
+                transactionId: id,
+              );
+            }
           case ReviewDecisionKind.categorize:
             _ledger.categorizeTransactions(
               decision.transactionIds,

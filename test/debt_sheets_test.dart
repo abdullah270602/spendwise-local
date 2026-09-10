@@ -169,6 +169,12 @@ class _FakeViewModel extends ChangeNotifier
   @override
   String? get errorMessage => null;
 
+  /// The loan section reads the entry back from here rather than trusting
+  /// the snapshot it was handed, so that recording a repayment updates the
+  /// screen. Empty is enough: it falls back to the entry under test.
+  @override
+  List<TransactionViewData> get transactions => const [];
+
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

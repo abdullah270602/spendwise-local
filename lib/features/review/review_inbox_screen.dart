@@ -60,6 +60,7 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
       reviews: widget.viewModel.reviews,
       accounts: widget.viewModel.accounts,
       unroutedAlerts: widget.viewModel.uiUnroutedAlerts,
+      debts: widget.viewModel.uiDebts,
     );
     final alerts = rules.fold<int>(0, (sum, rule) => sum + rule.count);
 

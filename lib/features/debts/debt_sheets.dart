@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../app/theme.dart';
 import '../../widgets/shape_kit.dart';
 import '../shell/spendwise_view_model.dart';
+import 'debt_matching.dart';
 
 /// The colour a debt kind is drawn in, wherever one is drawn.
 ///
@@ -424,10 +425,21 @@ class _DebtSheetState extends State<_DebtSheet> {
             ],
             const SizedBox(height: 24),
             if (!current.isSettled) ...[
+              _MatchingEntries(
+                viewModel: widget.viewModel,
+                debt: current,
+                onRecorded: () {
+                  if (!mounted) return;
+                  setState(() {
+                    amount.text = (debt.outstanding.minorUnits / 100)
+                        .toStringAsFixed(0);
+                  });
+                },
+              ),
               Eyebrow(
                 current.lent
-                    ? 'Record money coming back'
-                    : 'Record a repayment',
+                    ? 'Record money coming back in cash'
+                    : 'Record a repayment in cash',
               ),
               const SizedBox(height: 8),
               Row(
@@ -454,9 +466,9 @@ class _DebtSheetState extends State<_DebtSheet> {
               ),
               const SizedBox(height: 8),
               Text(
-                'If the repayment already arrived as a bank alert, open that '
-                'entry instead and mark it against this loan — the money only '
-                'counts once either way.',
+                'For cash in hand. If the repayment arrived as a bank '
+                'alert, open that entry and record it against this loan '
+                'instead — that is what stops it counting twice.',
                 style: SpendWiseType.body.copyWith(fontSize: 12),
               ),
               const SizedBox(height: 18),
@@ -605,5 +617,413 @@ class _DebtSheetState extends State<_DebtSheet> {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Could not do that: $error')));
     }
+  }
+}
+
+/// Attaching an entry the bank already reported to a loan that is still open.
+///
+/// The missing half of settling. Recording an amount on the loan alone is
+/// right for cash that never touched an account, but when the repayment
+/// arrived as an alert there are two records of the same money: the loan says
+/// it came back, and the ledger still counts it as income. Stamping the entry
+/// with the loan is what makes it stop counting -- the whole exclusion turns
+/// on debtId, nothing else.
+Future<bool> settleFromEntry(
+  BuildContext context, {
+  required SpendWiseViewModel viewModel,
+  required TransactionViewData transaction,
+  DebtViewData? debt,
+}) async {
+  final result = await showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    useSafeArea: true,
+    builder: (sheetContext) => _SettleFromEntrySheet(
+      viewModel: viewModel,
+      transaction: transaction,
+      preselected: debt,
+    ),
+  );
+  return result ?? false;
+}
+
+class _SettleFromEntrySheet extends StatefulWidget {
+  const _SettleFromEntrySheet({
+    required this.viewModel,
+    required this.transaction,
+    this.preselected,
+  });
+
+  final SpendWiseViewModel viewModel;
+  final TransactionViewData transaction;
+  final DebtViewData? preselected;
+
+  @override
+  State<_SettleFromEntrySheet> createState() => _SettleFromEntrySheetState();
+}
+
+class _SettleFromEntrySheetState extends State<_SettleFromEntrySheet> {
+  String? chosen;
+  bool saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    chosen = widget.preselected?.id;
+  }
+
+  /// The reasons the matcher found, so a suggested loan can say why it is
+  /// near the top rather than appearing there by magic.
+  Map<String, String> get _reasons => {
+    for (final match in debtMatchesFor(
+      transaction: widget.transaction,
+      debts: widget.viewModel.uiDebts,
+      limit: 99,
+    ))
+      match.debt.id: match.reason,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final incoming = widget.transaction.kind == TransactionKind.income;
+    final amount = widget.transaction.amount.minorUnits.abs();
+    final reasons = _reasons;
+    final loans =
+        debtsOpenTo(
+            transaction: widget.transaction,
+            debts: widget.viewModel.uiDebts,
+          )
+          // Suggested loans first: the matcher already decided which ones look
+          // like this entry, and burying them under an older loan would waste
+          // the one thing this sheet knows.
+          ..sort((a, b) {
+            final suggested =
+                (reasons.containsKey(b.id) ? 1 : 0) -
+                (reasons.containsKey(a.id) ? 1 : 0);
+            if (suggested != 0) return suggested;
+            return b.openedAt.compareTo(a.openedAt);
+          });
+    final selected = loans.where((item) => item.id == chosen).firstOrNull;
+    final over = selected == null
+        ? 0
+        : amount - selected.outstanding.minorUnits;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        SpendWiseTheme.gutter,
+        0,
+        SpendWiseTheme.gutter,
+        MediaQuery.viewInsetsOf(context).bottom +
+            MediaQuery.viewPaddingOf(context).bottom +
+            24,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              incoming ? 'Money coming back' : 'Money going back',
+              style: SpendWiseType.title,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'It stops counting as ${incoming ? 'income' : 'spending'} and '
+              'comes off what is still out.',
+              style: SpendWiseType.body.copyWith(fontSize: 13),
+            ),
+            const SizedBox(height: 22),
+            if (loans.isEmpty)
+              Text(
+                incoming
+                    ? 'No open loan is waiting on money coming in.'
+                    : 'Nothing open is waiting on money going out.',
+                style: SpendWiseType.body.copyWith(fontSize: 13),
+              )
+            else ...[
+              const Eyebrow('Which loan'),
+              const SizedBox(height: 8),
+              for (final loan in loans)
+                _LoanChoice(
+                  debt: loan,
+                  reason: reasons[loan.id],
+                  selected: loan.id == chosen,
+                  onTap: () => setState(() => chosen = loan.id),
+                ),
+            ],
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.only(top: 13),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: SpendWiseColors.line)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.transaction.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: SpendWiseType.body.copyWith(fontSize: 13),
+                    ),
+                  ),
+                  Text(
+                    formatAmount(widget.transaction.amount),
+                    style: SpendWiseType.rowStrong.copyWith(
+                      color: selected == null
+                          ? SpendWiseColors.fg
+                          : toneForDebtKind(selected.kind),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // The entry goes onto the loan whole or not at all. Recording a
+            // smaller figure would still stamp the whole entry, so a payment
+            // that was half repayment and half a gift would take the gift out
+            // of the month as well, silently.
+            if (over > 0) ...[
+              const SizedBox(height: 12),
+              Text(
+                'That is '
+                '${formatAmount(MoneyViewData(over, currency: widget.transaction.amount.currency), cents: false)} '
+                'more than is still out. All of it stops counting as '
+                '${incoming ? 'income' : 'spending'}, and the loan closes.',
+                style: SpendWiseType.body.copyWith(
+                  fontSize: 12.5,
+                  color: SpendWiseColors.warning,
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            PrimaryAction(
+              label: 'Record it',
+              busy: saving,
+              onPressed: selected == null ? null : _record,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _record() async {
+    final debtId = chosen;
+    if (debtId == null) return;
+    setState(() => saving = true);
+    try {
+      await widget.viewModel.uiSettleDebt(
+        debtId: debtId,
+        amount: widget.transaction.amount,
+        transactionId: widget.transaction.id,
+      );
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => saving = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not record that: $error')));
+    }
+  }
+}
+
+class _LoanChoice extends StatelessWidget {
+  const _LoanChoice({
+    required this.debt,
+    required this.selected,
+    required this.onTap,
+    this.reason,
+  });
+
+  final DebtViewData debt;
+  final bool selected;
+  final VoidCallback onTap;
+
+  /// Why the matcher put this one forward, if it did.
+  final String? reason;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = toneForDebtKind(debt.kind);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: selected ? tone : SpendWiseColors.edge,
+              width: selected ? 1.6 : 1,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 14,
+                height: 14,
+                margin: const EdgeInsets.only(top: 3, right: 12),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: selected ? tone : SpendWiseColors.edge,
+                    width: 1.5,
+                  ),
+                  color: selected ? tone : Colors.transparent,
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            debt.counterparty,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: SpendWiseType.rowStrong.copyWith(
+                              fontSize: 14,
+                              color: selected ? tone : SpendWiseColors.fg,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          formatAmount(debt.outstanding, cents: false),
+                          style: SpendWiseType.body.copyWith(fontSize: 13),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      reason == null
+                          ? '${debt.kind.categoryName} - opened '
+                                '${DateFormat('d MMM').format(debt.openedAt)}'
+                          : 'Suggested: $reason',
+                      style: SpendWiseType.body.copyWith(
+                        fontSize: 12,
+                        color: reason == null
+                            ? SpendWiseColors.dim
+                            : SpendWiseColors.keep,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Entries the ledger already holds that look like this loan coming home.
+///
+/// Drawn above the amount box on purpose. That box is where somebody would
+/// otherwise type the figure by hand, which settles the loan and leaves the
+/// same money still counted as income — the double count this whole path
+/// exists to stop. Offering the entry first makes the right answer the
+/// nearer one.
+class _MatchingEntries extends StatelessWidget {
+  const _MatchingEntries({
+    required this.viewModel,
+    required this.debt,
+    required this.onRecorded,
+  });
+
+  final SpendWiseViewModel viewModel;
+  final DebtViewData debt;
+
+  /// The sheet around this one is not listening to the ledger, so recording
+  /// an entry has to say so out loud or the loan goes on showing the money
+  /// as still out.
+  final VoidCallback onRecorded;
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = entriesMatching(
+      debt: debt,
+      transactions: viewModel.transactions,
+    );
+    if (entries.isEmpty) return const SizedBox.shrink();
+    final tone = toneForDebtKind(debt.kind);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Eyebrow(
+          entries.length == 1
+              ? 'This entry could be it'
+              : 'These entries could be it',
+        ),
+        const SizedBox(height: 8),
+        for (final entry in entries)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: InkWell(
+              onTap: () async {
+                final recorded = await settleFromEntry(
+                  context,
+                  viewModel: viewModel,
+                  transaction: entry,
+                  debt: debt,
+                );
+                if (recorded) onRecorded();
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 11,
+                ),
+                decoration: BoxDecoration(
+                  border: Border(
+                    left: BorderSide(color: tone, width: 2),
+                    top: const BorderSide(color: SpendWiseColors.line),
+                    right: const BorderSide(color: SpendWiseColors.line),
+                    bottom: const BorderSide(color: SpendWiseColors.line),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            entry.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: SpendWiseType.row,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            DateFormat('d MMM').format(entry.occurredAt),
+                            style: SpendWiseType.metaTight,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      formatAmount(entry.amount),
+                      style: SpendWiseType.rowStrong.copyWith(color: tone),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        const SizedBox(height: 6),
+        Text(
+          'Recording one of these stops it counting as '
+          '${debt.lent ? 'income' : 'spending'} as well as closing the loan.',
+          style: SpendWiseType.body.copyWith(fontSize: 12),
+        ),
+        const SizedBox(height: 18),
+      ],
+    );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../widgets/category_picker.dart';
 import '../../widgets/shape_kit.dart';
+import '../debts/debt_matching.dart';
 import '../debts/debt_sheets.dart' as debt_sheets;
 import '../../widgets/spendwise_components.dart';
 import '../shell/spendwise_view_model.dart';
@@ -701,51 +702,28 @@ class _LoanSection extends StatelessWidget {
   final TransactionViewData transaction;
 
   @override
-  Widget build(BuildContext context) {
-    if (transaction.kind == TransactionKind.transfer) {
+  Widget build(BuildContext context) => AnimatedBuilder(
+    // The screen is handed a snapshot taken when it was pushed. Attaching an
+    // entry to a loan changes exactly this section, so it has to read the
+    // entry back rather than keep drawing the copy it arrived with.
+    animation: viewModel,
+    builder: (context, _) => _body(context),
+  );
+
+  Widget _body(BuildContext context) {
+    final live =
+        viewModel.transactions
+            .where((item) => item.id == transaction.id)
+            .firstOrNull ??
+        transaction;
+    if (live.kind == TransactionKind.transfer) {
       return const SizedBox.shrink();
     }
-    final debt = transaction.debtId == null
+    final debt = live.debtId == null
         ? null
-        : viewModel.uiDebts
-              .where((item) => item.id == transaction.debtId)
-              .firstOrNull;
+        : viewModel.uiDebts.where((item) => item.id == live.debtId).firstOrNull;
 
-    if (debt == null) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SectionHeading('Whose money was this?'),
-          const SizedBox(height: 8),
-          Text(
-            'A bank alert cannot tell lending, borrowing and holding apart '
-            '— only you know which one this was.',
-            style: SpendWiseType.body.copyWith(fontSize: 13),
-          ),
-          const SizedBox(height: 12),
-          // All three stories, not the two most likely -- an entry point
-          // that only offered lending and borrowing was the reason holding
-          // was only ever reached by picking one of those first and
-          // correcting it inside the sheet.
-          for (final kind in DebtKind.values) ...[
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () => debt_sheets.markAsLoan(
-                  context,
-                  viewModel: viewModel,
-                  transaction: transaction,
-                  initialKind: kind,
-                ),
-                child: Text(kind.title),
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-          const SizedBox(height: 10),
-        ],
-      );
-    }
+    if (debt == null) return _unattached(context, live);
 
     final tone = debt_sheets.toneForDebtKind(debt.kind);
     return Column(
@@ -790,6 +768,159 @@ class _LoanSection extends StatelessWidget {
         ),
         const SizedBox(height: 18),
       ],
+    );
+  }
+
+  /// What an entry that belongs to no loan offers: the three stories it could
+  /// be the start of, and — the half that was missing — the loans it could be
+  /// the end of.
+  Widget _unattached(BuildContext context, TransactionViewData live) {
+    final matches = debtMatchesFor(transaction: live, debts: viewModel.uiDebts);
+    final open = debtsOpenTo(transaction: live, debts: viewModel.uiDebts);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (matches.isNotEmpty) ...[
+          _Suggestion(
+            viewModel: viewModel,
+            transaction: live,
+            match: matches.first,
+            others: matches.length - 1,
+          ),
+          const SizedBox(height: 22),
+        ],
+        const SectionHeading('Whose money was this?'),
+        const SizedBox(height: 8),
+        Text(
+          'A bank alert cannot tell lending, borrowing and holding apart '
+          '— only you know which one this was.',
+          style: SpendWiseType.body.copyWith(fontSize: 13),
+        ),
+        const SizedBox(height: 12),
+        // All three stories, not the two most likely -- an entry point
+        // that only offered lending and borrowing was the reason holding
+        // was only ever reached by picking one of those first and
+        // correcting it inside the sheet.
+        for (final kind in DebtKind.values) ...[
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () => debt_sheets.markAsLoan(
+                context,
+                viewModel: viewModel,
+                transaction: live,
+                initialKind: kind,
+              ),
+              child: Text(kind.title),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+        // Opening a new loan and closing an old one are opposite answers to
+        // the same question, and only one of them used to be on this screen.
+        // Without this, somebody whose loan came back had no move except to
+        // record a second loan for the same money.
+        if (open.isNotEmpty && matches.isEmpty)
+          SizedBox(
+            width: double.infinity,
+            child: TextButton(
+              onPressed: () => debt_sheets.settleFromEntry(
+                context,
+                viewModel: viewModel,
+                transaction: live,
+              ),
+              child: Text(
+                live.kind == TransactionKind.income
+                    ? 'This is money coming back on a loan'
+                    : 'This is money going back on a loan',
+              ),
+            ),
+          ),
+        const SizedBox(height: 10),
+      ],
+    );
+  }
+}
+
+/// The one loan this entry most looks like, offered as a question.
+///
+/// Never acted on by itself. Settling a loan the owner did not settle is the
+/// expensive mistake here: a loan they believe is closed is money they will
+/// never ask for again, and nothing in a bank alert can carry that decision.
+class _Suggestion extends StatelessWidget {
+  const _Suggestion({
+    required this.viewModel,
+    required this.transaction,
+    required this.match,
+    required this.others,
+  });
+
+  final SpendWiseViewModel viewModel;
+  final TransactionViewData transaction;
+  final DebtMatch match;
+
+  /// How many other open loans this entry also looks like.
+  final int others;
+
+  @override
+  Widget build(BuildContext context) {
+    final debt = match.debt;
+    final tone = debt_sheets.toneForDebtKind(debt.kind);
+    final headline = switch (debt.kind) {
+      DebtKind.lent => 'Is this ${debt.counterparty} paying you back?',
+      DebtKind.borrowed => 'Is this you paying ${debt.counterparty} back?',
+      DebtKind.holding => 'Is this ${debt.counterparty} money going on?',
+    };
+    return Container(
+      padding: const EdgeInsets.fromLTRB(13, 12, 13, 13),
+      decoration: BoxDecoration(
+        border: Border(
+          left: BorderSide(color: tone, width: 2),
+          top: const BorderSide(color: SpendWiseColors.line),
+          right: const BorderSide(color: SpendWiseColors.line),
+          bottom: const BorderSide(color: SpendWiseColors.line),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(headline, style: SpendWiseType.row),
+          const SizedBox(height: 4),
+          // The reason is on screen because a suggestion nobody can check is
+          // just an assertion, and this one moves money out of the month.
+          Text(
+            '${formatAmount(debt.outstanding, cents: false)} is still out on '
+            'this loan, and ${match.reason}.',
+            style: SpendWiseType.body.copyWith(fontSize: 12.5),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () => debt_sheets.settleFromEntry(
+                context,
+                viewModel: viewModel,
+                transaction: transaction,
+                debt: debt,
+              ),
+              child: const Text('Record it against this loan'),
+            ),
+          ),
+          if (others > 0)
+            TextButton(
+              onPressed: () => debt_sheets.settleFromEntry(
+                context,
+                viewModel: viewModel,
+                transaction: transaction,
+              ),
+              child: Text(
+                others == 1
+                    ? 'One other loan also fits'
+                    : '$others other loans also fit',
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

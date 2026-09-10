@@ -223,6 +223,10 @@ enum ReviewDecisionKind {
   /// These alerts are transactions; the parser just could not tell which way
   /// the money went. Take the user's answer and file them.
   fileAlerts,
+
+  /// These are a loan coming home, not money earned or spent. Attach them to
+  /// the loan, which is what takes them out of the month.
+  settleLoan,
 }
 
 @immutable
@@ -235,6 +239,7 @@ class ReviewDecision {
     this.expense = true,
     this.packageName,
     this.alertIds = const [],
+    this.debtId,
   });
 
   final ReviewDecisionKind kind;
@@ -246,6 +251,9 @@ class ReviewDecision {
 
   /// Raw observation ids, for decisions that act before parsing.
   final List<String> alertIds;
+
+  /// The loan these entries belong to, for [ReviewDecisionKind.settleLoan].
+  final String? debtId;
 
   int get count => alertIds.isEmpty ? transactionIds.length : alertIds.length;
 }

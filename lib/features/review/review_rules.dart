@@ -1,3 +1,4 @@
+import '../debts/debt_matching.dart';
 import '../shell/spendwise_view_model.dart';
 
 /// A Review rule: one question that resolves many alerts at once.
@@ -110,6 +111,7 @@ List<ReviewRule> buildReviewRules({
   required List<ReviewViewData> reviews,
   required List<AccountViewData> accounts,
   List<AlertViewData> unroutedAlerts = const [],
+  List<DebtViewData> debts = const [],
 }) {
   final pending = transactions.where((item) => !item.isReviewed).toList();
   final claimed = <String>{};
@@ -173,6 +175,66 @@ List<ReviewRule> buildReviewRules({
 
   // 2. No account matched. Nothing reaches a balance until this is answered,
   //    so it outranks categorisation.
+  // 2. A loan coming home. Second only to a misread direction, and for the
+  //    same reason: confirming one of these as ordinary money is not a
+  //    filing mistake, it is a month that says the owner earned what they
+  //    only got back. Asked per loan, because the answer names one.
+  //
+  //    Each entry goes to its *best* loan rather than to the first one that
+  //    fits. Two loans of the same size both match a payment of that size on
+  //    the amount alone, and whichever was asked first would otherwise claim
+  //    a payment that carries the other one's name.
+  final byLoan = <String, List<TransactionViewData>>{};
+  for (final item in pending) {
+    if (claimed.contains(item.id)) continue;
+    final best = debtMatchesFor(transaction: item, debts: debts).firstOrNull;
+    if (best == null) continue;
+    byLoan.putIfAbsent(best.debt.id, () => []).add(item);
+  }
+  for (final debt in debts) {
+    final candidates = byLoan[debt.id] ?? const <TransactionViewData>[];
+    if (candidates.isEmpty) continue;
+    claimed.addAll(candidates.map((item) => item.id));
+    final one = candidates.length == 1;
+    final incoming = debt.lent;
+    rules.add(
+      ReviewRule(
+        id: 'loan-${debt.id}',
+        count: candidates.length,
+        unit: _fromSource(candidates),
+        claim: incoming
+            ? '${debt.counterparty} has money out with you. This looks '
+                  'like it coming back.'
+            : 'This looks like ${debt.counterparty} being paid back.',
+        evidence: _sampleTitles(candidates),
+        actions: [
+          ReviewAction(
+            label: one
+                ? 'Record it against the loan'
+                : 'Record all ${candidates.length} against the loan',
+            decision: ReviewDecision(
+              kind: ReviewDecisionKind.settleLoan,
+              transactionIds: [for (final item in candidates) item.id],
+              debtId: debt.id,
+            ),
+          ),
+          // The refusal has to be an answer too. Without it the question
+          // has no way to go away, and a rule that cannot be answered no
+          // is a rule that outlives the truth.
+          ReviewAction(
+            label: incoming
+                ? 'No, it is ordinary money in'
+                : 'No, it is ordinary spending',
+            decision: ReviewDecision(
+              kind: ReviewDecisionKind.confirm,
+              transactionIds: [for (final item in candidates) item.id],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Both must be missing: a transaction can carry a readable account label
   // without an id (manual entries, legacy rows), and claiming those are
   // unrouted would send the user shopping for an account they already picked.

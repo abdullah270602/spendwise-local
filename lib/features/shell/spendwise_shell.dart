@@ -163,6 +163,7 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
         reviews: widget.viewModel.reviews,
         accounts: widget.viewModel.accounts,
         unroutedAlerts: widget.viewModel.uiUnroutedAlerts,
+        debts: widget.viewModel.uiDebts,
       ).length;
 
       return Scaffold(
