@@ -253,6 +253,48 @@ final class LedgerSnapshot {
     return total;
   }
 
+  /// What each account held immediately after each entry that touched it,
+  /// keyed by entry id and then by account id.
+  ///
+  /// The point of it is checking. Every figure in this app is derived, and
+  /// after enough derivations somebody reasonably stops believing them; a
+  /// balance printed beside each entry is the one thing an owner can verify
+  /// against their bank without trusting a single sum this app makes.
+  ///
+  /// Built by walking the entries oldest-first from each account's opening
+  /// balance, so the last value for an account is [accountBalanceMinor] by
+  /// construction rather than by coincidence -- a test holds those two
+  /// together, and if they ever part it is this that is wrong, not the
+  /// balance.
+  ///
+  /// Entries sharing one timestamp are ordered by the same tiebreak the
+  /// query uses. Their intermediate values depend on that order; the total
+  /// after all of them does not.
+  Map<String, Map<String, int>> accountRunningBalances() {
+    final running = <String, int>{...openingBalances};
+    final result = <String, Map<String, int>>{};
+    // `transactions` arrives newest-first, so this reads it from the far end.
+    for (final item in transactions.reversed) {
+      void touch(String? accountId, int delta) {
+        if (accountId == null) return;
+        final now = (running[accountId] ?? 0) + delta;
+        running[accountId] = now;
+        (result[item.id] ??= <String, int>{})[accountId] = now;
+      }
+
+      switch (item.kind) {
+        case TransactionKind.expense:
+          touch(item.accountId, -item.amount.minorUnits);
+        case TransactionKind.income:
+          touch(item.accountId, item.amount.minorUnits);
+        case TransactionKind.transfer:
+          touch(item.fromAccountId, -item.amount.minorUnits);
+          touch(item.toAccountId, item.amount.minorUnits);
+      }
+    }
+    return result;
+  }
+
   int accountBalanceMinor(String accountId) {
     var value = openingBalances[accountId] ?? 0;
     for (final item in transactions) {

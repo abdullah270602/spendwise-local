@@ -98,6 +98,7 @@ class TransactionDetailsScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 18),
+          _BalanceTrail(transaction: transaction),
           _LoanSection(viewModel: viewModel, transaction: transaction),
           const SectionHeading('Source evidence'),
           const SizedBox(height: 8),
@@ -923,4 +924,136 @@ class _Suggestion extends StatelessWidget {
       ),
     );
   }
+}
+
+/// What this entry did to the balance of every account it touched.
+///
+/// Every other figure in this app is derived from something derived, and past
+/// a certain number of derivations a person is entitled to stop believing
+/// them. This is the one an owner can hold against a bank statement and check
+/// line by line without trusting a single sum SpendWise made.
+///
+/// Drawn from the entry's own record rather than recomputed here: the figure
+/// before is the figure after less what this entry did, so the three numbers
+/// on the row cannot disagree with each other.
+class _BalanceTrail extends StatelessWidget {
+  const _BalanceTrail({required this.transaction});
+
+  final TransactionViewData transaction;
+
+  @override
+  Widget build(BuildContext context) {
+    final balances = transaction.balances;
+    // An alert that matched no account has no balance to have moved, and
+    // inventing one would be the app asserting something it cannot know.
+    if (balances.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeading('Balance around this'),
+        const SizedBox(height: 8),
+        for (final change in balances) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+            decoration: BoxDecoration(
+              border: Border.all(color: SpendWiseColors.edge),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(change.accountName, style: SpendWiseType.row),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _Step(
+                        label: 'Before',
+                        minor: change.beforeMinor,
+                        tone: SpendWiseColors.dim,
+                      ),
+                    ),
+                    Text(
+                      change.deltaMinor < 0 ? '−' : '+',
+                      style: SpendWiseType.row.copyWith(
+                        color: change.deltaMinor < 0
+                            ? SpendWiseColors.spend
+                            : SpendWiseColors.keep,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: _Step(
+                        label: 'Moved',
+                        minor: change.deltaMinor.abs(),
+                        tone: change.deltaMinor < 0
+                            ? SpendWiseColors.spend
+                            : SpendWiseColors.keep,
+                      ),
+                    ),
+                    const Text(
+                      '=',
+                      style: TextStyle(color: SpendWiseColors.dim),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: _Step(
+                        label: 'After',
+                        minor: change.afterMinor,
+                        tone: SpendWiseColors.fg,
+                        alignRight: true,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+        Text(
+          balances.length > 1
+              ? 'Both sides of a move between your own accounts.'
+              : 'Check these against your bank. They are the only figures '
+                    'here that are not worked out from another figure.',
+          style: SpendWiseType.body.copyWith(fontSize: 12),
+        ),
+        const SizedBox(height: 18),
+      ],
+    );
+  }
+}
+
+class _Step extends StatelessWidget {
+  const _Step({
+    required this.label,
+    required this.minor,
+    required this.tone,
+    this.alignRight = false,
+  });
+
+  final String label;
+  final int minor;
+  final Color tone;
+  final bool alignRight;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: alignRight
+        ? CrossAxisAlignment.end
+        : CrossAxisAlignment.start,
+    children: [
+      Eyebrow(label),
+      const SizedBox(height: 3),
+      // A figure has no spaces to wrap at, so its only way of fitting a
+      // third of a narrow screen is to shrink.
+      FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: alignRight ? Alignment.centerRight : Alignment.centerLeft,
+        child: Text(
+          formatMinor(minor),
+          style: SpendWiseType.rowStrong.copyWith(color: tone),
+        ),
+      ),
+    ],
+  );
 }

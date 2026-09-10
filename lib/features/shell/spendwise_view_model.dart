@@ -50,6 +50,7 @@ class TransactionViewData {
     this.toAccountId,
     this.evidence = const [],
     this.debtId,
+    this.balances = const [],
   });
   final String id;
   final String title;
@@ -71,6 +72,37 @@ class TransactionViewData {
   final String? debtId;
 
   bool get isLoanMovement => debtId != null;
+
+  /// What each account this entry touched held before and after it.
+  ///
+  /// Every other figure in this app is derived from something derived. This
+  /// is the one an owner can hold against a bank statement and check without
+  /// trusting a single sum SpendWise made — which is the whole reason it is
+  /// worth carrying all the way out to a screen.
+  ///
+  /// Empty when the entry reached no account: an alert that matched nothing
+  /// has no balance to have moved, and inventing one would be the app
+  /// asserting something it cannot know. Two entries for a transfer, which
+  /// moves two accounts at once.
+  final List<AccountBalanceChange> balances;
+}
+
+/// One account's balance either side of one entry.
+@immutable
+class AccountBalanceChange {
+  const AccountBalanceChange({
+    required this.accountId,
+    required this.accountName,
+    required this.beforeMinor,
+    required this.afterMinor,
+  });
+
+  final String accountId;
+  final String accountName;
+  final int beforeMinor;
+  final int afterMinor;
+
+  int get deltaMinor => afterMinor - beforeMinor;
 }
 
 @immutable

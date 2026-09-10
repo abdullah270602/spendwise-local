@@ -348,6 +348,10 @@ final class SpendWiseController extends ChangeNotifier
     final cached = _transactionsCache;
     if (cached != null) return cached;
     final categories = _ledger.transactionCategories();
+    // Walked once for the whole ledger rather than per row: the walk is over
+    // every entry there is, and doing it inside the map would make drawing a
+    // list quadratic in the size of somebody's history.
+    final running = _snapshot.accountRunningBalances();
     return _transactionsCache = _snapshot.transactions
         .map((item) {
           final kind = switch (item.kind) {
@@ -427,10 +431,39 @@ final class SpendWiseController extends ChangeNotifier
                 .toList(growable: false),
             isReviewed: !item.needsReview,
             debtId: item.debtId,
+            balances: [
+              for (final entry
+                  in (running[item.id] ?? const <String, int>{}).entries)
+                AccountBalanceChange(
+                  accountId: entry.key,
+                  accountName: _accountName(entry.key),
+                  // The walk stores where each account landed. What it held
+                  // before is that, less what this entry did to it -- so the
+                  // two figures cannot disagree with each other or with the
+                  // amount printed between them.
+                  beforeMinor: entry.value - _effectOn(item, entry.key),
+                  afterMinor: entry.value,
+                ),
+            ],
           );
         })
         .toList(growable: false);
   }
+
+  /// What one entry did to one account's balance.
+  ///
+  /// The same rule `LedgerSnapshot.accountBalanceMinor` applies, kept in one
+  /// place so a balance and the change printed beside it cannot come apart.
+  static int _effectOn(domain.CanonicalTransaction item, String accountId) =>
+      switch (item.kind) {
+        domain.TransactionKind.expense =>
+          item.accountId == accountId ? -item.amount.minorUnits : 0,
+        domain.TransactionKind.income =>
+          item.accountId == accountId ? item.amount.minorUnits : 0,
+        domain.TransactionKind.transfer =>
+          (item.fromAccountId == accountId ? -item.amount.minorUnits : 0) +
+              (item.toAccountId == accountId ? item.amount.minorUnits : 0),
+      };
 
   @override
   DashboardViewData get dashboard {
