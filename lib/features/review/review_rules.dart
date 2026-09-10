@@ -250,17 +250,20 @@ List<ReviewRule> buildReviewRules({
         item.accountId == null &&
         item.accountName.trim().isEmpty,
   );
+  // The cash pocket is not an account anybody chose, and no alert can reach
+  // it, so it cannot be the reason this question has an answer.
+  final ownAccounts = accounts.where((item) => !item.isCash);
   if (unrouted.isNotEmpty) {
     rules.add(
       ReviewRule(
         id: 'route',
         count: unrouted.length,
         unit: _fromSource(unrouted),
-        claim: accounts.isEmpty
+        claim: ownAccounts.isEmpty
             ? 'No account matched. You have not set one up yet.'
             : 'No account matched. Nothing here has reached a balance.',
         evidence: _sampleBody(unrouted),
-        alternative: accounts.isEmpty ? null : 'Handle them one by one',
+        alternative: ownAccounts.isEmpty ? null : 'Handle them one by one',
         actions: [
           ReviewAction(
             label: unrouted.length == 1

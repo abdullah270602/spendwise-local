@@ -74,7 +74,11 @@ class _AccountsScreenState extends State<AccountsScreen> {
         )
         .toList(growable: false);
 
-    if (viewModel.accounts.isEmpty && deleted == null) {
+    // Cash does not count towards having set anything up: it arrives on its
+    // own the moment setup finishes, and counting it would mean nobody is
+    // ever told to add the bank the whole app reads from.
+    final ownAccounts = viewModel.accounts.where((item) => !item.isCash);
+    if (ownAccounts.isEmpty && deleted == null) {
       return SafeArea(
         bottom: false,
         child: RestState(

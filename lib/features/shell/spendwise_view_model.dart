@@ -137,6 +137,16 @@ class AccountViewData {
   final String currency;
   final String institution;
   final List<AccountSourceViewData> sources;
+
+  /// Whether this is the cash pocket SpendWise makes by itself rather than an
+  /// account the owner set up.
+  ///
+  /// It exists from the moment setup finishes, so any question of the shape
+  /// "has this person added an account yet" has to ask around it -- otherwise
+  /// the answer is yes forever and nobody is ever asked for their bank. It is
+  /// also not somewhere a bank alert can be filed: alert routing excludes it
+  /// deliberately, because notes send no notifications.
+  bool get isCash => type.toLowerCase().contains('cash');
 }
 
 @immutable

@@ -270,6 +270,22 @@ final class LedgerSnapshot {
   }
 }
 
+/// The ledger is on disk but its key is not where it was left.
+///
+/// Thrown rather than recovered from, because every recovery available here
+/// is worse than stopping: a new key would overwrite the old one and take the
+/// database with it, and an unencrypted fallback would defeat the point of
+/// the app. The owner is told, and the file stays exactly as it is.
+final class LedgerKeyMissingException implements Exception {
+  const LedgerKeyMissingException();
+
+  @override
+  String toString() =>
+      'The ledger is on this device but its encryption key is not. '
+      'SpendWise will not replace the key, because that would make the '
+      'ledger unreadable for good.';
+}
+
 /// The single encrypted, on-device source of truth for SpendWise.
 final class LocalLedger {
   LocalLedger._(this._db, this._path);
@@ -287,7 +303,9 @@ final class LocalLedger {
     final directory = await getApplicationSupportDirectory();
     await directory.create(recursive: true);
     final path = p.join(directory.path, 'spendwise.db');
-    final key = await _loadOrCreateKey();
+    final key = await _loadOrCreateKey(
+      hasExistingLedger: File(path).existsSync(),
+    );
     final db = sqlite3.open(path);
     try {
       // SQLCipher requires keying before any read, including schema inspection.
@@ -357,9 +375,29 @@ final class LocalLedger {
     }
   }
 
-  static Future<String> _loadOrCreateKey() async {
+  /// The key to the ledger, made once and never remade.
+  ///
+  /// [hasExistingLedger] is the guard, and it is the whole point of this
+  /// function. Secure storage can come back empty for reasons that have
+  /// nothing to do with the owner: a keystore reset by a system update, a
+  /// restore onto a new device, storage the platform decides it can no longer
+  /// read. Minting a fresh key in that moment and writing it over the old one
+  /// destroys the only key to a database that is still sitting on disk, and
+  /// there is no backup by design -- so the money is gone, permanently, and
+  /// nothing about the app looks broken while it happens.
+  ///
+  /// A key is therefore only ever made when there is no database to lose.
+  /// When there is one and the key has gone missing, this refuses rather than
+  /// papers over it: an error the owner can be told about is recoverable by
+  /// somebody who still has the file, and an overwrite never is.
+  static Future<String> _loadOrCreateKey({
+    required bool hasExistingLedger,
+  }) async {
     final existing = await _secureStorage.read(key: _keyName);
     if (existing != null && existing.length == 64) return existing;
+    if (hasExistingLedger) {
+      throw const LedgerKeyMissingException();
+    }
     final random = Random.secure();
     final bytes = Uint8List.fromList(
       List<int>.generate(32, (_) => random.nextInt(256)),

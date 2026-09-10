@@ -588,7 +588,13 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
   );
 
   Future<String?> _pickAccount() {
-    final accounts = widget.viewModel.accounts;
+    // Never the cash pocket. These are bank alerts looking for somewhere to
+    // land, and cash is the one account no alert can belong to -- offering it
+    // to somebody who has added nothing else files their bank's money into
+    // their pocket, silently and wrongly.
+    final accounts = widget.viewModel.accounts
+        .where((item) => !item.isCash)
+        .toList(growable: false);
     if (accounts.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
