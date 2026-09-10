@@ -359,8 +359,10 @@ class DialHero implements ReportHero {
       canvas.fillPath();
     }
 
-    // The centre pin, same as the screen's always-drawn dot -- an anchor for
-    // the eye, not a reading. No needle: a needle is a record of *motion*,
+    // The centre pin, the same anchor the screen draws -- for the eye, not a
+    // reading. Its weight is judged against paper rather than copied from the
+    // screen, where the same tone sits on black. No needle: a needle is a
+    // record of *motion*,
     // and a printed page has none to record.
     canvas.setFillColor(paper.muted);
     canvas.drawEllipse(cx, cy, 1.8, 1.8);

@@ -38,14 +38,15 @@ enum HomeCategories {
   final String title;
   final String detail;
 
-  /// The default is [all]: the breakdown is what Home is for once the top
-  /// figure is read, and hiding it by default would answer a question nobody
-  /// asked.
+  /// The default is [off]. Home's job is the shape and the two figures that
+  /// go with it; the breakdown is the next question, and a list of every
+  /// category is a lot to meet on a first run before anyone has asked for it.
+  /// It is one tap away in Appearance for whoever wants it.
   static HomeCategories fromId(String? id) {
     for (final style in values) {
       if (style.id == id) return style;
     }
-    return all;
+    return off;
   }
 }
 

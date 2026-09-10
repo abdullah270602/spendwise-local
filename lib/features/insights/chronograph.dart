@@ -515,7 +515,15 @@ class _ChronographPainter extends CustomPainter {
       }
     }
 
-    canvas.drawCircle(_Geo.center, 3, Paint()..color = SpendWiseColors.dim);
+    // The pin only has to say where the hands come from. Drawn at full [dim]
+    // it was the brightest thing inside the hub ring and pulled the eye to the
+    // middle of a dial whose reading is all at the rim, so it is held back to
+    // something nearer the hairlines it sits among.
+    canvas.drawCircle(
+      _Geo.center,
+      2,
+      Paint()..color = SpendWiseColors.dim.withValues(alpha: 0.35),
+    );
 
     if (!reduce) {
       final raw = entryValue.clamp(0.0, 1.0);

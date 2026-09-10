@@ -64,6 +64,15 @@ void main() {
       });
     }
 
+    testWidgets('is the chronograph when nothing is stored', (tester) async {
+      // The out-of-the-box Insights. Nothing seeds this key at setup, so a
+      // first run reaches the dial through the fallback alone.
+      await pump(tester, {});
+      expect(find.byType(Chronograph), findsOneWidget);
+      expect(find.byType(CategoryBars), findsNothing);
+      expect(find.byType(MixingDesk), findsNothing);
+    });
+
     testWidgets('off draws none of them', (tester) async {
       await pump(tester, {InsightsPreference.share: InsightsShare.off.id});
       for (final widget in expected.values) {

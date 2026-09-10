@@ -91,10 +91,10 @@ List<HelpTopic> helpTopics(SpendWiseViewModel viewModel) => [
     brief:
         'Home answers a single question and draws the answer to true '
         'proportion: of everything that came in over a stretch of time, this '
-        'much stayed and this much left. Underneath, the part that left is '
-        'broken down by category — in full, as the five biggest with the rest '
-        'grouped into one line, or not at all if you would rather Home stayed '
-        'quiet. That middle option keeps a line for everything it does not '
+        'much stayed and this much left. Home stops there unless you ask for '
+        'more: under Appearance the part that left can also be broken down by '
+        'category, in full or as the five biggest with the rest grouped into '
+        'one line. That middle option keeps a line for everything it does not '
         'name, because the bar is drawn to true proportion and dropping the '
         'tail would stretch the rest to fill it. "Left" means everything that '
         'left, not only '
@@ -119,8 +119,8 @@ List<HelpTopic> helpTopics(SpendWiseViewModel viewModel) => [
     body: () => [
       HelpExample(
         caption:
-            'The bar is everything that arrived. The strip under it is the '
-            'part that left, by category.',
+            'The bar is everything that arrived. Turn the breakdown on and '
+            'the strip under it is the part that left, by category.',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

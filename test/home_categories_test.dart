@@ -102,14 +102,18 @@ void main() {
   });
 
   group('choosing it', () {
-    test('the default draws everything', () {
-      // Hiding the breakdown by default would answer a question nobody asked.
-      expect(HomeCategories.fromId(null), HomeCategories.all);
-      expect(HomeCategories.fromId('nonsense'), HomeCategories.all);
+    test('the default draws nothing', () {
+      // Home's own answer is the shape and the two figures. The breakdown is
+      // the question after that, so it is turned on by whoever wants it
+      // rather than met on a first run.
+      expect(HomeCategories.fromId(null), HomeCategories.off);
+      expect(HomeCategories.fromId('nonsense'), HomeCategories.off);
     });
 
     test('a stored choice wins', () {
-      expect(HomeCategories.fromId('off'), HomeCategories.off);
+      // Both of the ones that ask for a breakdown, since the default is now
+      // the quiet option and matching it would prove nothing.
+      expect(HomeCategories.fromId('all'), HomeCategories.all);
       expect(HomeCategories.fromId('top'), HomeCategories.top);
     });
 
@@ -127,10 +131,14 @@ void main() {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 3.0;
       addTearDown(tester.view.reset);
+      // A choice that draws something, stated rather than assumed: the
+      // unstored default is now the option that draws nothing, and this test
+      // is about what the preview shows when there is something to show.
+      final viewModel = _Fake(eight)..preferences['home_categories'] = 'all';
       await tester.pumpWidget(
         MaterialApp(
           theme: SpendWiseTheme.dark,
-          home: Scaffold(body: HomeCategoriesScreen(viewModel: _Fake(eight))),
+          home: Scaffold(body: HomeCategoriesScreen(viewModel: viewModel)),
         ),
       );
       await tester.pumpAndSettle();
@@ -147,7 +155,9 @@ void main() {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 3.0;
       addTearDown(tester.view.reset);
-      final viewModel = _Fake(eight);
+      // Starting from a breakdown that is drawn, so the tap is genuinely
+      // turning something off rather than reselecting the default.
+      final viewModel = _Fake(eight)..preferences['home_categories'] = 'all';
       await tester.pumpWidget(
         MaterialApp(
           theme: SpendWiseTheme.dark,

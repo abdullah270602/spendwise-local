@@ -139,7 +139,9 @@ in `AGENTS.md`. In particular:
   toast, and clears itself.
 - The category breakdown on Home is a choice: every category, the five biggest
   with the rest folded into one line, or none at all. The fold keeps the
-  remainder because the bar is drawn to true proportion.
+  remainder because the bar is drawn to true proportion. It defaults to none:
+  Home's answer is the shape and the two figures, and the breakdown is turned
+  on by whoever wants it rather than met on a first run.
 - Motion: the ribbon pours downward on open and on returning to Home, travels
   between proportions rather than jumping when figures change, and answers a
   tap with a two-pixel damped wobble. Reduced motion turns all of it off.

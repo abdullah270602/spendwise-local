@@ -138,9 +138,12 @@ void main() {
     );
   });
 
-  testWidgets('an unset choice draws everything', (tester) async {
+  testWidgets('an unset choice draws no breakdown at all', (tester) async {
+    // The out-of-the-box Home: the shape and the two figures, and nothing
+    // underneath until somebody asks for it in Appearance.
     await pumpHome(tester, null, height: 1600);
-    expect(rowsOn(tester), 8);
+    expect(rowsOn(tester), 0);
+    expect(find.text('Groceries'), findsNothing);
   });
 
   testWidgets('the bar and the rows always agree', (tester) async {
