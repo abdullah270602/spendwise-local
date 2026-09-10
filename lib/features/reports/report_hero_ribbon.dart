@@ -218,10 +218,19 @@ class RibbonHero implements ReportHero {
       );
     }
     if (data.keptMinor < 0) {
+      // A negative "kept" is not proof of an overspend. Money lent out comes
+      // off what is still yours without ever joining what was spent, so a
+      // month that received 100,000, spent 20,000 and lent 200,000 has a kept
+      // of -120,000 and has overspent nothing at all. Printing "spent 120,000
+      // more than came in" of that month is simply false, on a document
+      // people keep and send on.
+      final overspend = data.spentMinor - data.receivedMinor;
       return _figure(
         'Still yours',
         paper.money(0),
-        'spent ${paper.money(-data.keptMinor)} more than came in',
+        overspend > 0
+            ? 'spent ${paper.money(overspend)} more than came in'
+            : '${paper.money(data.loanOutMinor)} went out on loans',
         paper.ink,
         paper,
       );

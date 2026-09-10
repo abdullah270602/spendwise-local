@@ -405,7 +405,17 @@ class MonthLegend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final aside = setsSavingAside && savedMinor > 0 ? savedMinor : 0;
+    // Clamped exactly as the ribbon clamps it. The ribbon has always taken
+    // saving out of what is kept only as far as there is kept money to take
+    // it out of; the legend subtracted the whole of it. Put 300,000 of an
+    // existing balance into savings in a month that kept 5,000 and the shape
+    // drew an ordinary month while the words beside it read OVERSPENT
+    // 295,000 -- the picture and its own caption disagreeing about the same
+    // money, and the caption telling somebody who had just saved that they
+    // had overspent.
+    final aside = setsSavingAside && savedMinor > 0
+        ? savedMinor.clamp(0, kept < 0 ? 0 : kept)
+        : 0;
     final headline = kept - aside;
     // Every entry is flexible, including the last. "Gone" used to take its
     // intrinsic width before the others were measured, so at a large text

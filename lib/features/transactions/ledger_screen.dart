@@ -520,22 +520,92 @@ class _LedgerScreenState extends State<LedgerScreen> {
     return month.year == now.year && month.month == now.month;
   }
 
+  /// What the owner can actually spend right now.
+  ///
+  /// Money held for somebody else landed in an account and looks exactly like
+  /// their own money, so an account total overstates it: a balance is not a
+  /// permission to spend. Accounts already takes it off the top for
+  /// "Available to spend" (`accounts_screen.dart`), and "Balance now" is the
+  /// same idea under a different name -- so it comes off here too. Without
+  /// it, one everyday account holding nothing but a relative's 100,000 reads
+  /// as 0 on Accounts and 100,000 on the Ledger, about the same money on the
+  /// same day.
+  ///
+  /// It is derived from `uiDebts` rather than from a figure of its own
+  /// because `uiDebts` is where Accounts derives it, and a second derivation
+  /// of one number is a second chance for two screens to disagree.
+  /// `LocalLedger.heldOutstandingMinor()` computes the same total, but it is
+  /// not reachable from a view model, so nothing on screen can ask it.
   int get _currentBalance {
     final dashboard = widget.viewModel.dashboard;
-    return (dashboard.spendableBalance ?? dashboard.netWorth).minorUnits;
+    final balance =
+        (dashboard.spendableBalance ?? dashboard.netWorth).minorUnits;
+    return balance - _heldForOthers;
+  }
+
+  /// The money sitting in the accounts that belongs to somebody else.
+  int get _heldForOthers => widget.viewModel.uiDebts
+      .where((item) => item.isHeld && !item.isSettled)
+      .fold<int>(0, (sum, item) => sum + item.outstanding.minorUnits);
+
+  /// How much one entry moved the figure printed above the chart.
+  ///
+  /// The walk-back below is only honest if it un-applies exactly what
+  /// `_currentBalance` counts and nothing else. That figure is the total of
+  /// the everyday accounts -- `LedgerSnapshot.spendableBalanceMinor` sums the
+  /// accounts that are not savings, which is what [AccountViewData.isIncluded]
+  /// marks -- less money held for somebody else. So there are exactly two
+  /// things an entry can move, and three cases where an entry moves neither:
+  ///
+  /// * A transfer into savings leaves the total; a transfer out of savings
+  ///   rejoins it; a transfer between two everyday accounts moves money the
+  ///   total already contains on both sides and changes nothing. Skipping
+  ///   every transfer -- which this did -- drew a line that contradicted the
+  ///   number directly above it the moment anybody saved.
+  /// * Spending from a savings account, or income landing in one, never
+  ///   touches the spendable total either.
+  /// * Held money moves the account and the held total by the same amount in
+  ///   the same direction, so what is left over is unchanged whether it is
+  ///   arriving or being handed on. (Settling a held debt by typing an amount
+  ///   rather than attaching an entry moves the held total with no entry to
+  ///   find; nothing in the register can represent that.)
+  int _spendableDelta(
+    TransactionViewData item,
+    Set<String> spendable,
+    Set<String> heldDebts,
+  ) {
+    if (heldDebts.contains(item.debtId)) return 0;
+    final amount = item.amount.minorUnits.abs();
+    switch (item.kind) {
+      case TransactionKind.income:
+        return spendable.contains(item.accountId) ? amount : 0;
+      case TransactionKind.expense:
+        return spendable.contains(item.accountId) ? -amount : 0;
+      case TransactionKind.transfer:
+        var delta = 0;
+        if (spendable.contains(item.accountId)) delta -= amount;
+        if (spendable.contains(item.toAccountId)) delta += amount;
+        return delta;
+    }
   }
 
   /// End-of-day balances for the scoped month, reconstructed backwards from
   /// today's balance so the right-hand end of the line is always the number
   /// printed above it.
   List<int> _balanceSeries(List<TransactionViewData> visible) {
+    final spendable = {
+      for (final account in widget.viewModel.accounts)
+        if (account.isIncluded) account.id,
+    };
+    final heldDebts = {
+      for (final debt in widget.viewModel.uiDebts)
+        if (debt.isHeld) debt.id,
+    };
     final days = DateTime(month.year, month.month + 1, 0).day;
     final deltas = List<int>.filled(days, 0);
     for (final item in visible) {
       final local = item.occurredAt.toLocal();
-      if (item.kind == TransactionKind.transfer) continue;
-      final sign = item.kind == TransactionKind.income ? 1 : -1;
-      deltas[local.day - 1] += sign * item.amount.minorUnits.abs();
+      deltas[local.day - 1] += _spendableDelta(item, spendable, heldDebts);
     }
     // Only the current month ends at today's balance; a past month ends where
     // the months after it began, which we walk back to from today.
@@ -545,9 +615,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
       for (final item in widget.viewModel.transactions) {
         final local = item.occurredAt.toLocal();
         if (local.isBefore(cutoff)) continue;
-        if (item.kind == TransactionKind.transfer) continue;
-        final sign = item.kind == TransactionKind.income ? 1 : -1;
-        running -= sign * item.amount.minorUnits.abs();
+        running -= _spendableDelta(item, spendable, heldDebts);
       }
     }
     final series = List<int>.filled(days, 0);

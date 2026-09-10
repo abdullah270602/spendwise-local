@@ -75,6 +75,7 @@ class _ReportScreenState extends State<ReportScreen> {
       request: request,
       transactions: widget.viewModel.transactions,
       accounts: widget.viewModel.accounts,
+      debts: widget.viewModel.uiDebts,
     );
 
     return Scaffold(

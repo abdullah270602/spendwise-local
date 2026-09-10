@@ -1,3 +1,4 @@
+import '../../app/period_figures.dart';
 import '../shell/spendwise_view_model.dart';
 
 /// How saving appears on Home, if at all.
@@ -291,40 +292,22 @@ HomeFigures homeFigures(SpendWiseViewModel viewModel, {DateTime? now}) {
       if (debt.isHeld) debt.id,
   };
 
+  // The rules for what loan money does to a month live in one place now --
+  // netted, held money dropped -- because the report grew its own version of
+  // them and the two disagreed about the words they both print. What counts
+  // as earnings and as spending stays with the dashboard, which is the
+  // ledger's own answer; this adds only what the dashboard deliberately
+  // leaves out.
+  final loans = periodFigures(
+    transactions: viewModel.transactions,
+    from: from,
+    to: to,
+    heldDebtIds: heldDebtIds,
+  );
   final dashboard = viewModel.dashboard;
-  // Loan movement enters the picture netted, not both ways at once.
-  //
-  // The shape's denominator is what came in, and a loan that went out and
-  // came back inside the same window is not money that came in: it is the
-  // same note leaving and returning. Counting both legs made a month look
-  // twice the size it was and made the share meaningless -- lend 200,000 and
-  // get it back, and "of 300,000 received, this much is still yours" is
-  // measuring a real 100,000 month against a denominator that never existed.
-  //
-  // Netting costs nothing, because what is kept does not move by a rupee.
-  // Kept is received minus spent minus what went out on loans, and netting
-  // takes the same amount off both received and that last term -- so the
-  // figure that has to agree with the balance still agrees with it exactly,
-  // and only the denominator stops being inflated. Both directions are
-  // covered: a loan repaid this month with nothing lent still raises what
-  // came in, and a loan made and not yet repaid still lowers what is kept.
-  final inflow = debtInflowInWindow(
-    transactions: viewModel.transactions,
-    from: from,
-    to: to,
-    heldDebtIds: heldDebtIds,
-  );
-  final lentOut = debtOutflowInWindow(
-    transactions: viewModel.transactions,
-    from: from,
-    to: to,
-    heldDebtIds: heldDebtIds,
-  );
-  final netIn = inflow - lentOut;
-  final received =
-      dashboard.incomeThisMonth.minorUnits + (netIn > 0 ? netIn : 0);
+  final received = dashboard.incomeThisMonth.minorUnits + loans.loanIn;
   final spent = dashboard.spendingThisMonth.minorUnits;
-  final outflow = netIn < 0 ? -netIn : 0;
+  final outflow = loans.loanOut;
 
   return HomeFigures(
     received: received,

@@ -9,6 +9,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../../app/category_tones.dart';
+import '../../app/period_figures.dart';
 import '../../app/theme.dart';
 import '../../app/palette.dart';
 import '../shell/spendwise_view_model.dart';
@@ -89,6 +90,18 @@ class ReportRequest {
   /// voice, or a report that talks about itself in two dialects reads as a
   /// bug.
   static String periodLabel(DateTime from, DateTime to) {
+    // A month's name is only allowed to stand for a window that is actually
+    // that whole month. "1-15 September" was labelled "September 2026", and
+    // so was the comparison window beside it, which really ran 17-31 August
+    // -- the report naming a month while measuring half of it, on both sides
+    // of a sentence about whether things got better.
+    final opensAMonth = from.day == 1;
+    final closesAMonth = to.day == DateTime(to.year, to.month + 1, 0).day;
+    if (!opensAMonth || !closesAMonth) {
+      final sameYear = from.year == to.year;
+      return '${DateFormat(sameYear ? 'd MMM' : 'd MMM yyyy').format(from)} – '
+          '${DateFormat('d MMM yyyy').format(to)}';
+    }
     final sameMonth = from.year == to.year && from.month == to.month;
     if (sameMonth) return DateFormat('MMMM yyyy').format(from);
     if (from.year == to.year) {
@@ -109,6 +122,7 @@ class _Totals {
   const _Totals({
     required this.received,
     required this.spent,
+    required this.loanOut,
     required this.moved,
     required this.byCategory,
     required this.byMerchant,
@@ -116,12 +130,34 @@ class _Totals {
 
   final int received;
   final int spent;
+
+  /// Money lent out over the window, net of what came back. Home subtracts
+  /// this from what is still yours; the report did not, and was out by
+  /// exactly a loan.
+  final int loanOut;
   final int moved;
   final List<MapEntry<String, int>> byCategory;
   final List<MapEntry<String, int>> byMerchant;
 
-  static _Totals of(List<TransactionViewData> items) {
-    var received = 0, spent = 0, moved = 0;
+  /// [from] and [to] bound the same window [items] was filtered to. They are
+  /// passed rather than re-derived because the two figures this page leads
+  /// with now come from `periodFigures`, the one place in the app that works
+  /// out what came in and what is still yours. This used to do its own sum
+  /// and printed "Still yours" 30,000 higher than Home did on a month with a
+  /// 30,000 loan in it -- the same words, the same money, two answers.
+  static _Totals of(
+    List<TransactionViewData> items, {
+    required DateTime from,
+    required DateTime to,
+    required Set<String> heldDebtIds,
+  }) {
+    final figures = periodFigures(
+      transactions: items,
+      from: from,
+      to: to.add(const Duration(seconds: 1)),
+      heldDebtIds: heldDebtIds,
+    );
+    var moved = 0;
     final categories = <String, int>{};
     final merchants = <String, int>{};
     for (final item in items) {
@@ -135,9 +171,8 @@ class _Totals {
       final amount = item.amount.minorUnits.abs();
       switch (item.kind) {
         case TransactionKind.income:
-          received += amount;
+          break;
         case TransactionKind.expense:
-          spent += amount;
           categories.update(
             item.category,
             (value) => value + amount,
@@ -155,8 +190,9 @@ class _Totals {
     List<MapEntry<String, int>> ranked(Map<String, int> source) =>
         source.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
     return _Totals(
-      received: received,
-      spent: spent,
+      received: figures.received,
+      spent: figures.spent,
+      loanOut: figures.loanOut,
       moved: moved,
       byCategory: ranked(categories),
       byMerchant: ranked(merchants),
@@ -171,6 +207,7 @@ class ReportData {
     required this.transactions,
     required this.receivedMinor,
     required this.spentMinor,
+    required this.loanOutMinor,
     required this.movedMinor,
     required this.byCategory,
     required this.byMerchant,
@@ -186,6 +223,11 @@ class ReportData {
   final List<TransactionViewData> transactions;
   final int receivedMinor;
   final int spentMinor;
+
+  /// Money lent out over the window, net of what came back. It is neither
+  /// spending nor still in hand, so it comes off what is kept without ever
+  /// joining what was spent -- exactly as it does on Home.
+  final int loanOutMinor;
   final int movedMinor;
   final List<MapEntry<String, int>> byCategory;
   final List<MapEntry<String, int>> byMerchant;
@@ -200,7 +242,7 @@ class ReportData {
   final String currency;
   final List<AccountViewData> accounts;
 
-  int get keptMinor => receivedMinor - spentMinor;
+  int get keptMinor => receivedMinor - spentMinor - loanOutMinor;
 
   double get keptFraction =>
       receivedMinor <= 0 ? 0 : (keptMinor / receivedMinor).clamp(0.0, 1.0);
@@ -225,6 +267,9 @@ class ReportData {
     required ReportRequest request,
     required List<TransactionViewData> transactions,
     required List<AccountViewData> accounts,
+    // Money the owner is holding for somebody else is not theirs on either
+    // leg, and the report has to drop it for the same reason Home does.
+    List<DebtViewData> debts = const [],
   }) {
     final to = DateTime(
       request.to.year,
@@ -243,22 +288,70 @@ class ReportData {
     // immediately before this one -- the same rule Insights uses for its own
     // period-over-period reading, so "did this get better" means one thing
     // across the app.
-    final spanDays = to.difference(request.from).inDays + 1;
-    final previousFrom = request.from.subtract(Duration(days: spanDays));
-    final previousTo = request.from.subtract(const Duration(seconds: 1));
+    // A whole month is compared against the whole month before it, and any
+    // other stretch against the same number of days before it.
+    //
+    // Rolling back a day count cannot land on the 1st of the month before,
+    // because months are different lengths: thirty days back from 1
+    // September is 2 August, and the report still labelled that window
+    // "August 2026". Every month-length report quietly lost the 1st of its
+    // previous month, which is exactly where a salary tends to land, so a
+    // fall in spending could read as a rise from nothing.
+    final firstDay = DateTime(
+      request.from.year,
+      request.from.month,
+      request.from.day,
+    );
+    final lastDay = DateTime(to.year, to.month, to.day);
+    //
+    // Any run of whole months, not only one. "Last 3 months" is July to
+    // September, and rolling its 92 days back landed on 31 March -- so the
+    // comparison was four months wide at one end, called itself "Mar - Jun",
+    // and a day of spending that belonged to the quarter before last was
+    // counted against the quarter just gone. A whole year had the same shape
+    // and reached back into the year before that.
+    final wholeMonths =
+        firstDay.day == 1 &&
+        lastDay.day == DateTime(lastDay.year, lastDay.month + 1, 0).day &&
+        !lastDay.isBefore(firstDay);
+    final monthsSpanned = (lastDay.year - firstDay.year) * 12 +
+        lastDay.month -
+        firstDay.month +
+        1;
+    final previousTo = firstDay.subtract(const Duration(seconds: 1));
+    final previousFrom = wholeMonths
+        ? DateTime(firstDay.year, firstDay.month - monthsSpanned)
+        : firstDay.subtract(
+            Duration(days: lastDay.difference(firstDay).inDays + 1),
+          );
     final previousWithin = transactions.where((item) {
       final at = item.occurredAt.toLocal();
       return !at.isBefore(previousFrom) && !at.isAfter(previousTo);
     }).toList();
 
-    final current = _Totals.of(within);
-    final previous = _Totals.of(previousWithin);
+    final heldDebtIds = {
+      for (final debt in debts)
+        if (debt.isHeld) debt.id,
+    };
+    final current = _Totals.of(
+      within,
+      from: request.from,
+      to: to,
+      heldDebtIds: heldDebtIds,
+    );
+    final previous = _Totals.of(
+      previousWithin,
+      from: previousFrom,
+      to: previousTo,
+      heldDebtIds: heldDebtIds,
+    );
 
     return ReportData._(
       request: request,
       transactions: within,
       receivedMinor: current.received,
       spentMinor: current.spent,
+      loanOutMinor: current.loanOut,
       movedMinor: current.moved,
       byCategory: current.byCategory,
       byMerchant: current.byMerchant,
