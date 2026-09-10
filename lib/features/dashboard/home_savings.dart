@@ -292,21 +292,39 @@ HomeFigures homeFigures(SpendWiseViewModel viewModel, {DateTime? now}) {
   };
 
   final dashboard = viewModel.dashboard;
-  final received =
-      dashboard.incomeThisMonth.minorUnits +
-      debtInflowInWindow(
-        transactions: viewModel.transactions,
-        from: from,
-        to: to,
-        heldDebtIds: heldDebtIds,
-      );
-  final spent = dashboard.spendingThisMonth.minorUnits;
-  final outflow = debtOutflowInWindow(
+  // Loan movement enters the picture netted, not both ways at once.
+  //
+  // The shape's denominator is what came in, and a loan that went out and
+  // came back inside the same window is not money that came in: it is the
+  // same note leaving and returning. Counting both legs made a month look
+  // twice the size it was and made the share meaningless -- lend 200,000 and
+  // get it back, and "of 300,000 received, this much is still yours" is
+  // measuring a real 100,000 month against a denominator that never existed.
+  //
+  // Netting costs nothing, because what is kept does not move by a rupee.
+  // Kept is received minus spent minus what went out on loans, and netting
+  // takes the same amount off both received and that last term -- so the
+  // figure that has to agree with the balance still agrees with it exactly,
+  // and only the denominator stops being inflated. Both directions are
+  // covered: a loan repaid this month with nothing lent still raises what
+  // came in, and a loan made and not yet repaid still lowers what is kept.
+  final inflow = debtInflowInWindow(
     transactions: viewModel.transactions,
     from: from,
     to: to,
     heldDebtIds: heldDebtIds,
   );
+  final lentOut = debtOutflowInWindow(
+    transactions: viewModel.transactions,
+    from: from,
+    to: to,
+    heldDebtIds: heldDebtIds,
+  );
+  final netIn = inflow - lentOut;
+  final received =
+      dashboard.incomeThisMonth.minorUnits + (netIn > 0 ? netIn : 0);
+  final spent = dashboard.spendingThisMonth.minorUnits;
+  final outflow = netIn < 0 ? -netIn : 0;
 
   return HomeFigures(
     received: received,
