@@ -1010,14 +1010,7 @@ class _BalanceTrail extends StatelessWidget {
           ),
           const SizedBox(height: 8),
         ],
-        Text(
-          balances.length > 1
-              ? 'Both sides of a move between your own accounts.'
-              : 'Check these against your bank. They are the only figures '
-                    'here that are not worked out from another figure.',
-          style: SpendWiseType.body.copyWith(fontSize: 12),
-        ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 10),
       ],
     );
   }

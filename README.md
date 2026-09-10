@@ -146,9 +146,10 @@ server to send anything to and none to be breached. The app shows you its own
 permission list, read from the installed package, under *Settings → How
 SpendWise works → Privacy*.
 
-**The ledger is encrypted on the phone.** SQLCipher, with the key held by the
-Android keystore. Notification text is encrypted before it is even handed to
-the app.
+**The ledger is encrypted on the phone.** SQLCipher, with a random 256-bit key
+held in Keystore-backed Android secure storage. Alerts captured while the app
+is stopped wait in a queue encrypted under a separate, non-exportable Android
+Keystore key until SpendWise is running to read them.
 
 **Nothing syncs or backs up.** Android backup and device-transfer extraction
 are switched off. Data leaves only when you export it yourself, to a file you

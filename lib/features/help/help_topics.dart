@@ -531,8 +531,9 @@ List<HelpTopic> helpTopics(SpendWiseViewModel viewModel) => [
         'internet permission: not disabled, not opted out of, never '
         'requested, so Android will not grant it network access and there is '
         'no server to send anything to. The ledger is encrypted on the phone '
-        'with a key held by the Android keystore, and notification text is '
-        'encrypted before it is handed to the app. Android backup is switched '
+        'with a random key held in Keystore-backed secure storage, and alerts '
+        'captured while the app is stopped wait in a queue encrypted under a '
+        'separate key the phone will not export. Android backup is switched '
         'off, so nothing syncs; data leaves only when you export it yourself. '
         'The app lock is separate from all of that: because the ledger is '
         'already encrypted, a PIN is about somebody holding your unlocked '
@@ -552,8 +553,9 @@ List<HelpTopic> helpTopics(SpendWiseViewModel viewModel) => [
         index: 1,
         title: 'Encrypted on the phone',
         detail:
-            'The key is held by the Android keystore. Alert text is encrypted '
-            'before the app even sees it.',
+            'The key is held in Keystore-backed secure storage. Alerts caught '
+            'while the app is stopped wait in a queue encrypted under a '
+            'separate key that cannot leave the phone.',
       ),
       const HelpStep(
         index: 2,

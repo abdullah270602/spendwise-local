@@ -1,20 +1,20 @@
 # SpendWise project handoff
 
-Last updated: 2026-09-08
+Last updated: 2026-09-11
 
 ## Current release
 
-- Version: `0.9.25+40`
+- Version: `0.9.34+49`
 - Android package: `com.spendwise.app` — keep this stable so upgrades retain data.
 - Public repository: <https://github.com/abdullah270602/spendwise-local>
-- Latest release: <https://github.com/abdullah270602/spendwise-local/releases/tag/v0.9.25>
+- Latest release: <https://github.com/abdullah270602/spendwise-local/releases/tag/v0.9.25> (the code is ahead of it)
 - Shipped APK is the optimized split-per-ABI release build, not a Flutter debug
   build. Build with `flutter build apk --release --split-per-abi`; a plain
   `--release` writes only the universal APK and leaves the per-ABI files from
   the *previous* build sitting in the output directory, which is an easy way to
   install a stale binary and believe it is current. Check the APK's mtime
   against the commit before installing.
-- Split-per-ABI adds 2000 to the version code for arm64: `40` becomes `2040`.
+- Split-per-ABI adds 2000 to the version code for arm64: `49` becomes `2049`.
 - Installed on the connected Pixel 9 at this version, with `adb install -r`.
 
 ## Known reliability issues
@@ -242,6 +242,19 @@ in `AGENTS.md`. In particular:
   when setup finishes, or on the first withdrawal if setup was skipped, and a
   `cash_routing_from` stamp keeps every withdrawal made before the feature
   existed exactly as it was filed.
+- A loan can be settled with the entry that repaid it, from the entry, from
+  the loan, or from a Review question that names the loan. Attaching the entry
+  is what stops the money counting twice -- the ledger excludes an entry from
+  the month by its `debt_id` and by nothing else -- and a loan already settled
+  by hand can be corrected afterwards. Nothing settles by itself: a loan the
+  owner believes is closed is money they will never ask for again.
+- Every entry says what each account it touched held before it and after it.
+  It is the only figure in the app that can be checked from outside, against a
+  bank statement, without trusting a sum SpendWise made.
+- One place decides what came in, what was spent and what is still yours:
+  `lib/app/period_figures.dart`. Home and the report read it, and a test holds
+  the two screens to the same answers over a month containing earnings,
+  spending, a loan still out, held money and a transfer to savings.
 - Local export, insights, notification-source health, demo-data controls, and
   Settings version/build display with a user-invoked GitHub link.
 
@@ -263,7 +276,7 @@ invalidation behavior when changing the shell/controller.
 
 ## Verification baseline
 
-At `0.9.25`, the analyzer is clean and all 709 tests pass. Before shipping:
+At `0.9.34`, the analyzer is clean and all 853 tests pass. Before shipping:
 
 1. Run `dart format` on changed Dart files.
 2. Run `flutter analyze --no-pub`.
@@ -283,6 +296,31 @@ current configured paths rather than assume another user's home directory.
 
 ## Working rules learned the hard way
 
+- **Two screens that answer the same question separately will disagree.** Six
+  money figures drifted across Home, the report and the Ledger, and every one
+  of them was locally reasonable -- reading any single file found nothing
+  wrong. What catches this class is not a better implementation but a test
+  that asserts two screens reach the same number over one awkward month.
+- **One screen, one window.** Home took earnings from a cached dashboard that
+  resolved its own window against the clock when the cache was filled, and
+  loans from a window resolved fresh on every build. Across midnight on the
+  1st it printed last month's earnings beside this month's loans.
+- **A fake that reports totals its own ledger cannot produce cannot catch a
+  sum going wrong.** Nineteen Home tests asserted layouts against a dashboard
+  claiming money their transaction lists never moved, which is why a whole
+  class of arithmetic bug survived under a green suite.
+- **A test you have not seen fail is not evidence.** Every fix in this round
+  was proved by reverting it and reading the failure, twice catching a test
+  that passed for the wrong reason -- including one that compared an
+  expression to itself.
+- **Never mint a key without asking whether there is data to lose.** Secure
+  storage coming back empty is not proof there is no ledger; it is proof the
+  key is missing. Writing a new one over it destroys the only key to a
+  database still on disk, and there is no backup by design.
+- **A label is part of the arithmetic.** "Call it settled" recorded no money
+  and touched no entry, so somebody used it to close a loan that had been
+  repaid and the repayment went on counting as income. It is "Write it off"
+  now, with a line saying what it does not do.
 - **A stored setting must notify.** `setViewPreference` wrote to the ledger and
   told nobody, so screens already built kept the previous choice and the whole
   setting looked broken. Every earlier setting had masked this by also calling
