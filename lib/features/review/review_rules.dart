@@ -184,14 +184,20 @@ List<ReviewRule> buildReviewRules({
   //    fits. Two loans of the same size both match a payment of that size on
   //    the amount alone, and whichever was asked first would otherwise claim
   //    a payment that carries the other one's name.
+  // Only loans with money still out. Correcting one that was settled by
+  // typing the figure in is a deliberate act on the loan itself, not a
+  // question to put in front of somebody clearing their alerts.
+  final stillOut = debts
+      .where((debt) => debt.outstanding.minorUnits > 0)
+      .toList();
   final byLoan = <String, List<TransactionViewData>>{};
   for (final item in pending) {
     if (claimed.contains(item.id)) continue;
-    final best = debtMatchesFor(transaction: item, debts: debts).firstOrNull;
+    final best = debtMatchesFor(transaction: item, debts: stillOut).firstOrNull;
     if (best == null) continue;
     byLoan.putIfAbsent(best.debt.id, () => []).add(item);
   }
-  for (final debt in debts) {
+  for (final debt in stillOut) {
     final candidates = byLoan[debt.id] ?? const <TransactionViewData>[];
     if (candidates.isEmpty) continue;
     claimed.addAll(candidates.map((item) => item.id));

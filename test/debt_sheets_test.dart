@@ -159,6 +159,7 @@ class _FakeViewModel extends ChangeNotifier
     required String debtId,
     required MoneyViewData amount,
     String? transactionId,
+    bool replacingByHand = false,
   }) async {
     notifyListeners();
   }

@@ -1098,6 +1098,10 @@ final class SpendWiseController extends ChangeNotifier
             currency: item.currency,
           ),
           settled: MoneyViewData(item.settledMinor, currency: item.currency),
+          settledByHand: MoneyViewData(
+            item.settledByHandMinor,
+            currency: item.currency,
+          ),
           outstanding: MoneyViewData(
             item.outstandingMinor,
             currency: item.currency,
@@ -1136,11 +1140,13 @@ final class SpendWiseController extends ChangeNotifier
     required String debtId,
     required MoneyViewData amount,
     String? transactionId,
+    bool replacingByHand = false,
   }) => _runBusy(() async {
     _ledger.settleDebt(
       debtId: debtId,
       amountMinor: amount.minorUnits.abs(),
       transactionId: transactionId,
+      replacingByHand: replacingByHand,
     );
   });
 

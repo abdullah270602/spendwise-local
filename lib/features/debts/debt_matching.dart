@@ -62,8 +62,7 @@ List<DebtMatch> debtMatchesFor({
 
   final matches = <DebtMatch>[];
   for (final debt in debts) {
-    if (debt.isSettled) continue;
-    final outstanding = debt.outstanding.minorUnits;
+    final outstanding = _roomFor(debt);
     if (outstanding <= 0) continue;
     // Money coming in settles what was lent out; money going out settles what
     // was borrowed, or passes on what was only ever being held.
@@ -83,6 +82,9 @@ List<DebtMatch> debtMatchesFor({
 
     final named = _namesMatch(debt.counterparty, words);
     final whole = amount == outstanding;
+    // A loan with nothing out is one somebody already settled by typing the
+    // figure in. "Exactly what is still out" would be nonsense on it.
+    final byHand = debt.outstanding.minorUnits <= 0;
     if (!named && !whole) continue;
 
     matches.add(
@@ -91,11 +93,7 @@ List<DebtMatch> debtMatchesFor({
         strength: named && whole
             ? DebtMatchStrength.exact
             : DebtMatchStrength.likely,
-        reason: named && whole
-            ? 'the name matches and it is exactly what is still out'
-            : whole
-            ? 'it is exactly what is still out'
-            : 'the name matches',
+        reason: _reasonFor(named: named, whole: whole, byHand: byHand),
       ),
     );
   }
@@ -110,6 +108,31 @@ List<DebtMatch> debtMatchesFor({
     return a.debt.counterparty.compareTo(b.debt.counterparty);
   });
   return matches.length > limit ? matches.sublist(0, limit) : matches;
+}
+
+String _reasonFor({
+  required bool named,
+  required bool whole,
+  required bool byHand,
+}) {
+  final amount = byHand
+      ? 'it is the amount already recorded by hand'
+      : 'it is exactly what is still out';
+  if (named && whole) return 'the name matches and $amount';
+  return whole ? amount : 'the name matches';
+}
+
+/// How much of a loan an entry could still account for.
+///
+/// Normally what is still out. But a loan settled by typing an amount into
+/// it is a loan whose money is recorded twice over: the loan says it came
+/// home, and the entry that actually brought it home is still sitting in the
+/// month as income. Nothing marks it settled *by an entry*, so the room to
+/// correct that is exactly what was typed in by hand.
+int _roomFor(DebtViewData debt) {
+  final outstanding = debt.outstanding.minorUnits;
+  if (outstanding > 0) return outstanding;
+  return debt.settledByHand.minorUnits;
 }
 
 /// Open loans this entry could be attached to by hand, most recent first.
@@ -127,12 +150,7 @@ List<DebtViewData> debtsOpenTo({
   final incoming = transaction.kind == TransactionKind.income;
   final open =
       debts
-          .where(
-            (debt) =>
-                !debt.isSettled &&
-                debt.outstanding.minorUnits > 0 &&
-                incoming == debt.lent,
-          )
+          .where((debt) => _roomFor(debt) > 0 && incoming == debt.lent)
           .toList()
         ..sort((a, b) => b.openedAt.compareTo(a.openedAt));
   return open;
@@ -179,8 +197,8 @@ List<TransactionViewData> entriesMatching({
   required Iterable<TransactionViewData> transactions,
   int limit = 3,
 }) {
-  final outstanding = debt.outstanding.minorUnits;
-  if (debt.isSettled || outstanding <= 0) return const [];
+  final outstanding = _roomFor(debt);
+  if (outstanding <= 0) return const [];
   final found = <TransactionViewData>[];
   for (final item in transactions) {
     // Cheap tests first. This runs over the whole ledger every time a loan

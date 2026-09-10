@@ -424,18 +424,18 @@ class _DebtSheetState extends State<_DebtSheet> {
               ),
             ],
             const SizedBox(height: 24),
+            _MatchingEntries(
+              viewModel: widget.viewModel,
+              debt: current,
+              onRecorded: () {
+                if (!mounted) return;
+                setState(() {
+                  amount.text = (debt.outstanding.minorUnits / 100)
+                      .toStringAsFixed(0);
+                });
+              },
+            ),
             if (!current.isSettled) ...[
-              _MatchingEntries(
-                viewModel: widget.viewModel,
-                debt: current,
-                onRecorded: () {
-                  if (!mounted) return;
-                  setState(() {
-                    amount.text = (debt.outstanding.minorUnits / 100)
-                        .toStringAsFixed(0);
-                  });
-                },
-              ),
               Eyebrow(
                 current.lent
                     ? 'Record money coming back in cash'
@@ -705,7 +705,10 @@ class _SettleFromEntrySheetState extends State<_SettleFromEntrySheet> {
             return b.openedAt.compareTo(a.openedAt);
           });
     final selected = loans.where((item) => item.id == chosen).firstOrNull;
-    final over = selected == null
+    // Not asked of a loan settled by hand: nothing is out on one of those by
+    // definition, and "more than is still out" would fire on every entry
+    // while the sheet is busy explaining the opposite.
+    final over = selected == null || selected.outstanding.minorUnits <= 0
         ? 0
         : amount - selected.outstanding.minorUnits;
 
@@ -779,6 +782,15 @@ class _SettleFromEntrySheetState extends State<_SettleFromEntrySheet> {
                 ],
               ),
             ),
+            if (selected != null && selected.outstanding.minorUnits <= 0) ...[
+              const SizedBox(height: 12),
+              Text(
+                'This replaces the '
+                '${formatAmount(selected.settledByHand, cents: false)} you '
+                'recorded on this loan by hand.',
+                style: SpendWiseType.body.copyWith(fontSize: 12.5),
+              ),
+            ],
             // The entry goes onto the loan whole or not at all. Recording a
             // smaller figure would still stamp the whole entry, so a payment
             // that was half repayment and half a gift would take the gift out
@@ -813,10 +825,17 @@ class _SettleFromEntrySheetState extends State<_SettleFromEntrySheet> {
     if (debtId == null) return;
     setState(() => saving = true);
     try {
+      final loan = widget.viewModel.uiDebts
+          .where((item) => item.id == debtId)
+          .firstOrNull;
       await widget.viewModel.uiSettleDebt(
         debtId: debtId,
         amount: widget.transaction.amount,
         transactionId: widget.transaction.id,
+        // Nothing left out means the loan was settled by hand. Without this
+        // the loan would count the same money twice: once as the amount
+        // somebody typed, and once as the entry that actually carried it.
+        replacingByHand: (loan?.outstanding.minorUnits ?? 1) <= 0,
       );
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
@@ -952,11 +971,18 @@ class _MatchingEntries extends StatelessWidget {
     );
     if (entries.isEmpty) return const SizedBox.shrink();
     final tone = toneForDebtKind(debt.kind);
+    // A loan with nothing left out was settled by typing the figure in. The
+    // money is recorded twice over in that state -- the loan says it came
+    // home, and the entry that brought it home is still in the month as
+    // income -- and this is the only way back from it.
+    final byHand = debt.outstanding.minorUnits <= 0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Eyebrow(
-          entries.length == 1
+          byHand
+              ? 'Was this the money?'
+              : entries.length == 1
               ? 'This entry could be it'
               : 'These entries could be it',
         ),
@@ -1018,8 +1044,14 @@ class _MatchingEntries extends StatelessWidget {
           ),
         const SizedBox(height: 6),
         Text(
-          'Recording one of these stops it counting as '
-          '${debt.lent ? 'income' : 'spending'} as well as closing the loan.',
+          byHand
+              ? 'You recorded this loan as an amount, so the entry that '
+                    'brought the money back is still counted as '
+                    '${debt.lent ? 'income' : 'spending'}. Recording it here '
+                    'replaces the amount you typed in and takes it out.'
+              : 'Recording one of these stops it counting as '
+                    '${debt.lent ? 'income' : 'spending'} as well as closing '
+                    'the loan.',
           style: SpendWiseType.body.copyWith(fontSize: 12),
         ),
         const SizedBox(height: 18),

@@ -271,6 +271,7 @@ class DebtViewData {
     required this.counterparty,
     required this.principal,
     required this.settled,
+    this.settledByHand = const MoneyViewData(0),
     required this.outstanding,
     required this.openedAt,
     required this.isSettled,
@@ -291,6 +292,12 @@ class DebtViewData {
   final String counterparty;
   final MoneyViewData principal;
   final MoneyViewData settled;
+
+  /// How much of [settled] was typed in as an amount rather than attached to
+  /// an entry. Money recorded this way is right for cash and wrong for a
+  /// bank repayment, whose entry is still counted as income until it is
+  /// attached -- so this is what says the correction is available.
+  final MoneyViewData settledByHand;
   final MoneyViewData outstanding;
   final DateTime openedAt;
   final bool isSettled;
@@ -552,6 +559,7 @@ abstract class SpendWiseAdvancedViewModel implements SpendWiseViewModel {
     required String debtId,
     required MoneyViewData amount,
     String? transactionId,
+    bool replacingByHand = false,
   });
 
   Future<void> closeDebt(String id);
@@ -702,11 +710,13 @@ extension SpendWiseAdvancedAccess on SpendWiseViewModel {
     required String debtId,
     required MoneyViewData amount,
     String? transactionId,
+    bool replacingByHand = false,
   }) =>
       _advanced?.settleDebt(
         debtId: debtId,
         amount: amount,
         transactionId: transactionId,
+        replacingByHand: replacingByHand,
       ) ??
       Future.error(UnsupportedError('Loans are not available'));
   Future<void> uiCloseDebt(String id) =>

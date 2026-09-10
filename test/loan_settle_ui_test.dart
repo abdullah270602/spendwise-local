@@ -277,6 +277,69 @@ void main() {
       reason: 'the advice now describes a door that exists',
     );
   });
+
+  testWidgets('a loan settled by hand can still take the entry', (
+    tester,
+  ) async {
+    // The trap. Typing the figure into a loan closes it, and every way of
+    // attaching an entry looks for a loan with money still out -- so the
+    // loan read settled, the repayment went on counting as income, and
+    // nothing on any screen could reach either fact.
+    phoneSized(tester);
+    final repayment = entry();
+    final handSettled = DebtViewData(
+      id: 'loan',
+      kind: DebtKind.lent,
+      counterparty: 'Sana',
+      principal: const MoneyViewData(5000000),
+      settled: const MoneyViewData(5000000),
+      settledByHand: const MoneyViewData(5000000),
+      outstanding: const MoneyViewData(0),
+      openedAt: opened,
+      isSettled: true,
+    );
+    final model = _Fake(debts: [handSettled], transactions: [repayment]);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () => debt_sheets.openDebt(
+                  context,
+                  viewModel: model,
+                  debt: handSettled,
+                ),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('WAS THIS THE MONEY?'), findsOneWidget);
+    expect(
+      find.textContaining('still counted as income'),
+      findsOneWidget,
+      reason: 'it has to say what is wrong, not just offer a button',
+    );
+
+    await tester.tap(find.text('From Sana'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Record it'));
+    await tester.pumpAndSettle();
+
+    expect(model.settled.single.transactionId, 'back');
+    expect(
+      model.settled.single.replacingByHand,
+      isTrue,
+      reason: 'otherwise the loan counts the same money twice over',
+    );
+  });
 }
 
 /// Only what these screens read. `noSuchMethod` covers the rest so growing
@@ -300,12 +363,14 @@ class _Fake extends ChangeNotifier implements SpendWiseAdvancedViewModel {
     required String debtId,
     required MoneyViewData amount,
     String? transactionId,
+    bool replacingByHand = false,
   }) async {
     settled.add(
       Settled(
         debtId: debtId,
         transactionId: transactionId,
         amountMinor: amount.minorUnits,
+        replacingByHand: replacingByHand,
       ),
     );
     // What the ledger does: the entry is stamped, which is what takes it out
@@ -347,9 +412,14 @@ class Settled {
     required this.debtId,
     required this.transactionId,
     required this.amountMinor,
+    this.replacingByHand = false,
   });
 
   final String debtId;
   final String? transactionId;
   final int amountMinor;
+
+  /// Whether this entry was offered as the correction of a figure somebody
+  /// had already typed into the loan.
+  final bool replacingByHand;
 }

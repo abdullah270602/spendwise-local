@@ -127,6 +127,7 @@ final class StoredDebt {
     required this.counterparty,
     required this.principalMinor,
     required this.settledMinor,
+    this.settledByHandMinor = 0,
     required this.currency,
     required this.openedAt,
     this.note,
@@ -152,6 +153,16 @@ final class StoredDebt {
 
   /// How much has come back (or been repaid), across any number of payments.
   final int settledMinor;
+
+  /// How much of [settledMinor] was recorded as a bare amount, with no entry
+  /// behind it.
+  ///
+  /// That is the right record for cash, which sends no alert. It is the wrong
+  /// one for money that arrived in an account, because the entry is still
+  /// sitting in the ledger being counted as income -- the loan says the money
+  /// came home and the month says it was earned. This is what makes that
+  /// correctable after the fact.
+  final int settledByHandMinor;
   final String currency;
   final DateTime openedAt;
   final String? note;
@@ -1407,11 +1418,17 @@ final class LocalLedger {
   /// Records money coming back against a loan. [transactionId] links a real
   /// entry from the ledger; leaving it null records the payment as a note on
   /// the debt alone, for cash that never touched a tracked account.
+  /// Records money coming back against a loan.
+  ///
+  /// Pass [replacingByHand] when this entry is the same money somebody
+  /// already recorded as a bare amount. Without it the loan would count the
+  /// repayment twice over: once by hand and once by entry.
   void settleDebt({
     required String debtId,
     required int amountMinor,
     String? transactionId,
     DateTime? at,
+    bool replacingByHand = false,
   }) {
     if (amountMinor <= 0) {
       throw ArgumentError.value(amountMinor, 'amountMinor', 'Must be positive');
@@ -1444,9 +1461,55 @@ final class LocalLedger {
         ],
       );
     }
+    if (replacingByHand && transactionId != null) {
+      // The entry accounts for what is still out first. Only what it cannot
+      // fit there is money somebody has already claimed by hand, and only
+      // that much is displaced -- so a real cash payment sitting beside a
+      // mistyped one survives being corrected.
+      _displaceHandRecords(debtId, amountMinor - existing.outstandingMinor);
+    }
     final after = debt(debtId);
     if (after != null && after.outstandingMinor == 0) {
       closeDebt(debtId);
+    } else {
+      // Dropping a hand record can leave money outstanding again, and a loan
+      // with money still out that reads "settled" is the worse of the two
+      // wrong answers: it is the one nobody goes back to check.
+      reopenDebt(debtId);
+    }
+  }
+
+  /// Takes [amountMinor] of hand-written settlement off a loan, oldest
+  /// first, because an entry has just been attached that accounts for it.
+  ///
+  /// A record bigger than what is being displaced is reduced rather than
+  /// deleted: somebody who typed the whole loan in and then attaches the one
+  /// transfer that actually arrived has corrected that much and no more, and
+  /// deleting the rest would be the app deciding the remainder never
+  /// happened.
+  void _displaceHandRecords(String debtId, int amountMinor) {
+    var left = amountMinor;
+    if (left <= 0) return;
+    final rows = _db.select(
+      'SELECT id, amount_minor FROM debt_settlements '
+      'WHERE debt_id = ? AND transaction_id IS NULL '
+      'ORDER BY settled_at, id',
+      [debtId],
+    );
+    for (final row in rows) {
+      if (left <= 0) break;
+      final id = row['id'] as String;
+      final amount = row['amount_minor'] as int;
+      if (amount <= left) {
+        _db.execute('DELETE FROM debt_settlements WHERE id = ?', [id]);
+        left -= amount;
+      } else {
+        _db.execute(
+          'UPDATE debt_settlements SET amount_minor = ? WHERE id = ?',
+          [amount - left, id],
+        );
+        left = 0;
+      }
     }
   }
 
@@ -1517,7 +1580,10 @@ final class LocalLedger {
       SELECT d.*, COALESCE((
         SELECT SUM(s.amount_minor) FROM debt_settlements s
         WHERE s.debt_id = d.id
-      ), 0) AS settled
+      ), 0) AS settled, COALESCE((
+        SELECT SUM(s.amount_minor) FROM debt_settlements s
+        WHERE s.debt_id = d.id AND s.transaction_id IS NULL
+      ), 0) AS settled_by_hand
       FROM debts d
       $where
       ORDER BY d.closed_at IS NOT NULL, d.opened_at DESC
@@ -1533,6 +1599,7 @@ final class LocalLedger {
           counterparty: row['counterparty'] as String,
           principalMinor: row['principal_minor'] as int,
           settledMinor: (row['settled'] as num).toInt(),
+          settledByHandMinor: (row['settled_by_hand'] as num).toInt(),
           currency: row['currency'] as String,
           openedAt: DateTime.fromMillisecondsSinceEpoch(
             row['opened_at'] as int,

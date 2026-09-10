@@ -589,6 +589,7 @@ class _BatchImportViewModel extends _FakeViewModel
     required String debtId,
     required MoneyViewData amount,
     String? transactionId,
+    bool replacingByHand = false,
   }) async {}
 
   @override
