@@ -57,8 +57,17 @@ class _AccountsScreenState extends State<AccountsScreen> {
     // Money you are holding for somebody else sits in the bank looking
     // exactly like your own. It is the one thing a balance cannot tell you,
     // so it comes off the top -- a balance is not a permission to spend.
+    // Only what landed in an everyday account. Somebody's funds paid
+    // straight into savings were never part of this total, so subtracting
+    // them from it showed the owner less of their own money than they had.
+    final spendableIds = {for (final account in everyday) account.id};
     final heldTotal = viewModel.uiDebts
-        .where((item) => item.isHeld && !item.isSettled)
+        .where(
+          (item) =>
+              item.isHeld &&
+              !item.isSettled &&
+              (item.accountId == null || spendableIds.contains(item.accountId)),
+        )
         .fold<int>(0, (sum, item) => sum + item.outstanding.minorUnits);
     final everydayTotal = _sum(everyday) - heldTotal;
     final savingsTotal = _sum(savings);

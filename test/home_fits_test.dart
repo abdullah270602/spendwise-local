@@ -153,10 +153,56 @@ class _Fake extends ChangeNotifier implements SpendWiseAdvancedViewModel {
     ],
   );
 
-  /// One move into savings inside the window, so the "Saved" figure has
-  /// something to report and the legend draws all three entries.
+  /// The entries behind the figures above: a salary of 18,000,000, the three
+  /// categories adding to the 13,600,000 spent, and one move into savings so
+  /// the "Saved" figure has something to report and the legend draws all
+  /// three entries.
+  ///
+  /// Home works every figure out from these, over the window it names, so a
+  /// dashboard claiming a salary this list never received would draw an empty
+  /// Home and measure nothing.
   @override
   List<TransactionViewData> get transactions => [
+    TransactionViewData(
+      id: 'salary',
+      title: 'Salary',
+      subtitle: 'Everyday',
+      amount: const MoneyViewData(1800000000),
+      kind: TransactionKind.income,
+      occurredAt: DateTime.now(),
+      category: 'Income',
+      accountId: 'bank',
+    ),
+    TransactionViewData(
+      id: 'groceries',
+      title: 'Groceries',
+      subtitle: 'Everyday',
+      amount: const MoneyViewData(500000000),
+      kind: TransactionKind.expense,
+      occurredAt: DateTime.now(),
+      category: 'Groceries',
+      accountId: 'bank',
+    ),
+    TransactionViewData(
+      id: 'bills',
+      title: 'Bills',
+      subtitle: 'Everyday',
+      amount: const MoneyViewData(400000000),
+      kind: TransactionKind.expense,
+      occurredAt: DateTime.now(),
+      category: 'Bills',
+      accountId: 'bank',
+    ),
+    TransactionViewData(
+      id: 'transport',
+      title: 'Transport',
+      subtitle: 'Everyday',
+      amount: const MoneyViewData(460000000),
+      kind: TransactionKind.expense,
+      occurredAt: DateTime.now(),
+      category: 'Transport',
+      accountId: 'bank',
+    ),
     TransactionViewData(
       id: 'put-away',
       title: 'To Emergency fund',

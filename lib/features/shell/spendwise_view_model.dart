@@ -285,6 +285,7 @@ class DebtViewData {
     required this.outstanding,
     required this.openedAt,
     required this.isSettled,
+    this.accountId,
     this.note,
     this.closedAt,
   });
@@ -311,6 +312,16 @@ class DebtViewData {
   final MoneyViewData outstanding;
   final DateTime openedAt;
   final bool isSettled;
+
+  /// The account the money landed in, taken from the entry that opened the
+  /// loan.
+  ///
+  /// Held money has to come off what can be spent, and that subtraction is
+  /// only right where the money actually is. Somebody's funds paid straight
+  /// into a savings account were being taken off an everyday total they had
+  /// never joined, which showed the owner less of their own money than they
+  /// had. Null when the opening entry reached no account at all.
+  final String? accountId;
   final String? note;
   final DateTime? closedAt;
 

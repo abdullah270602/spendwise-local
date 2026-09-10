@@ -252,9 +252,13 @@ int debtInflowInWindow({
 /// straight from the ledger -- and three implementations of one sum is three
 /// chances for a picture to disagree with the thing it is a picture of.
 ///
-/// Earnings and spending come from the controller, which is the authority on
-/// what counts as either. Re-deriving them here would be a second copy of
-/// those rules, free to drift from the first.
+/// Every figure here is worked out over one window, the one [homeFigures]
+/// resolves. Earnings and spending used to be taken from the controller's
+/// `dashboard` instead, which resolves a window of its own against the clock
+/// at the moment its cache is filled. Two windows meant two answers: with the
+/// app open across midnight on the 1st, Home printed the old month's earnings
+/// under the new month's label, and every preview that passes an explicit
+/// `now` was reading somebody else's month.
 class HomeFigures {
   const HomeFigures({
     required this.received,
@@ -292,22 +296,19 @@ HomeFigures homeFigures(SpendWiseViewModel viewModel, {DateTime? now}) {
       if (debt.isHeld) debt.id,
   };
 
-  // The rules for what loan money does to a month live in one place now --
-  // netted, held money dropped -- because the report grew its own version of
-  // them and the two disagreed about the words they both print. What counts
-  // as earnings and as spending stays with the dashboard, which is the
-  // ledger's own answer; this adds only what the dashboard deliberately
-  // leaves out.
-  final loans = periodFigures(
+  // One window governs all of it. The shared rules -- earnings, spending,
+  // loan money netted and held money dropped -- live in one place, so the
+  // report and Home cannot disagree about the words they both print, and
+  // every figure Home shows is measured over the stretch of time Home names.
+  final figures = periodFigures(
     transactions: viewModel.transactions,
     from: from,
     to: to,
     heldDebtIds: heldDebtIds,
   );
-  final dashboard = viewModel.dashboard;
-  final received = dashboard.incomeThisMonth.minorUnits + loans.loanIn;
-  final spent = dashboard.spendingThisMonth.minorUnits;
-  final outflow = loans.loanOut;
+  final received = figures.received;
+  final spent = figures.spent;
+  final outflow = figures.loanOut;
 
   return HomeFigures(
     received: received,

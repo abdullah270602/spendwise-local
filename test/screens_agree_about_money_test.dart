@@ -213,23 +213,54 @@ void main() {
   });
 
   test('the shared rules and Home reach the same place independently', () {
-    // Home takes earnings from the ledger's own dashboard and adds only what
-    // the dashboard leaves out. That is only safe while the two agree about
-    // what earnings are -- which is exactly the assumption that broke before.
+    // Home works every figure out from the shared rules over the one window
+    // it names. It used to take earnings from the ledger's own dashboard
+    // instead, which resolves a window of its own -- safe only while the two
+    // windows were the same window, which is exactly the assumption that
+    // broke.
     final (:controller, :ledger) = monthWithEverything();
+
+    Set<String> heldDebtIds() => {
+      for (final debt in controller.debts)
+        if (debt.isHeld) debt.id,
+    };
+
     final home = homeFigures(controller);
     final shared = periodFigures(
       transactions: controller.transactions,
       from: home.from,
       to: home.to,
-      heldDebtIds: {
-        for (final debt in controller.debts)
-          if (debt.isHeld) debt.id,
-      },
+      heldDebtIds: heldDebtIds(),
     );
 
     expect(shared.received, home.received);
     expect(shared.spent, home.spent);
     expect(shared.kept, home.kept);
+
+    // The fixture dates everything to this month, so the window above is the
+    // one the dashboard would resolve anyway and the two agreeing proves
+    // little on its own. Ask about a month the fixture put nothing in, which
+    // no cached "this month" can answer, and require the same agreement --
+    // and that Home reports the empty month rather than this one.
+    final month = home.from;
+    final before = homeFigures(
+      controller,
+      now: DateTime(month.year, month.month - 1, 15, 12),
+    );
+    final sharedBefore = periodFigures(
+      transactions: controller.transactions,
+      from: before.from,
+      to: before.to,
+      heldDebtIds: heldDebtIds(),
+    );
+
+    expect(before.received, sharedBefore.received);
+    expect(before.spent, sharedBefore.spent);
+    expect(before.kept, sharedBefore.kept);
+    expect(
+      before.received,
+      0,
+      reason: 'nothing arrived in a month this fixture never wrote to',
+    );
   });
 }

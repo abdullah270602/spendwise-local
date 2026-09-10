@@ -349,6 +349,16 @@ current configured paths rather than assume another user's home directory.
   was reported as one; unified, it turned out the owner preferred the
   original. Taste questions go to the person whose app it is before a sweep,
   not after.
+- **One screen, one window.** Home resolved its own window for loans and
+  savings and took earnings and spending from the controller's `dashboard`,
+  which resolves a window of its own against `DateTime.now()` when its cache
+  is filled and keeps it until a reload. Both halves were locally right and
+  the pair was wrong: the period chooser's preview asked about last month and
+  was answered about this one, and the app left open across midnight on the
+  1st printed the old month's earnings under the new month's name. A figure
+  assembled from two sources is also assembled from two clocks unless
+  something forces them to be the same one. `homeFigures` now takes all of it
+  from `periodFigures` over the window it names.
 - **Percentages rank the wrong things.** A category that went from 350 to 900
   has risen further in percent than one that rose by 6,500 rupees, and only
   one of those belongs at the top of a list. Order by money moved, and gate

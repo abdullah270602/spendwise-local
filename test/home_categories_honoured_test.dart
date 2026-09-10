@@ -234,8 +234,37 @@ class _Fake extends ChangeNotifier implements SpendWiseAdvancedViewModel {
     ),
   ];
 
+  /// The entries the dashboard below is a summary of: one salary, and one
+  /// expense per category, which is where its 13,600,000 of spending comes
+  /// from.
+  ///
+  /// Home derives every figure it draws from these, over the window it names,
+  /// so a dashboard claiming money this list never moved would fall to Home's
+  /// empty state and none of the layout below would be measured at all.
   @override
-  List<TransactionViewData> get transactions => const [];
+  List<TransactionViewData> get transactions => [
+    TransactionViewData(
+      id: 'salary',
+      title: 'Salary',
+      subtitle: 'Everyday',
+      amount: const MoneyViewData(18000000),
+      kind: TransactionKind.income,
+      occurredAt: DateTime.now(),
+      category: 'Income',
+      accountId: 'current',
+    ),
+    for (final item in _spending)
+      TransactionViewData(
+        id: item.category,
+        title: item.category,
+        subtitle: 'Everyday',
+        amount: item.amount,
+        kind: TransactionKind.expense,
+        occurredAt: DateTime.now(),
+        category: item.category,
+        accountId: 'current',
+      ),
+  ];
 
   @override
   DashboardViewData get dashboard => const DashboardViewData(

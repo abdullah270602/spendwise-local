@@ -423,6 +423,12 @@ class _SavingsViewModel extends _FakeViewModel {
     monthlyChangePercent: 0,
   );
 
+  /// Balances only, and no movement whatsoever -- which is the whole point of
+  /// this fixture. The base fake's entries would be movement, and the zeroes
+  /// above would then be a claim its own ledger contradicts.
+  @override
+  List<TransactionViewData> get transactions => const [];
+
   @override
   List<AccountViewData> get accounts => const [
     AccountViewData(
@@ -683,8 +689,24 @@ class _FakeViewModel extends ChangeNotifier implements SpendWiseViewModel {
       suffix: '1234',
     ),
   ];
+
+  /// The entries the dashboard above is a summary of. Home works out what
+  /// came in and what went from these, over the window it names, so the
+  /// 4,000 the dashboard reports has to be an entry a person could point at.
   @override
   List<TransactionViewData> get transactions => [
+    TransactionViewData(
+      id: '0',
+      title: 'Salary',
+      subtitle: 'Everyday',
+      amount: const MoneyViewData(400000),
+      kind: TransactionKind.income,
+      occurredAt: DateTime.now(),
+      // Not 'Income': Export draws the kinds it can filter by, and a category
+      // sharing a kind's name makes that list read as two of one kind.
+      category: 'Salary',
+      accountId: 'bank',
+    ),
     TransactionViewData(
       id: '1',
       title: 'Groceries',

@@ -1086,33 +1086,43 @@ final class SpendWiseController extends ChangeNotifier
   );
 
   @override
-  List<DebtViewData> get debts => _debtsCache ??= _ledger
-      .debts()
-      .map(
-        (item) => DebtViewData(
-          id: item.id,
-          kind: item.kind,
-          counterparty: item.counterparty,
-          principal: MoneyViewData(
-            item.principalMinor,
-            currency: item.currency,
+  List<DebtViewData> get debts {
+    final cached = _debtsCache;
+    if (cached != null) return cached;
+    // Where each loan's money landed, read once rather than per debt: the
+    // ledger can hold thousands of entries and this runs on the UI isolate.
+    final accountOf = <String, String?>{
+      for (final item in _snapshot.transactions) item.id: item.accountId,
+    };
+    return _debtsCache = _ledger
+        .debts()
+        .map(
+          (item) => DebtViewData(
+            id: item.id,
+            kind: item.kind,
+            counterparty: item.counterparty,
+            principal: MoneyViewData(
+              item.principalMinor,
+              currency: item.currency,
+            ),
+            settled: MoneyViewData(item.settledMinor, currency: item.currency),
+            settledByHand: MoneyViewData(
+              item.settledByHandMinor,
+              currency: item.currency,
+            ),
+            outstanding: MoneyViewData(
+              item.outstandingMinor,
+              currency: item.currency,
+            ),
+            openedAt: item.openedAt.toLocal(),
+            isSettled: item.isSettled,
+            accountId: accountOf[item.openingTransactionId],
+            note: item.note,
+            closedAt: item.closedAt?.toLocal(),
           ),
-          settled: MoneyViewData(item.settledMinor, currency: item.currency),
-          settledByHand: MoneyViewData(
-            item.settledByHandMinor,
-            currency: item.currency,
-          ),
-          outstanding: MoneyViewData(
-            item.outstandingMinor,
-            currency: item.currency,
-          ),
-          openedAt: item.openedAt.toLocal(),
-          isSettled: item.isSettled,
-          note: item.note,
-          closedAt: item.closedAt?.toLocal(),
-        ),
-      )
-      .toList(growable: false);
+        )
+        .toList(growable: false);
+  }
 
   @override
   Future<void> openDebt({

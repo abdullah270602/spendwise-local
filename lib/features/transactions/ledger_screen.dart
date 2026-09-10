@@ -543,10 +543,29 @@ class _LedgerScreenState extends State<LedgerScreen> {
     return balance - _heldForOthers;
   }
 
-  /// The money sitting in the accounts that belongs to somebody else.
-  int get _heldForOthers => widget.viewModel.uiDebts
-      .where((item) => item.isHeld && !item.isSettled)
-      .fold<int>(0, (sum, item) => sum + item.outstanding.minorUnits);
+  /// The money sitting in the everyday accounts that belongs to somebody
+  /// else.
+  ///
+  /// Only what landed in an everyday account. A relative's funds paid
+  /// straight into savings are not in this figure to begin with, so taking
+  /// them off it would show the owner less of their own money than they
+  /// have. A holding whose opening entry reached no account at all is
+  /// counted, because the alternative is losing it entirely and a balance
+  /// that is too high is the more dangerous of the two mistakes.
+  int get _heldForOthers {
+    final spendable = {
+      for (final account in widget.viewModel.accounts)
+        if (account.isIncluded) account.id,
+    };
+    return widget.viewModel.uiDebts
+        .where(
+          (item) =>
+              item.isHeld &&
+              !item.isSettled &&
+              (item.accountId == null || spendable.contains(item.accountId)),
+        )
+        .fold<int>(0, (sum, item) => sum + item.outstanding.minorUnits);
+  }
 
   /// How much one entry moved the figure printed above the chart.
   ///
