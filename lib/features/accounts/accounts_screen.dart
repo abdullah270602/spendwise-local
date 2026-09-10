@@ -62,8 +62,16 @@ class _AccountsScreenState extends State<AccountsScreen> {
         .fold<int>(0, (sum, item) => sum + item.outstanding.minorUnits);
     final everydayTotal = _sum(everyday) - heldTotal;
     final savingsTotal = _sum(savings);
+    // Cash is exempt. It has no digits because notes have no account
+    // number, and it is deliberately excluded from alert routing anyway --
+    // so telling its owner that alerts cannot be matched to it is a warning
+    // about something that is never going to happen and cannot be fixed.
     final unconfigured = viewModel.accounts
-        .where((account) => account.suffix.trim().isEmpty)
+        .where(
+          (account) =>
+              _typeLabel(account.type) != 'Cash' &&
+              account.suffix.trim().isEmpty,
+        )
         .toList(growable: false);
 
     if (viewModel.accounts.isEmpty && deleted == null) {
@@ -330,7 +338,8 @@ class _AccountsScreenState extends State<AccountsScreen> {
 
   /// One aggregate warning rather than a second copy of every block: an
   /// account with no last digits saved cannot be matched from an alert, which
-  /// is a gap in the map, not an extra entry in it.
+  /// is a gap in the map, not an extra entry in it. Cash never appears here:
+  /// see where this list is built.
   Widget _incomplete(List<AccountViewData> accounts) => Padding(
     padding: const EdgeInsets.only(top: 18),
     child: InkWell(

@@ -347,6 +347,44 @@ void main() {
     expect(find.text('Available to spend'), findsNothing);
     expect(find.text('PKR 125,000'), findsNothing);
   });
+
+  testWidgets('cash is never nagged about digits it cannot have', (
+    tester,
+  ) async {
+    // Cash has no account number because banknotes have none, and it is
+    // deliberately kept out of alert routing, so warning that alerts cannot
+    // reach it describes something that will never happen and cannot be
+    // fixed. The bucket is made automatically, which means everybody who
+    // finishes setup would see this.
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: Scaffold(body: AccountsScreen(viewModel: _CashViewModel())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cash'), findsWidgets, reason: 'the bucket is on screen');
+    expect(
+      find.textContaining('no last digits saved'),
+      findsNothing,
+      reason: 'and nothing is asking it for a number it cannot have',
+    );
+  });
+
+  testWidgets('a bank without digits is still warned about', (tester) async {
+    // The other half: proving the exemption is about cash and did not
+    // quietly switch the warning off for everybody.
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: Scaffold(body: AccountsScreen(viewModel: _NoDigitsViewModel())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('no last digits saved'), findsOneWidget);
+  });
 }
 
 class _AccountCreateViewModel extends _FakeViewModel {
@@ -408,6 +446,37 @@ class _EmptyViewModel extends _FakeViewModel {
   List<AccountViewData> get accounts => const [];
   @override
   List<TransactionViewData> get transactions => const [];
+}
+
+class _CashViewModel extends _FakeViewModel {
+  @override
+  List<AccountViewData> get accounts => const [
+    AccountViewData(
+      id: 'bank',
+      name: 'Everyday',
+      type: 'bank',
+      balance: MoneyViewData(2500000),
+      suffix: '1234',
+    ),
+    AccountViewData(
+      id: 'cash',
+      name: 'Cash',
+      type: 'cash',
+      balance: MoneyViewData(1200000),
+    ),
+  ];
+}
+
+class _NoDigitsViewModel extends _FakeViewModel {
+  @override
+  List<AccountViewData> get accounts => const [
+    AccountViewData(
+      id: 'bank',
+      name: 'Everyday',
+      type: 'bank',
+      balance: MoneyViewData(2500000),
+    ),
+  ];
 }
 
 class _AccountSourcesViewModel extends _FakeViewModel {
