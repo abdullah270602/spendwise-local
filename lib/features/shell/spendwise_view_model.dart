@@ -637,6 +637,13 @@ abstract class SpendWiseAdvancedViewModel implements SpendWiseViewModel {
   /// single account.
   bool isSharedSource(String packageName);
 
+  /// What was spent per category over one window, for a screen that resolves
+  /// its own rather than taking the dashboard's.
+  List<CategorySpendViewData> categorySpendingIn({
+    required DateTime from,
+    required DateTime to,
+  });
+
   /// Every permission this build declares, read back from the installed
   /// package. Shown in the guide so the privacy claim can be checked
   /// rather than believed.
@@ -736,6 +743,12 @@ extension SpendWiseAdvancedAccess on SpendWiseViewModel {
       _advanced?.homePeriod ?? HomePeriod.calendarMonth;
   void uiSetHomePeriod(HomePeriod period) => _advanced?.setHomePeriod(period);
   List<DebtViewData> get uiDebts => _advanced?.debts ?? const [];
+  List<CategorySpendViewData> uiCategorySpendingIn({
+    required DateTime from,
+    required DateTime to,
+  }) =>
+      _advanced?.categorySpendingIn(from: from, to: to) ??
+      dashboard.categorySpending;
   Future<void> uiOpenDebt({
     required String transactionId,
     required DebtKind kind,

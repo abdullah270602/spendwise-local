@@ -230,4 +230,39 @@ void main() {
     expect(home.kept, 0);
     expect(home.saved, 0);
   });
+
+  test('the breakdown answers about the same window as the shape', () {
+    // The half that stayed open after "one screen, one window" was written
+    // down as closed. The figures came from the window Home resolves; the
+    // category breakdown under them came from `dashboard.categorySpending`,
+    // whose window is fixed at whatever moment the cache happened to be
+    // filled. On a rolling window they part company every midnight, and the
+    // bar then described a different stretch of time than the shape above it.
+    final (:controller, :earlier, :later) = twoMonths();
+
+    // Read the dashboard first, exactly as a live app does, so its cache is
+    // pinned to the current month before anything asks about the earlier one.
+    controller.dashboard;
+
+    final home = homeFigures(controller, now: middayOn(earlier));
+    final breakdown = controller.categorySpendingIn(
+      from: home.from,
+      to: home.to,
+    );
+    final total = breakdown.fold<int>(
+      0,
+      (sum, item) => sum + item.amount.minorUnits,
+    );
+
+    expect(
+      total,
+      home.spent,
+      reason: 'the bar has to add up to the figure printed above it',
+    );
+    expect(
+      total,
+      2000000,
+      reason: 'the earlier month spent 20,000, not the later one 70,000',
+    );
+  });
 }

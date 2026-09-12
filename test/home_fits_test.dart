@@ -257,6 +257,16 @@ class _Fake extends ChangeNotifier implements SpendWiseAdvancedViewModel {
   @override
   void setViewPreference(String key, String value) => preferences[key] = value;
 
+  /// Home asks for the breakdown over the window it resolved itself rather
+  /// than taking the dashboard's, so a fake standing in for the ledger has to
+  /// answer that question too. The window is ignored here: these fixtures
+  /// hold one period's worth of entries and nothing outside it.
+  @override
+  List<CategorySpendViewData> categorySpendingIn({
+    required DateTime from,
+    required DateTime to,
+  }) => dashboard.categorySpending;
+
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

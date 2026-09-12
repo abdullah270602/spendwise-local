@@ -28,14 +28,18 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final data = viewModel.dashboard;
+    // Home does not read the dashboard at all any more. It resolved a window
+    // of its own and asks every question against that one, which is the
+    // whole of "one screen, one window" -- the cache the dashboard holds is
+    // pinned to whenever it was last filled.
     final now = DateTime.now();
     final period = viewModel.uiHomePeriod;
     final month = period.label(now);
 
-    // Every figure on Home comes from one place, and the settings previews
-    // read the same one. Three separate assemblies of the same sum was three
-    // chances for the preview to disagree with the screen it previews.
+    // Every figure on Home comes from one place and one window, and the
+    // settings previews read the same one. Three separate assemblies of the
+    // same sum was three chances for the preview to disagree with the screen
+    // it previews.
     final figures = homeFigures(viewModel, now: now);
     final windowFrom = figures.from;
     final windowTo = figures.to;
@@ -72,7 +76,14 @@ class DashboardScreen extends StatelessWidget {
         : (usableHeight * 0.32).clamp(168.0, 260.0);
     // One fold, read by both the bar and the rows, so the picture and the
     // list can never disagree about what is on screen.
-    final categories = categoriesForHome(data.categorySpending, categoryStyle);
+    // Asked for the window this screen resolved, not the one the dashboard
+    // cache was filled with. Those two part company at every period
+    // boundary the app is left open across, and the breakdown then described
+    // a different stretch of time than the shape above it.
+    final categories = categoriesForHome(
+      viewModel.uiCategorySpendingIn(from: windowFrom, to: windowTo),
+      categoryStyle,
+    );
     // Keyed to the ledger's own category order, so a category does not change
     // colour because its spending rank moved between one period and the next.
     final tones = viewModel.tonesFor(categories.map((item) => item.category));

@@ -465,6 +465,30 @@ final class SpendWiseController extends ChangeNotifier
               (item.toAccountId == accountId ? item.amount.minorUnits : 0),
       };
 
+  /// What was spent per category over an arbitrary window.
+  ///
+  /// Home needs this for the window it resolves itself, not the one the
+  /// dashboard cache happens to hold. Those two come apart whenever the
+  /// clock crosses a period boundary with the app open -- every midnight on
+  /// a rolling seven- or thirty-day window -- and the breakdown then
+  /// described a different stretch of time than the shape directly above it.
+  @override
+  List<CategorySpendViewData> categorySpendingIn({
+    required DateTime from,
+    required DateTime to,
+  }) {
+    final totals = _ledger.spendingByCategory(from: from, to: to);
+    final largest = totals.values.fold<int>(0, (a, b) => a > b ? a : b);
+    return [
+      for (final entry in totals.entries)
+        CategorySpendViewData(
+          category: entry.key,
+          amount: MoneyViewData(entry.value),
+          fraction: largest == 0 ? 0 : entry.value / largest,
+        ),
+    ];
+  }
+
   @override
   DashboardViewData get dashboard {
     final cached = _dashboardCache;
