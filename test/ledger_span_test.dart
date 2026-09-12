@@ -97,6 +97,36 @@ void main() {
 
     expect(find.textContaining('show every month'), findsOneWidget);
   });
+
+  testWidgets('showing every month, a search that matches nothing says so', (
+    tester,
+  ) async {
+    // Showing every month had an answer of its own -- "Nothing recorded yet.
+    // / This is the whole ledger." -- and the only way to reach it was to
+    // search for something that is not there, because with no filter and a
+    // ledger that has entries the register is not empty. So the screen
+    // announced an empty ledger directly beneath a header counting
+    // "0 matches across all months", over a ledger with entries in it.
+    await openLedger(
+      tester,
+      viewModel: _Fake([entry('Recent', thisMonth), entry('Ancient', longAgo)]),
+    );
+    await tester.tap(find.byTooltip('Show every month'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Search the ledger'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'nothing matches this');
+    await tester.pumpAndSettle();
+
+    expect(find.text('0 MATCHES ACROSS ALL MONTHS'), findsOneWidget);
+    expect(
+      find.text('Nothing recorded yet.'),
+      findsNothing,
+      reason: 'two entries are recorded; the search is what found nothing',
+    );
+    expect(find.text('No transaction matches that.'), findsOneWidget);
+    expect(find.textContaining('clear the filters'), findsOneWidget);
+  });
 }
 
 class _Fake extends ChangeNotifier implements SpendWiseAdvancedViewModel {

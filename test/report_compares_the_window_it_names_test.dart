@@ -81,7 +81,8 @@ void main() {
       expect(
         data.previousSpentMinor,
         700000,
-        reason: 'the three months before July are April, May and June -- '
+        reason:
+            'the three months before July are April, May and June -- '
             'a day-count rollback reached back into March',
       );
     });

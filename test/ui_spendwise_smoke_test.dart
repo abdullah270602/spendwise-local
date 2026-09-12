@@ -520,6 +520,14 @@ class _BatchImportViewModel extends _FakeViewModel
     ),
   ];
 
+  /// Home asks for the breakdown over the window it resolved itself, so a
+  /// fake standing in for the ledger has to answer that question too.
+  @override
+  List<CategorySpendViewData> categorySpendingIn({
+    required DateTime from,
+    required DateTime to,
+  }) => dashboard.categorySpending;
+
   @override
   Future<List<String>> declaredPermissions() async => const [
     'android.permission.USE_BIOMETRIC',

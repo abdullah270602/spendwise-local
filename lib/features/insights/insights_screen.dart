@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../app/category_tones.dart';
 import '../../app/theme.dart';
 import '../../widgets/shape_kit.dart';
+import '../capture/capture_state.dart';
 import '../shell/spendwise_view_model.dart';
 import 'chronograph.dart';
 import 'gate.dart';
@@ -86,6 +87,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
       // one period to the next and Home agrees with this screen about which
       // colour it is.
       final tones = widget.viewModel.tonesFor(categories);
+      final gap = captureGap(widget.viewModel);
       // Three questions, three settings. What is drawn here is whatever the
       // reader has asked for, and nothing else.
       final overTime = InsightsOverTime.fromId(
@@ -136,13 +138,22 @@ class _InsightsScreenState extends State<InsightsScreen> {
             ),
             Expanded(
               child: widget.viewModel.transactions.isEmpty
-                  ? const RestState(
-                      headline: 'Nothing to compare yet.',
-                      detail:
-                          'Once transactions reach your ledger, this becomes '
-                          'the whole history of money in and out — by day, '
-                          'month, year, and category.',
-                    )
+                  // "Once transactions reach your ledger" is a promise that
+                  // something will arrive. With nothing being read nothing
+                  // will, and this screen offered no way to change that.
+                  ? (gap == null
+                        ? const RestState(
+                            headline: 'Nothing to compare yet.',
+                            detail:
+                                'Once transactions reach your ledger, this '
+                                'becomes the whole history of money in and '
+                                'out — by day, month, year, and category.',
+                          )
+                        : RestState(
+                            headline: 'Nothing to compare yet.',
+                            detail: gap.detail,
+                            action: gap.action,
+                          ))
                   : CustomScrollView(
                       slivers: [
                         SliverToBoxAdapter(

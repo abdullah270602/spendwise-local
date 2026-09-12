@@ -108,6 +108,95 @@ void main() {
     expect(model.removed, contains('debt-1'));
   });
 
+  group('the heading says which direction it is denying', () {
+    // The heading was fixed at "This was not spending" while the line under
+    // it already varied by kind. Marking money that *arrived* as borrowed
+    // therefore read "This was not spending" directly above "It stops
+    // counting as income" -- a heading about the wrong direction, on the one
+    // screen whose whole job is to say which way the money went.
+    TransactionViewData incoming() => TransactionViewData(
+      id: 'tx-1',
+      title: 'From Hamza',
+      subtitle: 'NayaPay',
+      amount: const MoneyViewData(1680000),
+      kind: TransactionKind.income,
+      occurredAt: DateTime.utc(2026, 9, 2, 12),
+      category: 'Income',
+      accountName: 'NayaPay',
+    );
+
+    Future<void> openMarkSheet(
+      WidgetTester tester,
+      DebtKind kind,
+      _FakeViewModel model,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SpendWiseTheme.dark,
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: ElevatedButton(
+                  onPressed: () => debt_sheets.markAsLoan(
+                    context,
+                    viewModel: model,
+                    transaction: incoming(),
+                    initialKind: kind,
+                  ),
+                  child: const Text('open'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await openSheet(tester);
+    }
+
+    testWidgets('money that came in and goes back is not income', (
+      tester,
+    ) async {
+      phoneSized(tester);
+      await openMarkSheet(tester, DebtKind.borrowed, _FakeViewModel(debts: []));
+
+      expect(find.text('This was not income'), findsOneWidget);
+      expect(find.text('This was not spending'), findsNothing);
+      expect(
+        find.textContaining('It stops counting as income'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('money that was never yours says exactly that', (tester) async {
+      phoneSized(tester);
+      await openMarkSheet(tester, DebtKind.holding, _FakeViewModel(debts: []));
+
+      expect(find.text('This was never yours'), findsOneWidget);
+    });
+
+    testWidgets('and money that went out is still not spending', (
+      tester,
+    ) async {
+      phoneSized(tester);
+      await openMarkSheet(tester, DebtKind.lent, _FakeViewModel(debts: []));
+
+      expect(find.text('This was not spending'), findsOneWidget);
+    });
+
+    testWidgets('and the heading follows the answer as it is changed', (
+      tester,
+    ) async {
+      phoneSized(tester);
+      await openMarkSheet(tester, DebtKind.lent, _FakeViewModel(debts: []));
+
+      await tester.tap(find.text('I borrowed it'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('This was not income'), findsOneWidget);
+      expect(find.text('This was not spending'), findsNothing);
+    });
+  });
+
   testWidgets('the sheet lays out at 360px', (tester) async {
     phoneSized(tester);
 

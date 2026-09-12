@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../app/failure_text.dart';
 import '../../app/theme.dart';
 import '../../core/money.dart';
 import '../../widgets/controller_scope.dart';
@@ -468,7 +469,9 @@ class _AccountsScreenState extends State<AccountsScreen> {
       );
     } catch (error) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Could not restore account: $error')),
+        SnackBar(
+          content: Text(failureText('Could not restore account', error)),
+        ),
       );
     }
   }
@@ -572,7 +575,10 @@ class _AccountsScreenState extends State<AccountsScreen> {
                               ScaffoldMessenger.of(dialogContext).showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                    'Could not update balance: $error',
+                                    failureText(
+                                      'Could not update balance',
+                                      error,
+                                    ),
                                   ),
                                 ),
                               );
@@ -640,7 +646,9 @@ class _AccountsScreenState extends State<AccountsScreen> {
         if (sheetContext.mounted) {
           setState(() => saving = false);
           messenger.showSnackBar(
-            SnackBar(content: Text('Could not remove account: $error')),
+            SnackBar(
+              content: Text(failureText('Could not remove account', error)),
+            ),
           );
         }
       }
@@ -833,15 +841,17 @@ class _AccountsScreenState extends State<AccountsScreen> {
                                 } catch (error) {
                                   if (sheetContext.mounted) {
                                     setState(() => saving = false);
-                                    ScaffoldMessenger.of(
-                                      sheetContext,
-                                    ).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Could not update account: $error',
-                                        ),
-                                      ),
-                                    );
+                                    ScaffoldMessenger.of(sheetContext)
+                                        .showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              failureText(
+                                                'Could not update account',
+                                                error,
+                                              ),
+                                            ),
+                                          ),
+                                        );
                                   }
                                 }
                               },
@@ -1079,7 +1089,10 @@ class _AccountsScreenState extends State<AccountsScreen> {
                                           .showSnackBar(
                                             SnackBar(
                                               content: Text(
-                                                'Could not add account: $error',
+                                                failureText(
+                                                  'Could not add account',
+                                                  error,
+                                                ),
                                               ),
                                             ),
                                           );

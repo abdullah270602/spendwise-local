@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../app/failure_text.dart';
 import '../../app/theme.dart';
 import '../../security/app_lock.dart';
 import '../../widgets/shape_kit.dart';
@@ -134,13 +135,17 @@ class _EraseScreenState extends State<EraseScreen> {
     setState(() => _stage = _Stage.erasing);
     try {
       await widget.viewModel.eraseAllData();
-      if (mounted) Navigator.pop(context);
+      // Popping with a result rather than bare: the screen that destroyed
+      // everything closes, and the list behind it looks exactly as it did
+      // before, so the biggest action in the app was the only one that said
+      // nothing about itself. The caller reports it.
+      if (mounted) Navigator.pop(context, true);
     } catch (error) {
       if (!mounted) return;
       setState(() => _stage = _Stage.confirm);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not erase data: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failureText('Could not erase data', error))),
+      );
     }
   }
 

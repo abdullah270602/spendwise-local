@@ -177,6 +177,22 @@ void main() {
 
 class _Fake extends ChangeNotifier implements SpendWiseAdvancedViewModel {
   final applied = <ReviewDecision>[];
+
+  /// Capture is live in these tests. Review and Insights now say out loud
+  /// when nothing is being read, and a fake that refuses the question would
+  /// drop every test here into the capture-off state rather than the one it
+  /// is about.
+  @override
+  bool get notificationAccessGranted => true;
+
+  @override
+  List<SourceViewData> get sources => const [
+    SourceViewData(
+      packageName: 'com.example.bank',
+      label: 'Example Bank',
+      enabled: true,
+    ),
+  ];
   Map<String, String>? restored;
 
   /// What a dismissal would hide, and what putting it back would restore.

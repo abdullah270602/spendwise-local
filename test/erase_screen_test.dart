@@ -149,6 +149,81 @@ void main() {
     expect(model.erased, isTrue);
   });
 
+  testWidgets('a finished erase is reported back to whoever opened it', (
+    tester,
+  ) async {
+    // The screen closed and Settings looked exactly as it had before, so the
+    // largest irreversible action in the app was the only one that said
+    // nothing about itself. A caller cannot report what it is not told.
+    final model = _Model();
+    Object? result = 'never popped';
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: ElevatedButton(
+              onPressed: () async {
+                result = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute<bool>(
+                    builder: (_) => EraseScreen(viewModel: model),
+                  ),
+                );
+              },
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'ERASE');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Erase everything'));
+    await tester.pump(const Duration(seconds: 31));
+    await tester.pumpAndSettle();
+
+    expect(model.erased, isTrue);
+    expect(result, isTrue);
+  });
+
+  testWidgets('backing out reports nothing, because nothing happened', (
+    tester,
+  ) async {
+    final model = _Model();
+    Object? result = 'never popped';
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: SpendWiseTheme.dark,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: ElevatedButton(
+              onPressed: () async {
+                result = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute<bool>(
+                    builder: (_) => EraseScreen(viewModel: model),
+                  ),
+                );
+              },
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    expect(model.erased, isFalse);
+    expect(result, isNull, reason: 'a cancel must not read as a wipe');
+  });
+
   testWidgets('it says what goes, and that nobody can get it back', (
     tester,
   ) async {

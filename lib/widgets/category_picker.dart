@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app/failure_text.dart';
 import '../app/theme.dart';
 import '../features/shell/spendwise_view_model.dart';
 import 'shape_kit.dart';
@@ -241,12 +242,45 @@ class _CategorySheetState extends State<_CategorySheet> {
       if (!mounted) return;
       setState(() => saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not add that category: $error')),
+        SnackBar(
+          content: Text(failureText('Could not add that category', error)),
+        ),
       );
     }
   }
 
+  /// Removing a category is not a tidy-up: `removeCategory` re-files every
+  /// transaction filed under it to Other and deletes every rule the app
+  /// learned for it, so the next alert from that merchant lands under Other
+  /// too. That was one unconfirmed tap on a 16px glyph sitting beside the row
+  /// you tap to *choose* the category, with no undo behind it.
   Future<void> _remove(CategoryViewData item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Remove ${item.name}?'),
+        content: Text(
+          'Everything filed under ${item.name} moves to Other, and what '
+          'SpendWise learned about filing things there is forgotten — so '
+          'entries it used to catch will arrive as Other from now on. '
+          'This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep it'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: SpendWiseColors.spend,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
     await widget.viewModel.uiRemoveCategory(item.id);
     if (mounted) setState(() {});
   }

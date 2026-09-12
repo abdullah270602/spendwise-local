@@ -97,6 +97,22 @@ class _Fake extends ChangeNotifier implements SpendWiseAdvancedViewModel {
   final List<DebtViewData> _debts;
   final List<ReviewDecision> applied = [];
 
+  /// Capture is live in these tests. Review and Insights now say out loud
+  /// when nothing is being read, and a fake that refuses the question would
+  /// drop every test here into the capture-off state rather than the one it
+  /// is about.
+  @override
+  bool get notificationAccessGranted => true;
+
+  @override
+  List<SourceViewData> get sources => const [
+    SourceViewData(
+      packageName: 'com.example.bank',
+      label: 'Example Bank',
+      enabled: true,
+    ),
+  ];
+
   @override
   List<TransactionViewData> transactions;
 

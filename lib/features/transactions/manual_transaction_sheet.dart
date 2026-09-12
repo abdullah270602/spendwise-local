@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/money.dart';
+import '../../app/failure_text.dart';
 import '../../app/theme.dart';
 import '../../widgets/category_picker.dart';
 import '../shell/spendwise_view_model.dart';
@@ -201,7 +202,9 @@ class _ManualTransactionSheetState extends State<ManualTransactionSheet> {
       if (!mounted) return;
       setState(() => saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not save transaction: $error')),
+        SnackBar(
+          content: Text(failureText('Could not save transaction', error)),
+        ),
       );
     }
   }

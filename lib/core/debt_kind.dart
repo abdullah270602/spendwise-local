@@ -70,6 +70,19 @@ enum DebtKind {
   final String partyLabel;
   final String openLabel;
 
+  /// What the sheet that records this is denying.
+  ///
+  /// The sheet's heading was fixed at "This was not spending" while the line
+  /// under it already varied by kind, so marking money that *arrived* as
+  /// borrowed read "This was not spending" over "It stops counting as
+  /// income" -- a heading about the wrong direction, at the top of the one
+  /// screen whose whole job is to say which way the money went.
+  String get sheetTitle => switch (this) {
+    lent => 'This was not spending',
+    borrowed => 'This was not income',
+    holding => 'This was never yours',
+  };
+
   /// Whether the money is the user's own while they hold it.
   ///
   /// The single question the whole enum exists to answer. Lent money is still

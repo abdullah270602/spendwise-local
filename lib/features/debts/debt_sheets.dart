@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../app/failure_text.dart';
 import '../../app/theme.dart';
 import '../../widgets/shape_kit.dart';
 import '../shell/spendwise_view_model.dart';
@@ -103,7 +104,7 @@ class _MarkLoanSheetState extends State<_MarkLoanSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('This was not spending', style: SpendWiseType.title),
+          Text(kind.sheetTitle, style: SpendWiseType.title),
           const SizedBox(height: 6),
           Text(
             kind == DebtKind.holding
@@ -201,9 +202,9 @@ class _MarkLoanSheetState extends State<_MarkLoanSheet> {
     } catch (error) {
       if (!mounted) return;
       setState(() => saving = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not record that: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failureText('Could not record that', error))),
+      );
     }
   }
 }
@@ -549,9 +550,9 @@ class _DebtSheetState extends State<_DebtSheet> {
     } catch (error) {
       if (!mounted) return;
       setState(() => working = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not re-file that: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failureText('Could not re-file that', error))),
+      );
     }
   }
 
@@ -629,8 +630,11 @@ class _DebtSheetState extends State<_DebtSheet> {
     } catch (error) {
       if (!mounted) return;
       setState(() => working = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Could not do that: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(failureText('Could not update this loan', error)),
+        ),
+      );
     }
   }
 }
@@ -856,9 +860,9 @@ class _SettleFromEntrySheetState extends State<_SettleFromEntrySheet> {
     } catch (error) {
       if (!mounted) return;
       setState(() => saving = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not record that: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failureText('Could not record that', error))),
+      );
     }
   }
 }

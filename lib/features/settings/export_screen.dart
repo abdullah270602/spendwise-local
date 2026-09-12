@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/failure_text.dart';
 import '../../app/theme.dart';
 import '../../widgets/spendwise_components.dart';
 import '../shell/spendwise_view_model.dart';
@@ -202,7 +203,9 @@ class _ExportScreenState extends State<ExportScreen> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not create export: $error')),
+          SnackBar(
+            content: Text(failureText('Could not create export', error)),
+          ),
         );
       }
     } finally {

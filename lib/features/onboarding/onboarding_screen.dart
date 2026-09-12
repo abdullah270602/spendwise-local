@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/failure_text.dart';
 import '../../app/theme.dart';
 import '../../core/money.dart';
 import '../../widgets/shape_kit.dart';
@@ -105,7 +106,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       if (mounted) {
         setState(() => finishing = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not finish setup: $error')),
+          SnackBar(content: Text(failureText('Could not finish setup', error))),
         );
       }
     }
@@ -505,7 +506,9 @@ class _LandingState extends State<_Landing> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not add the account: $error')),
+          SnackBar(
+            content: Text(failureText('Could not add the account', error)),
+          ),
         );
       }
     } finally {

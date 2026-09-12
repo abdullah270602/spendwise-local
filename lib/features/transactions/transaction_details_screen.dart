@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/failure_text.dart';
 import '../../app/theme.dart';
 import '../../widgets/category_picker.dart';
 import '../../widgets/shape_kit.dart';
@@ -18,11 +19,17 @@ class TransactionDetailsScreen extends StatelessWidget {
   final TransactionViewData transaction;
   @override
   Widget build(BuildContext context) {
-    final color = transaction.kind == TransactionKind.expense
-        ? SpendWiseColors.expense
-        : transaction.kind == TransactionKind.income
-        ? SpendWiseColors.income
-        : SpendWiseColors.warning;
+    // The Ledger paints a transfer `mine` -- the palette's third hue, the one
+    // that answers "did this only move between accounts you already own".
+    // This screen reached for `warning`, a hardcoded amber that
+    // `SpendWiseColors.apply` never touches, so the same entry was one colour
+    // in the register and another when you tapped it, and stayed amber
+    // through every palette the user chose.
+    final color = switch (transaction.kind) {
+      TransactionKind.expense => SpendWiseColors.spend,
+      TransactionKind.income => SpendWiseColors.keep,
+      TransactionKind.transfer => SpendWiseColors.mine,
+    };
     return Scaffold(
       appBar: AppBar(
         title: const Text('Transaction'),
@@ -183,7 +190,7 @@ class TransactionDetailsScreen extends StatelessWidget {
     } catch (error) {
       if (context.mounted) {
         messenger.showSnackBar(
-          SnackBar(content: Text('Could not delete: $error')),
+          SnackBar(content: Text(failureText('Could not delete', error))),
         );
       }
       return;

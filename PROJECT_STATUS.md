@@ -212,11 +212,17 @@ in `AGENTS.md`. In particular:
   all three debt stories are offered where the record is made. Deleting from a
   transaction's own screen offers the same Undo the Review inbox does, and
   "Not a loan" — which discards a debt's whole history — asks first.
-- Both empty states say so when notification access is granted but every
-  source is switched off, and offer the way back.
-  `lib/features/capture/capture_state.dart` owns that fact, because Home and
-  the Ledger both report it and a second copy of the wording is a second
-  chance for them to disagree.
+- Every empty state that promises alerts will arrive says so when they
+  cannot: Home, the Ledger, Review and Insights all report a capture gap --
+  access never granted, or granted with every source switched off -- and each
+  offers the control that closes it. `lib/features/capture/capture_state.dart`
+  owns both sentences and both buttons (`captureGap` returns the pair),
+  because four screens reporting one fact in four copies of the wording is
+  four chances for them to disagree. Home still spells its own out inline.
+  Review had been reporting that "every alert SpendWise captured was clear
+  enough to file on its own" with nothing captured, and Insights promising
+  that transactions would reach the ledger, in the state a new install starts
+  in.
 - A register row prints a sign and carries one merged `Semantics` label, so a
   screen reader hears whether money came in or went out. It had encoded that
   in colour alone.
@@ -225,7 +231,15 @@ in `AGENTS.md`. In particular:
   a full screen rather than a dismissable dialog, the word ERASE typed out,
   and a thirty-second countdown that leaving the screen or closing the app
   cancels. A pending erase is never resumed on next launch: that would take
-  the data of somebody who had already changed their mind.
+  the data of somebody who had already changed their mind. It reports back to
+  Settings, which says the device was erased -- the screen used to close onto
+  a list that looked untouched, which is how a finished wipe reads as a failed
+  one.
+- Removing one of your own categories asks first, and names what goes:
+  `removeCategory` re-files every entry under it to Other and deletes the
+  rules the app had learned for it, so the next alert from that merchant
+  arrives as Other too. It was one unconfirmed tap on a 16px glyph beside the
+  row you tap to choose that category.
 - An Android home-screen widget draws the ribbon and nothing else: no digits,
   no percentage, no words. It follows Home's own savings style, so the two
   objects cannot disagree about the same shape, and it is resizable, falling
@@ -276,7 +290,7 @@ invalidation behavior when changing the shell/controller.
 
 ## Verification baseline
 
-At `0.9.34`, the analyzer is clean and all 853 tests pass. Before shipping:
+At `0.9.34`, the analyzer is clean and all 898 tests pass. Before shipping:
 
 1. Run `dart format` on changed Dart files.
 2. Run `flutter analyze --no-pub`.
@@ -301,10 +315,15 @@ current configured paths rather than assume another user's home directory.
   of them was locally reasonable -- reading any single file found nothing
   wrong. What catches this class is not a better implementation but a test
   that asserts two screens reach the same number over one awkward month.
-- **One screen, one window.** Home took earnings from a cached dashboard that
-  resolved its own window against the clock when the cache was filled, and
-  loans from a window resolved fresh on every build. Across midnight on the
-  1st it printed last month's earnings beside this month's loans.
+- **One screen, one window -- and check every figure on it, not the loud
+  ones.** Home took earnings from a cached dashboard that resolved its own
+  window against the clock when the cache was filled, and loans from a window
+  resolved fresh on every build. Across midnight on the 1st it printed last
+  month's earnings beside this month's loans. That was fixed for the shape and
+  the legend, written down here as closed, and left open for the category
+  breakdown underneath them, which went on reading the cache. Home now reads
+  no dashboard at all. A claim that a class of bug is fixed has to be checked
+  against every place the class occurs.
 - **A fake that reports totals its own ledger cannot produce cannot catch a
   sum going wrong.** Nineteen Home tests asserted layouts against a dashboard
   claiming money their transaction lists never moved, which is why a whole
@@ -397,6 +416,17 @@ current configured paths rather than assume another user's home directory.
   assembled from two sources is also assembled from two clocks unless
   something forces them to be the same one. `homeFigures` now takes all of it
   from `periodFigures` over the window it names.
+- **A snackbar is not a log line.** Two dozen failure messages interpolated
+  the caught object into the sentence shown to the owner, which prints
+  `Instance of 'SqliteException'` as often as anything readable -- addressed
+  to whoever reads the stack trace, and there is nobody, because this app
+  reports no crashes anywhere by design. `lib/app/failure_text.dart` keeps the
+  action the app itself wrote and appends the error's own words only when they
+  read as words.
+- **A cancel is not a loss.** Dismissing the report's save dialog said "Report
+  discarded", which describes work thrown away rather than a file not written.
+  What a control says happened has to match what happened, including when
+  nothing did.
 - **Percentages rank the wrong things.** A category that went from 350 to 900
   has risen further in percent than one that rose by 6,500 rupees, and only
   one of those belongs at the top of a list. Order by money moved, and gate

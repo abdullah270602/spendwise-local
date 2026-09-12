@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../app/failure_text.dart';
 import '../../app/theme.dart';
 import '../../widgets/shape_kit.dart';
 import '../shell/spendwise_view_model.dart';
@@ -202,15 +203,19 @@ class _ReportScreenState extends State<ReportScreen> {
         bytes: bytes,
       );
       if (!mounted) return;
+      // A null here is the file picker being dismissed, which is somebody
+      // changing their mind about *where* to put it -- the report is built
+      // and a tap away from being built again. "Report discarded" described
+      // work being thrown away, and reads as a cancel having cost something.
       messenger.showSnackBar(
-        SnackBar(
-          content: Text(saved == null ? 'Report discarded.' : 'Report saved.'),
-        ),
+        SnackBar(content: Text(saved == null ? 'Not saved.' : 'Report saved.')),
       );
     } catch (error) {
       if (!mounted) return;
       messenger.showSnackBar(
-        SnackBar(content: Text('Could not build the report: $error')),
+        SnackBar(
+          content: Text(failureText('Could not save the report', error)),
+        ),
       );
     } finally {
       if (mounted) setState(() => working = false);

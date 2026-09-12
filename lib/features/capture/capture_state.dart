@@ -41,3 +41,48 @@ class ChooseSourcesButton extends StatelessWidget {
     child: const Text('Choose notification sources'),
   );
 }
+
+/// Said before access is granted at all, which is the state every new install
+/// starts in.
+const captureUngrantedDetail =
+    'Turn on notification access and SpendWise will start reading your bank '
+    'alerts.';
+
+/// The way out of *that* state.
+class TurnOnAccessButton extends StatelessWidget {
+  const TurnOnAccessButton({super.key, required this.viewModel});
+
+  final SpendWiseViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton(
+    onPressed: viewModel.requestNotificationAccess,
+    child: const Text('Turn on notification access'),
+  );
+}
+
+/// Why an empty screen is empty, when the reason is that nothing is being
+/// read -- and the control that fixes it. Null when capture is live, because
+/// then the emptiness is honest and the screen's own wording is true.
+///
+/// Two things can be wrong at once and only one of them is worth saying
+/// first: a source list is no use to somebody the listener cannot read for,
+/// so refused access is reported ahead of an empty source list.
+///
+/// Home spells the same two answers out inline. It predates this file and is
+/// being edited elsewhere; it is the one screen not reading from here.
+({String detail, Widget action})? captureGap(SpendWiseViewModel viewModel) {
+  if (!viewModel.notificationAccessGranted) {
+    return (
+      detail: captureUngrantedDetail,
+      action: TurnOnAccessButton(viewModel: viewModel),
+    );
+  }
+  if (captureIsOff(viewModel)) {
+    return (
+      detail: captureOffDetail,
+      action: ChooseSourcesButton(viewModel: viewModel),
+    );
+  }
+  return null;
+}

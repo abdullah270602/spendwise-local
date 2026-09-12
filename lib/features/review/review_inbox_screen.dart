@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../app/failure_text.dart';
 import '../../app/theme.dart';
 import '../../widgets/category_picker.dart';
 import '../../widgets/shape_kit.dart';
+import '../capture/capture_state.dart';
 import '../settings/source_selection_screen.dart';
 import '../shell/spendwise_view_model.dart';
 import '../transactions/transaction_details_screen.dart';
@@ -78,6 +80,7 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
     // just happened -- and if the answer settled less than it was asked to,
     // an empty screen is the app claiming otherwise.
     final resting = shown.isEmpty;
+    final gap = captureGap(widget.viewModel);
 
     return SafeArea(
       bottom: false,
@@ -111,15 +114,26 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
             ),
           ),
           if (resting)
-            const SliverFillRemaining(
+            SliverFillRemaining(
               hasScrollBody: false,
-              child: RestState(
-                headline: 'Nothing needs you.',
-                detail:
-                    'Every alert SpendWise captured was clear enough to '
-                    'file on its own. Anything it cannot read will show up '
-                    'here as a question, not a pile.',
-              ),
+              // "Every alert SpendWise captured was clear enough to file on
+              // its own" is a report on work that never happened when nothing
+              // is being read -- and it is the state a new install is in, so
+              // it was the first thing most people saw here. An empty inbox
+              // means the app is working only when capture is running.
+              child: gap == null
+                  ? const RestState(
+                      headline: 'Nothing needs you.',
+                      detail:
+                          'Every alert SpendWise captured was clear enough to '
+                          'file on its own. Anything it cannot read will show '
+                          'up here as a question, not a pile.',
+                    )
+                  : RestState(
+                      headline: 'Nothing has been captured.',
+                      detail: gap.detail,
+                      action: gap.action,
+                    ),
             )
           else ...[
             SliverPadding(
@@ -234,9 +248,9 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
       });
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not apply that: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failureText('Could not apply that', error))),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -320,8 +334,9 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
       await widget.viewModel.uiRestoreAlerts(statuses);
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Could not undo that: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failureText('Could not undo that', error))),
+      );
     }
   }
 
@@ -426,8 +441,9 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Could not confirm: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failureText('Could not confirm', error))),
+      );
     }
   }
 
@@ -453,7 +469,7 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
       );
     } catch (error) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Could not delete: $error')),
+        SnackBar(content: Text(failureText('Could not delete', error))),
       );
     }
   }

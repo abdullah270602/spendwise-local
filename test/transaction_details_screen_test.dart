@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:spendwise/app/palette.dart';
 import 'package:spendwise/app/theme.dart';
 import 'package:spendwise/features/transactions/transaction_details_screen.dart';
 import 'package:spendwise/features/shell/spendwise_view_model.dart';
@@ -126,6 +127,33 @@ void main() {
       find.text('It is not yours, so it stays out of what you can spend.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('a transfer is the same colour here as it is in the register', (
+    tester,
+  ) async {
+    // This screen reached for `SpendWiseColors.warning`, a hardcoded amber
+    // that `SpendWiseColors.apply` never touches. The Ledger paints a
+    // transfer `mine` -- the palette's own answer to "this only moved between
+    // accounts you already own" -- so one entry was two colours depending on
+    // whether you had tapped it, and stayed amber through every palette the
+    // owner chose.
+    SpendWiseColors.apply(SpendWisePalette.byId('brass'));
+    addTearDown(() => SpendWiseColors.apply(SpendWisePalette.sage));
+
+    final model = _FakeViewModel(debts: const []);
+    await tester.pumpWidget(
+      host(model, transaction(kind: TransactionKind.transfer)),
+    );
+    await tester.pumpAndSettle();
+
+    final amount = tester.widget<Text>(
+      find.byWidgetPredicate(
+        (widget) => widget is Text && (widget.data ?? '').contains('16,800'),
+      ),
+    );
+    expect(amount.style?.color, SpendWiseColors.mine);
+    expect(amount.style?.color, isNot(SpendWiseColors.warning));
   });
 
   testWidgets('deleting offers a working Undo', (tester) async {

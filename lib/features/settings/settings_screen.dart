@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../security/app_lock.dart';
 import '../help/help_screen.dart';
+import '../../app/failure_text.dart';
 import '../../app/theme.dart';
 import '../../widgets/controller_scope.dart';
 import '../../widgets/spendwise_components.dart';
@@ -283,13 +284,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: TextStyle(color: SpendWiseColors.expense),
                 ),
                 onTap: () async {
-                  await Navigator.push(
+                  final messenger = ScaffoldMessenger.of(context);
+                  final erased = await Navigator.push<bool>(
                     context,
-                    MaterialPageRoute<void>(
+                    MaterialPageRoute<bool>(
                       builder: (_) => EraseScreen(viewModel: viewModel),
                     ),
                   );
-                  if (mounted) setState(() {});
+                  if (!mounted) return;
+                  setState(() {});
+                  // Four gates, a countdown, and then the screen simply
+                  // closed onto a Settings list that looked untouched --
+                  // which is how a wipe reads as a failed wipe. Smaller
+                  // actions on this screen already say what they did.
+                  if (erased ?? false) {
+                    messenger.showSnackBar(
+                      const SnackBar(
+                        content: Text('Everything on this device was erased.'),
+                      ),
+                    );
+                  }
                 },
               ),
             ],
@@ -328,7 +342,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not update sample data: $error')),
+          SnackBar(
+            content: Text(failureText('Could not update sample data', error)),
+          ),
         );
       }
     } finally {
@@ -400,7 +416,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         } catch (error) {
           if (mounted) {
             messenger.showSnackBar(
-              SnackBar(content: Text('Could not save your name(s): $error')),
+              SnackBar(
+                content: Text(
+                  failureText('Could not save your name(s)', error),
+                ),
+              ),
             );
           }
         }

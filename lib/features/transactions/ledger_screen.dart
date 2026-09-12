@@ -211,12 +211,18 @@ class _LedgerScreenState extends State<LedgerScreen> {
           if (visible.isEmpty)
             SliverToBoxAdapter(
               child: RestState(
+                // Showing every month used to have an answer of its own --
+                // "Nothing recorded yet. / This is the whole ledger." -- and
+                // it could only ever be read by somebody whose filter matched
+                // nothing, because with no filter and a ledger that has
+                // entries the register is not empty. The screen said the
+                // ledger was empty directly above a header counting
+                // "0 matches across all months", which is the app arguing
+                // with itself about whether the entries exist.
                 headline: all.isEmpty
                     ? 'Nothing recorded yet.'
                     : scoped
                     ? 'Nothing in ${DateFormat('MMMM').format(month)}.'
-                    : allMonths
-                    ? 'Nothing recorded yet.'
                     : 'No transaction matches that.',
                 detail: all.isEmpty
                     ? captureIsOff(widget.viewModel)
@@ -226,8 +232,6 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                 'one by hand.'
                     : scoped
                     ? 'Step back a month, or show every month.'
-                    : allMonths
-                    ? 'This is the whole ledger.'
                     : 'Try fewer words, or clear the filters.',
                 action: all.isEmpty && captureIsOff(widget.viewModel)
                     ? ChooseSourcesButton(viewModel: widget.viewModel)
