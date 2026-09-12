@@ -1,21 +1,27 @@
 # SpendWise project handoff
 
-Last updated: 2026-09-11
+Last updated: 2026-09-13
 
 ## Current release
 
-- Version: `0.9.34+49`
+- Version: `0.9.35+50`
 - Android package: `com.spendwise.app` — keep this stable so upgrades retain data.
 - Public repository: <https://github.com/abdullah270602/spendwise-local>
-- Latest release: <https://github.com/abdullah270602/spendwise-local/releases/tag/v0.9.25> (the code is ahead of it)
+- Latest release: <https://github.com/abdullah270602/spendwise-local/releases/tag/v0.9.35> — the tag and the code are the same commit.
 - Shipped APK is the optimized split-per-ABI release build, not a Flutter debug
   build. Build with `flutter build apk --release --split-per-abi`; a plain
   `--release` writes only the universal APK and leaves the per-ABI files from
   the *previous* build sitting in the output directory, which is an easy way to
   install a stale binary and believe it is current. Check the APK's mtime
   against the commit before installing.
-- Split-per-ABI adds 2000 to the version code for arm64: `49` becomes `2049`.
-- Installed on the connected Pixel 9 at this version, with `adb install -r`.
+- Split-per-ABI adds 2000 to the version code for arm64: `50` becomes `2050`
+  (and 1000 for armeabi-v7a: `1050`).
+- Release assets are named `SpendWise-arm64-v8a.apk` and
+  `SpendWise-armeabi-v7a.apk`, with no version in the filename, so that
+  `README.md` can link at `releases/latest/download/<name>`. `AGENTS.md` has
+  the rule and the reason; do not reintroduce a versioned asset name.
+- Installed on the connected Pixel 9 at `0.9.34+49`, with `adb install -r`;
+  `0.9.35` was published without a device install.
 
 ## Known reliability issues
 
@@ -290,7 +296,7 @@ invalidation behavior when changing the shell/controller.
 
 ## Verification baseline
 
-At `0.9.34`, the analyzer is clean and all 898 tests pass. Before shipping:
+At `0.9.35`, the analyzer is clean and all 893 tests pass. Before shipping:
 
 1. Run `dart format` on changed Dart files.
 2. Run `flutter analyze --no-pub`.

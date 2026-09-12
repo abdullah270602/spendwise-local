@@ -66,6 +66,21 @@ file's mtime is later than the commit before installing, and check the
 package's `lastUpdateTime` after. `Success` alone proves nothing about *what*
 was installed.
 
+**Release asset names are fixed, and must never carry the version.**
+Publish the split-per-ABI APKs as exactly `SpendWise-arm64-v8a.apk` and
+`SpendWise-armeabi-v7a.apk`, identical at every release. The reason is that
+`README.md` links straight at
+`releases/latest/download/SpendWise-arm64-v8a.apk`, and GitHub only serves
+that redirect for an asset whose filename is the same in every release. The
+name is therefore part of a published contract, not a label: put the version
+in it and the redirect 404s, silently breaking every download link ever
+shared — including ones in other people's bookmarks and posts, which cannot
+be edited afterwards. Releases up to `0.9.25` were named
+`SpendWise-0.9.25-arm64-v8a.apk`, which is why no such link worked before
+`0.9.35`. The version still lives in the tag, the release title, the notes
+and the APK manifest; those are all places a reader looks *after* following
+the link, so none of them has to stay still.
+
 **Screenshots.** Take them from the sandbox install with demo data on
 (`local/sandbox-flavour.patch`, a separate application id), never from the
 real app — see the device rules below. Frame them with

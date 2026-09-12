@@ -13,7 +13,7 @@ It runs entirely on your phone and has no internet permission at all.
 [![Latest release](https://img.shields.io/github/v/release/abdullah270602/spendwise-local?display_name=tag)](https://github.com/abdullah270602/spendwise-local/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-9FB2AC.svg)](LICENSE)
 
-**[Download for Android →](https://github.com/abdullah270602/spendwise-local/releases/latest)**
+**[Download for Android →](https://github.com/abdullah270602/spendwise-local/releases/latest/download/SpendWise-arm64-v8a.apk)**
 
 </div>
 
