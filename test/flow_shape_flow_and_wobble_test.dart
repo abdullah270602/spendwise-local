@@ -42,10 +42,14 @@ class _Geometry {
   final double savedOfKept;
   final bool asBranch;
 
-  static const _barH = 10.0;
+  // Read from the widget's own constants rather than copied. This held its
+  // own `.075` while the shape moved to a narrower splay, so a tap aimed at
+  // the middle of the "Gone" foot landed on empty ground -- and the failure
+  // read as a broken wobble rather than as a stale number in the test.
+  static const _barH = FlowGeometry.barH;
 
-  double get _topW => width * .46;
-  double get _margin => width * .075;
+  double get _topW => width * FlowGeometry.topWidthFraction;
+  double get _margin => width * FlowGeometry.marginFraction;
   double get _botY => height - _barH - 2;
   double get _keptW => _topW * keptFraction;
   double get _spentW => _topW - _keptW;
@@ -57,7 +61,8 @@ class _Geometry {
   double get _spentBotX => (width - _margin) - _spentW;
   double get _liveKeptW => asBranch ? _keptW * (1 - savedOfKept) : _keptW;
   double get _savedBotW => asBranch ? _keptW * savedOfKept : 0.0;
-  double get _gap => asBranch && _savedBotW > 0 ? 6.0 : 0.0;
+  double get _gap =>
+      asBranch && _savedBotW > 0 ? FlowGeometry.siblingGapDp : 0.0;
 
   /// A point near the bottom of each branch's curve, well clear of its
   /// edges -- the curve's control points share an x-coordinate with the

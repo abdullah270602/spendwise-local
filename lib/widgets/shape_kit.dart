@@ -455,6 +455,59 @@ class _FlowGeometry {
   }
 }
 
+/// The seven numbers that decide the shape of the flow, in one place.
+///
+/// There are two other implementations of this geometry: the Home-screen
+/// widget redraws the static case in Kotlin, because a widget's process
+/// cannot reach the ledger and so cannot be handed a live Flutter render;
+/// and the wobble test works out where each branch's foot lands so it can
+/// tap one. `flow_shape_geometry_ports_test.dart` reads this file and the
+/// Kotlin one back as text and fails the moment a name here disagrees with
+/// its counterpart there.
+///
+/// The test copy had no such guard, and held its own `.075` after this file
+/// moved on — so a tap aimed at the "Gone" branch landed on empty ground and
+/// the failure read as a broken wobble rather than as a stale number. It
+/// reads these now. A constant with three copies and two guards is a
+/// constant with one copy too many.
+///
+/// See `android/app/src/main/kotlin/com/spendwise/app/SpendWiseHomeWidgetRenderer.kt`.
+class FlowGeometry {
+  const FlowGeometry._();
+
+  /// The height of the bar at the top and of each foot.
+  static const barH = 10.0;
+
+  /// How far the trunk sits below the top of the canvas.
+  static const topY = 6.0;
+
+  /// The trunk's width as a share of the canvas. Deliberately narrower than
+  /// the canvas so the ribbon has room to fan outward -- the widening is
+  /// what reads as "this became these".
+  static const topWidthFraction = .46;
+
+  /// How close the feet come to the edge of the canvas, and with it how far
+  /// the two branches splay apart.
+  ///
+  /// It was .075, which put each foot almost on the edge and opened a wide
+  /// wedge of empty ground between them -- the shape read as two legs rather
+  /// than as one thing dividing. The app's own mark is the argument: a trunk
+  /// whose branches lean apart just enough to leave a narrow lens between
+  /// them. Home draws that mark with live figures in it, so the two should
+  /// look like the same idea.
+  static const marginFraction = .14;
+
+  /// Where each branch's curve begins to bend, and where it stops. Both
+  /// control points share an x with the endpoint on their own side, so the
+  /// curve leaves the trunk vertically and arrives at the foot vertically,
+  /// and never bows wider than the foot it lands on.
+  static const control1Fraction = .42;
+  static const control2Fraction = .60;
+
+  /// The gap between the kept and saved footings in the "siblings" style.
+  static const siblingGapDp = 6.0;
+}
+
 /// Builds every path and colour the ribbon is made of, at the given size and
 /// proportions. Used both to paint the ribbon and, given the same values, to
 /// test a tap against the shapes actually on screen.
@@ -467,27 +520,13 @@ _FlowGeometry _buildFlowGeometry({
 }) {
   final w = size.width;
   final h = size.height;
-  // Named rather than inlined because the Home-screen widget draws this same
-  // static shape (reveal at 1, no wobble, no saved branch) again in Kotlin --
-  // the ledger cannot be reached from a widget's process, so there is no way
-  // to hand it a live Flutter render, only these numbers. That is a second
-  // implementation of one geometry, which drifts the moment someone tunes a
-  // curve here and forgets the other file exists. `flow_shape_geometry_ports_test.dart`
-  // reads both files' constants back out as text and fails the moment they
-  // stop matching, which is the only reason it is safe to keep two copies at
-  // all. See `android/app/src/main/kotlin/com/spendwise/app/SpendWiseHomeWidgetRenderer.kt`.
-  const barH = 10.0;
-  const topY = 6.0;
-  const topWidthFraction = .46;
-  const marginFraction = .075;
-  const control1Fraction = .42;
-  const control2Fraction = .60;
-  // The seventh geometry constant the widget's renderer has to mirror --
-  // named, like the six above, because the Home-screen widget also draws the
-  // three-branch "siblings" split, and a gap tuned here without a matching
-  // change there is exactly the silent drift `flow_shape_geometry_ports_test.dart`
-  // exists to catch.
-  const siblingGapDp = 6.0;
+  const barH = FlowGeometry.barH;
+  const topY = FlowGeometry.topY;
+  const topWidthFraction = FlowGeometry.topWidthFraction;
+  const marginFraction = FlowGeometry.marginFraction;
+  const control1Fraction = FlowGeometry.control1Fraction;
+  const control2Fraction = FlowGeometry.control2Fraction;
+  const siblingGapDp = FlowGeometry.siblingGapDp;
 
   // The source bar is deliberately narrower than the canvas so the ribbon has
   // room to fan outward -- the widening is what reads as "this became these".
@@ -661,8 +700,8 @@ class _FlowShapePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
-    const barH = 10.0;
-    const topY = 6.0;
+    const barH = FlowGeometry.barH;
+    const topY = FlowGeometry.topY;
 
     // `reveal` already widens the bottom bars out from the top one; clipping
     // to a window that grows downward over the same value turns that widen

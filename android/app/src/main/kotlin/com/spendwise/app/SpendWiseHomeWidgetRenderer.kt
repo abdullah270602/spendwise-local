@@ -56,7 +56,7 @@ object SpendWiseHomeWidgetRenderer {
     private const val BAR_HEIGHT_DP = 10f
     private const val TOP_Y_DP = 6f
     private const val TOP_WIDTH_FRACTION = 0.46f
-    private const val MARGIN_FRACTION = 0.075f
+    private const val MARGIN_FRACTION = 0.14f
     private const val CONTROL_1_FRACTION = 0.42f
     private const val CONTROL_2_FRACTION = 0.60f
 
