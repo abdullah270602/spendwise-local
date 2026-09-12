@@ -3005,108 +3005,202 @@ final class LocalLedger {
       // scale, so a seed with two similar balances shows none of that -- the
       // ladder from a salary account down to a nearly-empty wallet is the
       // thing worth demonstrating, in both zones.
+      //
+      // Nothing here is prefixed "Demo". Demo rows are tracked by id in
+      // `demo_entities`, so the prefix bought nothing and cost every
+      // screenshot: a person judging the app by its pictures was reading
+      // "Demo Meezan Current" where their own ledger will say a bank's name.
       final bank = addAccount(
-        name: 'Demo Meezan Current',
+        name: 'Meezan Current',
         type: AccountType.bank,
         institutionName: 'Meezan Bank',
         accountSuffix: '4821',
         openingBalanceMinor: 18500000,
       );
       final salary = addAccount(
-        name: 'Demo UBL Salary',
+        name: 'UBL Salary',
         type: AccountType.bank,
         institutionName: 'UBL',
         accountSuffix: '7719',
         openingBalanceMinor: 12120000,
       );
       final wallet = addAccount(
-        name: 'Demo SadaPay Wallet',
+        name: 'SadaPay',
         type: AccountType.wallet,
         institutionName: 'SadaPay',
         accountSuffix: '9012',
         openingBalanceMinor: 2450000,
       );
       final pocket = addAccount(
-        name: 'Demo JazzCash',
+        name: 'JazzCash',
         type: AccountType.wallet,
         institutionName: 'JazzCash',
         accountSuffix: '3388',
         openingBalanceMinor: 400000,
       );
       final emergency = addAccount(
-        name: 'Demo Emergency Fund',
+        name: 'Emergency Fund',
         type: AccountType.savings,
         institutionName: 'Meezan Bank',
         accountSuffix: '5540',
         openingBalanceMinor: 25000000,
       );
       final hajj = addAccount(
-        name: 'Demo Hajj Fund',
+        name: 'Hajj Fund',
         type: AccountType.savings,
         institutionName: 'UBL',
         accountSuffix: '6612',
         openingBalanceMinor: 8650000,
       );
       final now = DateTime.now();
+      DateTime dayOf(int day, int hour) =>
+          DateTime(now.year, now.month, day, hour);
+
+      // A month with enough in it to be worth drawing: several categories so
+      // the breakdown is a bar rather than a block, entries spread across the
+      // accounts so the Ledger is not one column of the same name, and one of
+      // each of the things the app exists to tell apart -- a transfer to
+      // savings, and money lent out that is still owed.
       final transactionIds = <String>[
         addManualTransaction(
           kind: TransactionKind.income,
           amountMinor: 15260000,
-          occurredAt: DateTime(now.year, now.month, 1, 9),
-          accountId: bank,
-          description: 'Demo salary',
+          occurredAt: dayOf(1, 9),
+          accountId: salary,
+          description: 'Salary',
           categoryId: 'income',
         ),
         addManualTransaction(
           kind: TransactionKind.expense,
-          amountMinor: 425000,
-          occurredAt: now.subtract(const Duration(days: 1, hours: 2)),
+          amountMinor: 2800000,
+          occurredAt: dayOf(2, 11),
           accountId: bank,
-          description: 'Demo Foodpanda order',
-          categoryId: 'food',
+          description: 'Rent',
+          categoryId: 'bills',
+        ),
+        addManualTransaction(
+          kind: TransactionKind.transfer,
+          amountMinor: 1800000,
+          occurredAt: dayOf(2, 12),
+          accountId: salary,
+          fromAccountId: salary,
+          toAccountId: emergency,
+          description: 'Into the emergency fund',
+          categoryId: 'transfer',
+        ),
+        addManualTransaction(
+          kind: TransactionKind.expense,
+          amountMinor: 825000,
+          occurredAt: dayOf(4, 10),
+          accountId: bank,
+          description: 'K-Electric bill',
+          categoryId: 'bills',
+        ),
+        addManualTransaction(
+          kind: TransactionKind.expense,
+          amountMinor: 940000,
+          occurredAt: dayOf(5, 18),
+          accountId: bank,
+          description: 'Imtiaz Super Market',
+          categoryId: 'groceries',
         ),
         addManualTransaction(
           kind: TransactionKind.expense,
           amountMinor: 600000,
-          occurredAt: now.subtract(const Duration(days: 2)),
+          occurredAt: dayOf(6, 8),
           accountId: bank,
-          description: 'Demo fuel',
+          description: 'Shell fuel',
           categoryId: 'transport',
         ),
         addManualTransaction(
           kind: TransactionKind.transfer,
           amountMinor: 1000000,
-          occurredAt: now.subtract(const Duration(days: 3)),
+          occurredAt: dayOf(7, 13),
+          accountId: bank,
           fromAccountId: bank,
           toAccountId: wallet,
-          description: 'Demo wallet top-up',
+          description: 'Top-up',
           categoryId: 'transfer',
         ),
         addManualTransaction(
           kind: TransactionKind.expense,
-          amountMinor: 1225000,
-          occurredAt: now.subtract(const Duration(days: 4)),
+          amountMinor: 425000,
+          occurredAt: dayOf(8, 20),
           accountId: wallet,
-          description: 'Demo electricity bill',
-          categoryId: 'bills',
+          description: 'Foodpanda',
+          categoryId: 'food',
         ),
         addManualTransaction(
           kind: TransactionKind.expense,
-          amountMinor: 280000,
-          occurredAt: now.subtract(const Duration(days: 5)),
-          accountId: salary,
-          description: 'Demo grocery run',
+          amountMinor: 580000,
+          occurredAt: dayOf(9, 16),
+          accountId: bank,
+          description: 'Al-Fatah',
           categoryId: 'groceries',
         ),
         addManualTransaction(
           kind: TransactionKind.expense,
           amountMinor: 88000,
-          occurredAt: now.subtract(const Duration(days: 6)),
+          occurredAt: dayOf(10, 22),
           accountId: pocket,
-          description: 'Demo ride home',
+          description: 'Careem home',
           categoryId: 'transport',
         ),
+        addManualTransaction(
+          kind: TransactionKind.expense,
+          amountMinor: 242000,
+          occurredAt: dayOf(11, 19),
+          accountId: wallet,
+          description: 'Cafe with Hamza',
+          categoryId: 'food',
+        ),
+        addManualTransaction(
+          kind: TransactionKind.expense,
+          amountMinor: 500000,
+          occurredAt: dayOf(12, 15),
+          accountId: bank,
+          description: 'Doctor and pharmacy',
+          categoryId: 'health',
+        ),
+        addManualTransaction(
+          kind: TransactionKind.transfer,
+          amountMinor: 700000,
+          occurredAt: dayOf(13, 10),
+          accountId: salary,
+          fromAccountId: salary,
+          toAccountId: hajj,
+          description: 'Into the Hajj fund',
+          categoryId: 'transfer',
+        ),
       ];
+
+      // Lent out, and not back yet. It is the one thing a bank alert cannot
+      // tell from spending, so a ledger that never shows it demonstrates
+      // nothing about the app's answer to it.
+      final lent = addManualTransaction(
+        kind: TransactionKind.expense,
+        amountMinor: 2000000,
+        occurredAt: dayOf(3, 17),
+        accountId: bank,
+        description: 'To Hamza',
+      );
+      transactionIds.add(lent);
+      final loan = openDebt(
+        transactionId: lent,
+        kind: DebtKind.lent,
+        counterparty: 'Hamza',
+        note: 'Back at the end of the month',
+      );
+      // Registered for removal like everything else here. A debt is not a
+      // transaction and does not go when one does: `transactions.debt_id`
+      // cascades, but the debt row itself survives its opening entry being
+      // deleted, so a demo loan left behind kept adding itself to what the
+      // owner had out with somebody every time the toggle was flipped.
+      _db.execute(
+        "INSERT INTO demo_entities(entity_type,entity_id) VALUES ('debt',?)",
+        [loan.id],
+      );
+
       for (final id in [bank, salary, wallet, pocket, emergency, hajj]) {
         _db.execute(
           "INSERT INTO demo_entities(entity_type,entity_id) VALUES ('account',?)",
@@ -3132,6 +3226,9 @@ final class LocalLedger {
   void removeDemoData() {
     _db.execute('BEGIN IMMEDIATE');
     try {
+      _db.execute(
+        "DELETE FROM debts WHERE id IN (SELECT entity_id FROM demo_entities WHERE entity_type='debt')",
+      );
       _db.execute(
         "DELETE FROM transactions WHERE id IN (SELECT entity_id FROM demo_entities WHERE entity_type='transaction')",
       );
