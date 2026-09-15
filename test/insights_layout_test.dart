@@ -32,17 +32,18 @@ void main() {
   test('an unset preference lands on the agreed defaults', () {
     // Nothing stored, and a value stored by a version that no longer exists.
     for (final absent in <String?>[null, '', 'donut']) {
-      expect(InsightsOverTime.fromId(absent), InsightsOverTime.spine);
+      expect(InsightsOverTime.fromId(absent), InsightsOverTime.off);
       expect(InsightsShare.fromId(absent), InsightsShare.chronograph);
       expect(InsightsChange.fromId(absent), InsightsChange.off);
     }
   });
 
-  test('what changed stays off until it is asked for', () {
-    // It is the only section that makes a claim about the past rather than
-    // reporting the present, so it is opted into, not met on a first run.
+  test('Insights opens on one drawing, not three', () {
+    // The share of a period is the question people arrive with. The shape of
+    // the days and the comparison against last period are both worth having
+    // and neither is worth meeting unasked, so each is opted into.
     expect(InsightsChange.fromId(null).isOn, isFalse);
-    expect(InsightsOverTime.fromId(null).isOn, isTrue);
+    expect(InsightsOverTime.fromId(null).isOn, isFalse);
     expect(InsightsShare.fromId(null).isOn, isTrue);
   });
 

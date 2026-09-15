@@ -146,27 +146,6 @@ void main() {
     expect(find.text('THIS MONTH'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
-
-  testWidgets('the spine prints the date and no second figure', (tester) async {
-    // A net figure used to sit under every date, restating in one clipped
-    // line what the two arms above already draw in full. The dates stay.
-    _phoneSized(tester);
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: SpendWiseTheme.dark,
-        home: Scaffold(body: InsightsScreen(viewModel: _InsightsModel())),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    final spine = find.byType(FlowSpine);
-    expect(spine, findsOneWidget);
-    expect(
-      find.descendant(of: spine, matching: find.textContaining('+')),
-      findsNothing,
-      reason: 'the signed net figure is gone from the spine',
-    );
-  });
 }
 
 /// Every previous widget test here ran at the 800x600 default, where a header

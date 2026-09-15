@@ -108,16 +108,36 @@ void main() {
   });
 
   group('over time', () {
-    testWidgets('is drawn by default', (tester) async {
+    testWidgets('is not drawn until it is asked for', (tester) async {
       await pump(tester, {}, scroll: false);
+      expect(find.byType(FlowSpine), findsNothing);
+    });
+
+    testWidgets('and is drawn when it is', (tester) async {
+      await pump(tester, {
+        InsightsPreference.overTime: InsightsOverTime.spine.id,
+      }, scroll: false);
       expect(find.byType(FlowSpine), findsOneWidget);
     });
 
-    testWidgets('is gone when it is turned off', (tester) async {
+    testWidgets('and prints the date without a second figure', (tester) async {
+      // A net figure used to sit under every date, restating in one clipped
+      // line what the two arms above already draw in full. The dates stay.
+      //
+      // This lived in `insights_screen_test.dart` until the spine stopped
+      // being drawn unless it is asked for: that file's fake cannot express
+      // a stored preference, so the assertion had nowhere to run there.
       await pump(tester, {
-        InsightsPreference.overTime: InsightsOverTime.off.id,
+        InsightsPreference.overTime: InsightsOverTime.spine.id,
       }, scroll: false);
-      expect(find.byType(FlowSpine), findsNothing);
+
+      final spine = find.byType(FlowSpine);
+      expect(spine, findsOneWidget);
+      expect(
+        find.descendant(of: spine, matching: find.textContaining('+')),
+        findsNothing,
+        reason: 'the signed net figure is gone from the spine',
+      );
     });
   });
 

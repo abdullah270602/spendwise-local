@@ -35,11 +35,17 @@ enum InsightsOverTime {
 
   bool get isOn => this == spine;
 
+  /// Off by default, so Insights opens on one drawing rather than three.
+  ///
+  /// The share of a period is the question people come to this screen with;
+  /// the shape of the days and the comparison against last period are both
+  /// worth having and neither is worth meeting unasked. Each is one tap away
+  /// under Appearance.
   static InsightsOverTime fromId(String? id) {
     for (final value in values) {
       if (value.id == id) return value;
     }
-    return spine;
+    return off;
   }
 }
 

@@ -71,27 +71,48 @@ void main() {
     ledger.seedDemoData();
 
     final snapshot = ledger.snapshot();
-    var income = 0, spending = 0;
+    var income = 0, spending = 0, lentOut = 0, saved = 0;
+    final savingsIds = {
+      for (final account in snapshot.accounts)
+        if (account.type == AccountType.savings) account.id,
+    };
     for (final item in snapshot.transactions) {
-      if (item.debtId != null) continue;
-      if (item.kind == TransactionKind.income) {
-        income += item.amount.minorUnits;
+      final amount = item.amount.minorUnits;
+      if (item.debtId != null) {
+        if (item.kind == TransactionKind.expense) lentOut += amount;
+        continue;
       }
-      if (item.kind == TransactionKind.expense) {
-        spending += item.amount.minorUnits;
+      switch (item.kind) {
+        case TransactionKind.income:
+          income += amount;
+        case TransactionKind.expense:
+          spending += amount;
+        case TransactionKind.transfer:
+          if (savingsIds.contains(item.toAccountId)) saved += amount;
       }
     }
 
     expect(income, greaterThan(0));
+
+    // The proportion the ribbon actually draws, worked out the way Home
+    // works it out: what is still yours against what went, with money put
+    // away taken off the kept side. Spending against income was the old
+    // proxy for this and measured the wrong thing -- it says nothing about
+    // the two branches, which is the entire picture.
+    final kept = income - spending - lentOut;
+    final aside = saved < kept ? saved : kept;
+    final drawnKept = kept - aside;
+    final share = drawnKept / (drawnKept + spending);
+
     expect(
-      spending / income,
-      lessThan(0.75),
-      reason: 'a month that spent nearly everything draws a sliver',
+      share,
+      greaterThan(0.6),
+      reason: 'the app mark is one wide branch against one narrow one',
     );
     expect(
-      spending / income,
-      greaterThan(0.25),
-      reason: 'and one that spent nearly nothing is not anybody real',
+      share,
+      lessThan(0.85),
+      reason: 'but not so lopsided that the spent branch is a hairline',
     );
 
     // Deliberately unequal balances: Accounts draws each account to scale.
