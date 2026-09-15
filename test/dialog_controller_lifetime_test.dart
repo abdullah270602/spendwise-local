@@ -97,6 +97,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // Settings is a ListView and this row sits below the fold on a phone,
+    // so it has to be scrolled to rather than tapped where it used to be.
+    // Without this the test breaks every time a row is added above it, which
+    // reads as the dialog regressing when nothing about the dialog changed.
+    await tester.scrollUntilVisible(find.text('Your name(s)'), 200);
+    await tester.pumpAndSettle();
+
     await tester.tap(find.text('Your name(s)'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'A. Person, A Person');

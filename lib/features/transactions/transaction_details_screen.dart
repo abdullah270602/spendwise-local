@@ -271,13 +271,27 @@ class TransactionDetailsScreen extends StatelessWidget {
                       ? null
                       : (value) => setModalState(() {
                           kind = value.first;
-                          if (kind == TransactionKind.transfer &&
-                              (toAccountId == null ||
-                                  toAccountId == accountId)) {
-                            toAccountId = accounts
-                                .where((item) => item.id != accountId)
-                                .firstOrNull
-                                ?.id;
+                          if (kind == TransactionKind.transfer) {
+                            if (toAccountId == null ||
+                                toAccountId == accountId) {
+                              toAccountId = accounts
+                                  .where((item) => item.id != accountId)
+                                  .firstOrNull
+                                  ?.id;
+                            }
+                            // Saying "this was a transfer" and leaving the
+                            // category alone left the entry reading "Income"
+                            // in the ledger after the correction -- which is
+                            // the very thing being corrected. Worse, the
+                            // ledger learns from a hand-set category, so the
+                            // wrong one taught the classifier to repeat the
+                            // mistake on the next alert from the same sender.
+                            final transferCategory = viewModel.uiCategories
+                                .where((item) => item.id == 'transfer')
+                                .firstOrNull;
+                            if (transferCategory != null) {
+                              category = transferCategory.name;
+                            }
                           }
                         }),
                 ),

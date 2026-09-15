@@ -20,11 +20,22 @@ final class AccountRouting {
     required this.accountId,
     required this.score,
     required this.reason,
+    this.namesAccountNumber = false,
   });
 
   final String accountId;
   final int score;
   final String reason;
+
+  /// Whether the text picked this account out by its registered number and
+  /// not merely by naming its bank.
+  ///
+  /// The difference decides whose word to take when an alert arrives from an
+  /// app attached to one account and mentions another institution inside it,
+  /// which wallets do constantly: "loaded through Northbank-9001 linked
+  /// account" is a wallet alert that names a bank in it. Naming the bank
+  /// is not claiming to be about it; quoting the account number is.
+  final bool namesAccountNumber;
 }
 
 /// Decides which of the user's accounts an alert belongs to, from what the
@@ -69,6 +80,7 @@ final class AccountRouter {
     var runnerUp = 0;
     for (final account in accounts) {
       var score = 0;
+      var byNumber = false;
       final reasons = <String>[];
 
       final suffix = account.suffix.replaceAll(RegExp(r'\D'), '');
@@ -80,6 +92,7 @@ final class AccountRouter {
                 suffix.endsWith(fragment),
           )) {
         score += 100;
+        byNumber = true;
         reasons.add('account ending $suffix');
       }
 
@@ -117,6 +130,7 @@ final class AccountRouter {
           accountId: account.id,
           score: score,
           reason: reasons.join(', '),
+          namesAccountNumber: byNumber,
         );
       } else if (score > runnerUp) {
         runnerUp = score;

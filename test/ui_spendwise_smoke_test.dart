@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:spendwise/data/parser_health.dart';
 import 'package:spendwise/app/theme.dart';
 import 'package:spendwise/features/accounts/accounts_screen.dart';
 import 'package:spendwise/features/dashboard/dashboard_screen.dart';
@@ -504,6 +505,11 @@ class _AccountSourcesViewModel extends _FakeViewModel {
 class _BatchImportViewModel extends _FakeViewModel
     implements SpendWiseAdvancedViewModel {
   int trayScans = 0;
+
+  /// Nothing captured: this fake is about batch import, not reading accuracy.
+  @override
+  ParserHealth parserHealth() => const ParserHealth(sources: []);
+
   @override
   List<AccountViewData> get accounts => const [
     AccountViewData(

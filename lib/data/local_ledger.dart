@@ -14,6 +14,8 @@ import '../core/debt_kind.dart';
 import '../core/notification_noise.dart';
 import '../core/perf.dart';
 import '../domain/domain.dart';
+import '../domain/parsing/parser_definition_codec.dart';
+import 'parser_health.dart';
 
 final class StoredSource {
   const StoredSource({
@@ -838,6 +840,7 @@ final class LocalLedger {
       UPDATE categories SET name = 'Self care'
       WHERE id = 'personal-care' AND is_system = 1;
     ''');
+    _seedBuiltinParserDefinitions();
     _recategorizeAutomaticTransactions();
     _dedupeRankingVolatileNotificationDuplicates();
     _dropStoredBackgroundNotices();
@@ -887,8 +890,17 @@ final class LocalLedger {
         sender: _storedSender(row['payload_json'] as String?),
         accounts: profiles,
       );
-      final accountId = routed?.accountId ?? row['account_id'] as String?;
-      if (routed != null && routed.accountId != row['account_id']) {
+      // Same rule as on ingest: an app attached to a single account keeps
+      // its own alerts unless the text names a different account by number.
+      // Without this the pass re-attributes every wallet top-up to the bank
+      // the wallet happens to mention, and does it again on each upgrade.
+      final attached = _singleAccountForSource(row['source_id'] as String?);
+      final reroute = routed != null &&
+          (attached == null || routed.namesAccountNumber);
+      final accountId =
+          (reroute ? routed.accountId : attached) ??
+          row['account_id'] as String?;
+      if (reroute && routed.accountId != row['account_id']) {
         _db.execute('UPDATE raw_observations SET account_id = ? WHERE id = ?', [
           routed.accountId,
           row['id'],
@@ -898,7 +910,7 @@ final class LocalLedger {
       if (accountId == null) {
         // Nothing to parse against yet, but the text can still be classified,
         // so adverts and codes do not sit in the routing queue forever.
-        final triage = const NotificationParser().parseDetailed(
+        final triage = _parser.parseDetailed(
           _rawFromRow(row, accountOverride: 'probe'),
         );
         if (triage.status == ParseStatus.unsupported) {
@@ -910,7 +922,7 @@ final class LocalLedger {
         }
         continue;
       }
-      final result = const NotificationParser().parseDetailed(
+      final result = _parser.parseDetailed(
         _rawFromRow(row, accountOverride: accountId),
       );
       final candidate = result.candidate;
@@ -1133,6 +1145,28 @@ final class LocalLedger {
     'com.yahoo.mobile.client.android.mail',
   };
 
+  /// The account a source speaks for, or null when it speaks for none or for
+  /// several. A source attached to exactly one account is the user saying
+  /// where its alerts belong.
+  String? _singleAccountForSource(String? sourceId) {
+    if (sourceId == null || sourceId.isEmpty) return null;
+    final rows = _db.select(
+      '''
+      SELECT s.package_name AS package_name,
+             COUNT(DISTINCT a.account_id) AS accounts,
+             MIN(a.account_id) AS account_id
+      FROM sources s
+      JOIN account_sources a ON a.source_id = s.id
+      WHERE s.id = ?
+      GROUP BY s.id
+      ''',
+      [sourceId],
+    );
+    if (rows.isEmpty || (rows.first['accounts'] as int) != 1) return null;
+    if (isSharedSource(rows.first['package_name'] as String?)) return null;
+    return rows.first['account_id'] as String?;
+  }
+
   /// Shared by declaration, or shared in practice: a source the user has
   /// attached to two or more accounts is telling us the same thing.
   bool isSharedSource(String? packageName) {
@@ -1148,6 +1182,359 @@ final class LocalLedger {
       [packageName],
     );
     return rows.isNotEmpty && (rows.first['accounts'] as int) > 1;
+  }
+
+  /// Writes the definitions that ship with the app into the table the
+  /// schema has always had for them.
+  ///
+  /// Until now `parser_definitions` was declared and never touched, and the
+  /// parser built its registry from a hardcoded Dart list — so teaching the
+  /// app one more bank meant a code change, a release, and waiting for
+  /// people to install it. A definition is data; this is where it starts
+  /// being stored like data.
+  ///
+  /// Built-ins are re-seeded only when the code carries a *newer* version of
+  /// the same id, so a definition the owner has switched off stays off, and
+  /// a row nobody has touched still picks up a fix.
+  void _seedBuiltinParserDefinitions() {
+    const codec = ParserDefinitionCodec();
+    for (final definition in pakistanParserDefinitions) {
+      final existing = _db.select(
+        'SELECT version, enabled FROM parser_definitions WHERE id = ?',
+        [definition.id],
+      );
+      if (existing.isNotEmpty &&
+          (existing.first['version'] as int) >= definition.version) {
+        continue;
+      }
+      _db.execute(
+        '''
+        INSERT INTO parser_definitions(
+          id,version,name,country,institution,source_match_json,rules_json,
+          is_builtin,enabled,created_at,updated_at
+        ) VALUES (?,?,?,?,NULL,?,?,1,?,?,?)
+        ON CONFLICT(id) DO UPDATE SET
+          version=excluded.version,
+          name=excluded.name,
+          country=excluded.country,
+          source_match_json=excluded.source_match_json,
+          rules_json=excluded.rules_json,
+          updated_at=excluded.updated_at
+        ''',
+        [
+          definition.id,
+          definition.version,
+          definition.id,
+          // Everything shipped today is Pakistani. Recorded rather than
+          // assumed, so a second country is a row and not a rewrite.
+          'PK',
+          codec.encodeSourceMatchJson(definition),
+          codec.encodeRulesJson(definition),
+          // A built-in the owner switched off stays off.
+          existing.isEmpty ? 1 : existing.first['enabled'],
+          _now,
+          _now,
+        ],
+      );
+    }
+    _parserRegistry = null;
+  }
+
+  /// Adds or replaces one parser definition.
+  ///
+  /// The public way to teach the app a bank. Takes plain maps rather than
+  /// a `ParserDefinition` so a definition can arrive from a file, a row or a
+  /// screen without first being turned into Dart objects — which is the
+  /// whole point of the table.
+  ///
+  /// [keepEnabledState] preserves an existing row's enabled flag, so an
+  /// upgrade carrying a newer built-in does not quietly switch back on
+  /// something the owner turned off.
+  void upsertParserDefinition({
+    required String id,
+    required int version,
+    required String name,
+    required String? country,
+    required String? institution,
+    required Map<String, Object?> sourceMatch,
+    required List<Map<String, Object?>> rules,
+    bool isBuiltin = false,
+    bool keepEnabledState = false,
+  }) {
+    final existing = _db.select(
+      'SELECT enabled FROM parser_definitions WHERE id = ?',
+      [id],
+    );
+    final enabled = keepEnabledState && existing.isNotEmpty
+        ? existing.first['enabled']
+        : 1;
+    _db.execute(
+      '''
+      INSERT INTO parser_definitions(
+        id,version,name,country,institution,source_match_json,rules_json,
+        is_builtin,enabled,created_at,updated_at
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(id) DO UPDATE SET
+        version=excluded.version,
+        name=excluded.name,
+        country=excluded.country,
+        institution=excluded.institution,
+        source_match_json=excluded.source_match_json,
+        rules_json=excluded.rules_json,
+        is_builtin=excluded.is_builtin,
+        enabled=excluded.enabled,
+        updated_at=excluded.updated_at
+      ''',
+      [
+        id,
+        version,
+        name,
+        country,
+        institution,
+        jsonEncode(sourceMatch),
+        jsonEncode(rules),
+        isBuiltin ? 1 : 0,
+        enabled,
+        _now,
+        _now,
+      ],
+    );
+    _parserRegistry = null;
+  }
+
+  /// Turns one definition on or off without deleting it, so a rule that is
+  /// misreading a bank can be stopped and later restored.
+  void setParserDefinitionEnabled(String id, bool enabled) {
+    _db.execute(
+      'UPDATE parser_definitions SET enabled = ?, updated_at = ? WHERE id = ?',
+      [enabled ? 1 : 0, _now, id],
+    );
+    _parserRegistry = null;
+  }
+
+  /// Every stored definition, exactly as held.
+  List<Map<String, Object?>> parserDefinitionRows() => [
+    for (final row in _db.select(
+      'SELECT id, version, name, country, institution, source_match_json, '
+      'rules_json, is_builtin, enabled FROM parser_definitions ORDER BY id',
+    ))
+      {for (final key in row.keys) key: row[key]},
+  ];
+
+  ParserRegistry? _parserRegistry;
+  final _refusedParserRules = <String>[];
+
+  /// Rules the app declined to run, and why. Read by the reading-accuracy
+  /// report: a definition silently doing nothing is the hardest kind of
+  /// failure to notice.
+  List<String> get refusedParserRules => List.unmodifiable(_refusedParserRules);
+
+  /// The enabled definitions, compiled once and held.
+  ///
+  /// Built per ledger rather than per alert: compiling a dozen regexes for
+  /// every notification in a 200-alert backlog is work the drain cannot
+  /// afford.
+  ParserRegistry get parserRegistry {
+    final cached = _parserRegistry;
+    if (cached != null) return cached;
+    const codec = ParserDefinitionCodec();
+    final definitions = <ParserDefinition>[];
+    _refusedParserRules.clear();
+    for (final row in _db.select(
+      'SELECT id, version, source_match_json, rules_json '
+      'FROM parser_definitions WHERE enabled = 1 ORDER BY is_builtin, id',
+    )) {
+      final decoded = codec.decode(
+        id: row['id'] as String,
+        version: row['version'] as int,
+        sourceMatchJson: row['source_match_json'] as String,
+        rulesJson: row['rules_json'] as String,
+      );
+      _refusedParserRules.addAll(decoded.refusals);
+      final definition = decoded.definition;
+      if (definition != null) definitions.add(definition);
+    }
+    // An empty table would silently disable every rule the app has. That
+    // should never happen -- the seed runs on migration -- but "should never
+    // happen" is how a ledger stops reading anything at all, so the shipped
+    // list stands in.
+    return _parserRegistry = ParserRegistry(
+      definitions.isEmpty ? pakistanParserDefinitions : definitions,
+    );
+  }
+
+  /// Every currency the owner holds an account in.
+  ///
+  /// This is what settles a shared marker. "Rs" names four currencies in
+  /// general and exactly one for somebody with a single Pakistani account,
+  /// and there is nothing in the text that could tell them apart -- only the
+  /// ledger knows.
+  Set<String> get heldCurrencies => {
+    for (final row in _db.select(
+      'SELECT DISTINCT currency FROM accounts WHERE archived = 0',
+    ))
+      row['currency'] as String,
+  };
+
+  /// The parser, carrying whatever definitions the table holds and whatever
+  /// currencies the ledger is denominated in.
+  NotificationParser get _parser => NotificationParser(
+    registry: parserRegistry,
+    currencies: heldCurrencies.isEmpty ? const {'PKR'} : heldCurrencies,
+  );
+
+  /// What the parser is managing, per source.
+  ///
+  /// Read from `raw_observations` and `financial_evidence`, both of which
+  /// have recorded all of this since the first release. Nothing new is
+  /// stored to answer the question; it was only never asked.
+  ///
+  /// Sources with nothing captured are included, because a source the user
+  /// enabled that has produced no alerts at all is itself the finding --
+  /// usually a bank whose app posts nothing, or a sender pattern that never
+  /// matches.
+  ParserHealth parserHealth() {
+    final counts = _db.select('''
+      SELECT s.id AS source_id,
+             s.display_name AS label,
+             s.package_name AS package_name,
+             s.institution_name AS institution,
+             r.parse_status AS status,
+             COUNT(*) AS tally,
+             MIN(r.observed_at) AS first_seen,
+             MAX(r.observed_at) AS last_seen
+      FROM raw_observations r
+      LEFT JOIN sources s ON s.id = r.source_id
+      WHERE r.kind = 'notification'
+      GROUP BY s.id, r.parse_status
+    ''');
+
+    final parsers = _db.select('''
+      SELECT r.source_id AS source_id,
+             e.parser_id AS parser_id,
+             COUNT(*) AS tally
+      FROM financial_evidence e
+      JOIN raw_observations r ON r.id = e.raw_observation_id
+      GROUP BY r.source_id, e.parser_id
+    ''');
+
+    // The parser's own sentence about why it stopped, which is far more use
+    // than a status. Trimmed to the leading sentence so ten phrasings of one
+    // gap do not read as ten gaps.
+    final reasons = _db.select('''
+      SELECT source_id AS source_id,
+             parse_error AS reason,
+             COUNT(*) AS tally
+      FROM raw_observations
+      WHERE kind = 'notification'
+        AND parse_status IN ('review', 'error')
+        AND parse_error IS NOT NULL AND parse_error != ''
+      GROUP BY source_id, parse_error
+    ''');
+
+    final byParser = <String?, Map<String, int>>{};
+    for (final row in parsers) {
+      byParser
+          .putIfAbsent(row['source_id'] as String?, () => <String, int>{})
+          .update(
+            row['parser_id'] as String,
+            (value) => value + (row['tally'] as int),
+            ifAbsent: () => row['tally'] as int,
+          );
+    }
+
+    final byReason = <String?, Map<String, int>>{};
+    for (final row in reasons) {
+      final text = (row['reason'] as String).trim();
+      final stop = text.indexOf('. ');
+      final headline = stop > 0 ? text.substring(0, stop + 1) : text;
+      byReason
+          .putIfAbsent(row['source_id'] as String?, () => <String, int>{})
+          .update(
+            headline,
+            (value) => value + (row['tally'] as int),
+            ifAbsent: () => row['tally'] as int,
+          );
+    }
+
+    final tallies = <String?, Map<String, int>>{};
+    final labels = <String?, List<String?>>{};
+    final spans = <String?, List<int>>{};
+    for (final row in counts) {
+      final id = row['source_id'] as String?;
+      tallies.putIfAbsent(id, () => <String, int>{})[row['status'] as String] =
+          row['tally'] as int;
+      labels[id] = [
+        row['label'] as String?,
+        row['package_name'] as String?,
+        row['institution'] as String?,
+      ];
+      final first = row['first_seen'] as int;
+      final last = row['last_seen'] as int;
+      final span = spans[id];
+      spans[id] = span == null
+          ? [first, last]
+          : [first < span[0] ? first : span[0], last > span[1] ? last : span[1]];
+    }
+
+    // Enabled sources that have never produced an alert. Absent from the
+    // join above precisely because they have nothing, which is the one case
+    // a report built only from captured rows would never show.
+    for (final row in _db.select(
+      'SELECT id, display_name, package_name, institution_name FROM sources '
+      'WHERE enabled = 1',
+    )) {
+      final id = row['id'] as String;
+      if (tallies.containsKey(id)) continue;
+      tallies[id] = const {};
+      labels[id] = [
+        row['display_name'] as String?,
+        row['package_name'] as String?,
+        row['institution_name'] as String?,
+      ];
+    }
+
+    final sources = <SourceCoverage>[];
+    for (final entry in tallies.entries) {
+      final id = entry.key;
+      final label = labels[id] ?? const [null, null, null];
+      final span = spans[id];
+      final reasonCounts =
+          (byReason[id] ?? const <String, int>{}).entries.toList()
+            ..sort((a, b) => b.value.compareTo(a.value));
+      sources.add(
+        SourceCoverage(
+          sourceId: id,
+          // An alert whose source row was deleted still happened, and hiding
+          // it would quietly shrink the denominator.
+          label: label[0] ?? label[1] ?? 'Unattached',
+          packageName: label[1],
+          institution: label[2],
+          parsed: entry.value['parsed'] ?? 0,
+          review: entry.value['review'] ?? 0,
+          error: entry.value['error'] ?? 0,
+          ignored: entry.value['ignored'] ?? 0,
+          parsers: Map.unmodifiable(byParser[id] ?? const <String, int>{}),
+          reasons: List.unmodifiable([
+            for (final item in reasonCounts) ReasonCount(item.key, item.value),
+          ]),
+          firstSeen: span == null
+              ? null
+              : DateTime.fromMillisecondsSinceEpoch(span[0], isUtc: true),
+          lastSeen: span == null
+              ? null
+              : DateTime.fromMillisecondsSinceEpoch(span[1], isUtc: true),
+        ),
+      );
+    }
+
+    // Worst first: this list is a queue of work, not a league table.
+    sources.sort((a, b) {
+      final unread = (b.review + b.error).compareTo(a.review + a.error);
+      if (unread != 0) return unread;
+      return b.total.compareTo(a.total);
+    });
+    return ParserHealth(sources: List.unmodifiable(sources));
   }
 
   /// Alerts that look like money but never reached an account, newest first.
@@ -1266,7 +1653,7 @@ final class LocalLedger {
         accountOverride: (row['account_id'] as String?) ?? accountId,
       );
       if (raw.accountId == null) continue;
-      final result = const NotificationParser().parseDetailed(
+      final result = _parser.parseDetailed(
         raw,
         assumeDirection: direction,
       );
@@ -1301,7 +1688,7 @@ final class LocalLedger {
     var parsed = 0;
     for (final row in rows) {
       final raw = _rawFromRow(row, accountOverride: accountId);
-      final result = const NotificationParser().parseDetailed(raw);
+      final result = _parser.parseDetailed(raw);
       final candidate = result.candidate;
       _db.execute(
         'UPDATE raw_observations SET account_id = ?, parse_status = ?, '
@@ -2481,11 +2868,21 @@ final class LocalLedger {
     // A shared source never lends its own account to an alert it could not
     // route: that is precisely how every bank's SMS ended up filed under
     // whichever account the messaging app happened to be attached to.
+    final attached = isSharedSource(packageName)
+        ? null
+        : sourceAccount?['account_id'] as String?;
+    // An app attached to one account speaks for that account. Wallets name
+    // the bank behind them in almost every message they send -- "Rs. 10,000
+    // loaded through Northbank-9001 linked account" -- and reading that
+    // mention
+    // as the subject filed a top-up of the wallet against the bank it came
+    // out of, which then read as income there. Only the text naming an
+    // account by its registered number outranks the attachment; a bank's
+    // name appearing in the sentence does not.
     final accountId =
-        routed?.accountId ??
-        (isSharedSource(packageName)
-            ? null
-            : sourceAccount?['account_id'] as String?);
+        (attached != null && routed?.namesAccountNumber != true)
+        ? attached
+        : (routed?.accountId ?? attached);
     final postedAt =
         (envelope['postedAt'] as num?)?.toInt() ??
         (envelope['postedAtEpochMs'] as num?)?.toInt() ??
@@ -2709,7 +3106,7 @@ final class LocalLedger {
     String payloadJson = '{}',
     String? contentHash,
   }) {
-    final result = const NotificationParser().parseDetailed(raw);
+    final result = _parser.parseDetailed(raw);
     final candidate = result.candidate;
     debugPrint(
       'SpendWiseNotif: parse pkg=${raw.sourcePackage} status=${result.status} '
@@ -2795,7 +3192,7 @@ final class LocalLedger {
     );
     for (final row in rows) {
       final raw = _rawFromRow(row, accountOverride: accountId);
-      final candidate = const NotificationParser().parseDetailed(raw).candidate;
+      final candidate = _parser.parseDetailed(raw).candidate;
       if (candidate == null) continue;
       _db.execute(
         "UPDATE raw_observations SET account_id = ?, parse_status = 'parsed', parse_error = NULL WHERE id = ?",
@@ -2985,26 +3382,49 @@ final class LocalLedger {
 
   OwnIdentity _ownIdentity() {
     final suffixes = <String, String>{};
+    final aliases = <String, Set<String>>{};
     for (final row in _db.select(
-      "SELECT id, account_suffix FROM accounts WHERE account_suffix IS NOT NULL AND account_suffix != ''",
+      '''
+      SELECT id, name, institution_name, account_suffix FROM accounts
+      WHERE account_suffix IS NOT NULL AND account_suffix != ''
+      ''',
     )) {
       final digits = (row['account_suffix'] as String).replaceAll(
         RegExp(r'\D'),
         '',
       );
-      if (digits.isNotEmpty) suffixes[row['id'] as String] = digits;
+      if (digits.isEmpty) continue;
+      final id = row['id'] as String;
+      suffixes[id] = digits;
+      // The words an alert would use for this account, longest first so
+      // "northbank ltd" is tried before "northbank". The first word of a
+      // multi-word institution is included because that is how the bank
+      // writes itself beside a number: "Northbank-9001", not
+      // "Northbank Ltd-9001".
+      final words = <String>{};
+      for (final label in [row['name'], row['institution_name']]) {
+        final value = (label as String?)?.trim() ?? '';
+        if (value.length < 3) continue;
+        words.add(value);
+        final head = value.split(RegExp(r'\s+')).first;
+        if (head.length >= 3) words.add(head);
+      }
+      aliases[id] = words;
     }
-    return OwnIdentity(names: ownNames.toSet(), accountSuffixes: suffixes);
+    return OwnIdentity(
+      names: ownNames.toSet(),
+      accountSuffixes: suffixes,
+      accountAliases: aliases,
+    );
   }
 
   void seedDemoData() {
     if (demoDataEnabled) return;
     _db.execute('BEGIN IMMEDIATE');
     try {
-      // Six accounts, deliberately unequal. Accounts draws each one to
-      // scale, so a seed with two similar balances shows none of that -- the
-      // ladder from a salary account down to a nearly-empty wallet is the
-      // thing worth demonstrating, in both zones.
+      // Five accounts on a deliberate ladder: Accounts draws each one to
+      // scale, so a seed with similar balances demonstrates none of that.
+      // Three to spend from, large down to nearly empty, and two put away.
       //
       // Nothing here is prefixed "Demo". Demo rows are tracked by id in
       // `demo_entities`, so the prefix bought nothing and cost every
@@ -3015,64 +3435,62 @@ final class LocalLedger {
         type: AccountType.bank,
         institutionName: 'Meezan Bank',
         accountSuffix: '4821',
-        openingBalanceMinor: 18500000,
-      );
-      final salary = addAccount(
-        name: 'UBL Salary',
-        type: AccountType.bank,
-        institutionName: 'UBL',
-        accountSuffix: '7719',
-        openingBalanceMinor: 12120000,
+        openingBalanceMinor: 10205000,
       );
       final wallet = addAccount(
         name: 'SadaPay',
         type: AccountType.wallet,
         institutionName: 'SadaPay',
         accountSuffix: '9012',
-        openingBalanceMinor: 2450000,
+        openingBalanceMinor: 2097000,
       );
       final pocket = addAccount(
         name: 'JazzCash',
         type: AccountType.wallet,
         institutionName: 'JazzCash',
         accountSuffix: '3388',
-        openingBalanceMinor: 400000,
+        openingBalanceMinor: 488000,
       );
       final emergency = addAccount(
         name: 'Emergency Fund',
         type: AccountType.savings,
         institutionName: 'Meezan Bank',
         accountSuffix: '5540',
-        openingBalanceMinor: 25000000,
+        openingBalanceMinor: 23600000,
       );
       final hajj = addAccount(
         name: 'Hajj Fund',
         type: AccountType.savings,
         institutionName: 'UBL',
         accountSuffix: '6612',
-        openingBalanceMinor: 8650000,
+        openingBalanceMinor: 8050000,
       );
       final now = DateTime.now();
       DateTime dayOf(int day, int hour) =>
           DateTime(now.year, now.month, day, hour);
 
-      // A month with enough in it to be worth drawing: several categories so
-      // the breakdown is a bar rather than a block, entries spread across the
-      // accounts so the Ledger is not one column of the same name, and one of
-      // each of the things the app exists to tell apart -- a transfer to
-      // savings, and money lent out that is still owed.
+      // The month is shaped to look like the app's own mark, because Home
+      // draws that mark with these figures in it: one wide branch of money
+      // still yours against one narrow branch of money gone. 152,600 in,
+      // 32,000 spent, 15,000 lent and 20,000 put away leaves roughly three
+      // quarters of the shape on the kept side, which is the proportion the
+      // logo holds.
+      //
+      // Spread across the accounts, and across enough categories, so the
+      // Ledger is not one column of the same name and the breakdown is a bar
+      // rather than a block.
       final transactionIds = <String>[
         addManualTransaction(
           kind: TransactionKind.income,
           amountMinor: 15260000,
           occurredAt: dayOf(1, 9),
-          accountId: salary,
+          accountId: bank,
           description: 'Salary',
           categoryId: 'income',
         ),
         addManualTransaction(
           kind: TransactionKind.expense,
-          amountMinor: 2800000,
+          amountMinor: 1500000,
           occurredAt: dayOf(2, 11),
           accountId: bank,
           description: 'Rent',
@@ -3080,17 +3498,17 @@ final class LocalLedger {
         ),
         addManualTransaction(
           kind: TransactionKind.transfer,
-          amountMinor: 1800000,
+          amountMinor: 1400000,
           occurredAt: dayOf(2, 12),
-          accountId: salary,
-          fromAccountId: salary,
+          accountId: bank,
+          fromAccountId: bank,
           toAccountId: emergency,
           description: 'Into the emergency fund',
           categoryId: 'transfer',
         ),
         addManualTransaction(
           kind: TransactionKind.expense,
-          amountMinor: 825000,
+          amountMinor: 425000,
           occurredAt: dayOf(4, 10),
           accountId: bank,
           description: 'K-Electric bill',
@@ -3098,7 +3516,7 @@ final class LocalLedger {
         ),
         addManualTransaction(
           kind: TransactionKind.expense,
-          amountMinor: 940000,
+          amountMinor: 540000,
           occurredAt: dayOf(5, 18),
           accountId: bank,
           description: 'Imtiaz Super Market',
@@ -3106,7 +3524,7 @@ final class LocalLedger {
         ),
         addManualTransaction(
           kind: TransactionKind.expense,
-          amountMinor: 600000,
+          amountMinor: 220000,
           occurredAt: dayOf(6, 8),
           accountId: bank,
           description: 'Shell fuel',
@@ -3114,7 +3532,7 @@ final class LocalLedger {
         ),
         addManualTransaction(
           kind: TransactionKind.transfer,
-          amountMinor: 1000000,
+          amountMinor: 500000,
           occurredAt: dayOf(7, 13),
           accountId: bank,
           fromAccountId: bank,
@@ -3124,7 +3542,7 @@ final class LocalLedger {
         ),
         addManualTransaction(
           kind: TransactionKind.expense,
-          amountMinor: 425000,
+          amountMinor: 147000,
           occurredAt: dayOf(8, 20),
           accountId: wallet,
           description: 'Foodpanda',
@@ -3132,7 +3550,7 @@ final class LocalLedger {
         ),
         addManualTransaction(
           kind: TransactionKind.expense,
-          amountMinor: 580000,
+          amountMinor: 280000,
           occurredAt: dayOf(9, 16),
           accountId: bank,
           description: 'Al-Fatah',
@@ -3147,39 +3565,42 @@ final class LocalLedger {
           categoryId: 'transport',
         ),
         addManualTransaction(
-          kind: TransactionKind.expense,
-          amountMinor: 242000,
-          occurredAt: dayOf(11, 19),
-          accountId: wallet,
-          description: 'Cafe with Hamza',
-          categoryId: 'food',
-        ),
-        addManualTransaction(
-          kind: TransactionKind.expense,
-          amountMinor: 500000,
-          occurredAt: dayOf(12, 15),
-          accountId: bank,
-          description: 'Doctor and pharmacy',
-          categoryId: 'health',
-        ),
-        addManualTransaction(
           kind: TransactionKind.transfer,
-          amountMinor: 700000,
+          amountMinor: 600000,
           occurredAt: dayOf(13, 10),
-          accountId: salary,
-          fromAccountId: salary,
+          accountId: bank,
+          fromAccountId: bank,
           toAccountId: hajj,
           description: 'Into the Hajj fund',
           categoryId: 'transfer',
         ),
       ];
 
+      // Money taken out of the bank is not money spent, and the cash bucket
+      // is where the app puts it. An empty one reading zero at the top of
+      // Accounts says nothing about that; a real balance shows the idea.
+      final cash = _existingCashAccount();
+      if (cash != null) {
+        transactionIds.add(
+          addManualTransaction(
+            kind: TransactionKind.transfer,
+            amountMinor: 1200000,
+            occurredAt: dayOf(11, 14),
+            accountId: bank,
+            fromAccountId: bank,
+            toAccountId: cash.id,
+            description: 'Cash withdrawal',
+            categoryId: 'transfer',
+          ),
+        );
+      }
+
       // Lent out, and not back yet. It is the one thing a bank alert cannot
       // tell from spending, so a ledger that never shows it demonstrates
       // nothing about the app's answer to it.
       final lent = addManualTransaction(
         kind: TransactionKind.expense,
-        amountMinor: 2000000,
+        amountMinor: 1500000,
         occurredAt: dayOf(3, 17),
         accountId: bank,
         description: 'To Hamza',
@@ -3201,7 +3622,7 @@ final class LocalLedger {
         [loan.id],
       );
 
-      for (final id in [bank, salary, wallet, pocket, emergency, hajj]) {
+      for (final id in [bank, wallet, pocket, emergency, hajj]) {
         _db.execute(
           "INSERT INTO demo_entities(entity_type,entity_id) VALUES ('account',?)",
           [id],
@@ -3806,7 +4227,15 @@ final class LocalLedger {
           'SELECT 1 FROM transactions WHERE id = ? AND locked = 1 LIMIT 1',
           [item.id],
         );
-        if (locked.isNotEmpty) continue;
+        if (locked.isNotEmpty) {
+          // The owner's answer is not to be rewritten -- but the evidence
+          // behind it is not the answer. A leg that arrives after somebody
+          // has already said what a transfer was is still the bank's own
+          // account of it, and dropping it leaves the entry unverifiable
+          // against a statement for no reason.
+          _linkEvidence(item);
+          continue;
+        }
         _insertTransaction(item);
       }
       for (final decision in result.decisions) {
@@ -3866,6 +4295,10 @@ final class LocalLedger {
         _now,
       ],
     );
+    _linkEvidence(item);
+  }
+
+  void _linkEvidence(CanonicalTransaction item) {
     for (final evidenceId in item.evidenceIds) {
       _db.execute(
         'INSERT OR IGNORE INTO transaction_evidence(transaction_id, observation_id) VALUES (?,?)',

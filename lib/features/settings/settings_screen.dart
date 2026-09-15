@@ -10,6 +10,7 @@ import '../../widgets/controller_scope.dart';
 import '../../widgets/spendwise_components.dart';
 import '../shell/spendwise_view_model.dart';
 import 'app_lock_screen.dart';
+import 'parser_health_screen.dart';
 import 'source_selection_screen.dart';
 import '../reports/report_screen.dart';
 import 'appearance_screen.dart';
@@ -99,6 +100,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   context,
                   MaterialPageRoute(
                     builder: (_) => SourceSelectionScreen(viewModel: viewModel),
+                  ),
+                ),
+              ),
+              const Divider(height: 1, indent: 56),
+              ListTile(
+                leading: const Icon(Icons.rule_rounded),
+                title: const Text('Reading accuracy'),
+                subtitle: const Text(
+                  'How much of each app SpendWise reads on its own',
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ParserHealthScreen(viewModel: viewModel),
                   ),
                 ),
               ),

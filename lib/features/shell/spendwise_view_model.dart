@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../app/home_period.dart';
 import '../../core/debt_kind.dart';
+import '../../data/parser_health.dart';
 export '../../app/home_period.dart';
 export '../../core/debt_kind.dart';
 
@@ -637,6 +638,10 @@ abstract class SpendWiseAdvancedViewModel implements SpendWiseViewModel {
   /// single account.
   bool isSharedSource(String packageName);
 
+  /// What the parser is managing, per source. Read fresh each time: it is
+  /// opened rarely and being a page behind would make it useless.
+  ParserHealth parserHealth();
+
   /// What was spent per category over one window, for a screen that resolves
   /// its own rather than taking the dashboard's.
   List<CategorySpendViewData> categorySpendingIn({
@@ -737,6 +742,8 @@ extension SpendWiseAdvancedAccess on SpendWiseViewModel {
       _advanced?.unroutedAlerts ?? const [];
   bool uiIsSharedSource(String packageName) =>
       _advanced?.isSharedSource(packageName) ?? false;
+  ParserHealth uiParserHealth() =>
+      _advanced?.parserHealth() ?? const ParserHealth(sources: []);
   Future<List<String>> uiDeclaredPermissions() =>
       _advanced?.declaredPermissions() ?? Future.value(const []);
   HomePeriod get uiHomePeriod =>

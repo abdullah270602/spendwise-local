@@ -10,6 +10,7 @@ import '../core/perf.dart';
 import '../core/source_label.dart';
 import '../data/ledger_exporter.dart';
 import '../data/local_ledger.dart';
+import '../data/parser_health.dart';
 import '../domain/domain.dart' as domain;
 import '../features/dashboard/home_savings.dart';
 import '../features/dashboard/home_widget_snapshot.dart';
@@ -1125,6 +1126,9 @@ final class SpendWiseController extends ChangeNotifier
   @override
   bool isSharedSource(String packageName) =>
       _ledger.isSharedSource(packageName);
+
+  @override
+  ParserHealth parserHealth() => _ledger.parserHealth();
 
   /// Not static: naming an app needs the live Android labels, and an alert
   /// that skips that step reaches Review as "com.google.android.apps.messaging",

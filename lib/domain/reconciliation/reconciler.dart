@@ -118,6 +118,10 @@ final class Reconciler {
     final transactions = <CanonicalTransaction>[];
     final decisions = <ReconciliationDecision>[];
     final consumed = <_Leg>{};
+    // Legs are paired first and filed second: pairing is what teaches the
+    // single-leg rules which bank code belongs to which account.
+    final unpaired = <_Unpaired>[];
+    final pairedAccounts = <_PairedText>[];
     for (final leg in legs) {
       if (consumed.contains(leg)) continue;
       final opposites = transferOptions[leg]!;
@@ -125,6 +129,11 @@ final class Reconciler {
         final other = opposites.single;
         if (!consumed.contains(other) && transferOptions[other]!.length == 1) {
           transactions.add(_transfer(leg, other));
+          // Each leg's text described the *other* account, so that is where
+          // its bank codes are recorded.
+          pairedAccounts
+            ..add(_PairedText(other.primary.accountId, _text(leg)))
+            ..add(_PairedText(leg.primary.accountId, _text(other)));
           decisions.add(
             _decision(
               ReconciliationDecisionType.pairTransfer,
@@ -140,7 +149,7 @@ final class Reconciler {
         }
       }
       final ambiguous = opposites.isNotEmpty;
-      transactions.add(_single(leg, needsReview: ambiguous));
+      unpaired.add(_Unpaired(leg, ambiguous));
       if (leg.candidates.length > 1) {
         decisions.add(
           _decision(
@@ -164,14 +173,98 @@ final class Reconciler {
       consumed.add(leg);
     }
 
+    // Every leg that found its partner has now told us something the next
+    // one cannot work out alone: which bank a stretch of IBAN belongs to.
+    // "S.OWNER PK11SBNKxx002" paired with an alert from the owner's other
+    // bank says PK11SBNK is that account -- so when the same owner's name
+    // turns up beside the same bank code weeks later and that bank sends
+    // nothing at all, the money has a named origin instead of appearing out
+    // of nowhere as income.
+    final bankCodes = <String, String>{};
+    for (final entry in pairedAccounts) {
+      for (final code in _bankCodes(entry.text)) {
+        bankCodes.update(
+          code,
+          (existing) => existing == entry.accountId ? existing : '',
+          ifAbsent: () => entry.accountId,
+        );
+      }
+    }
+    bankCodes.removeWhere((_, accountId) => accountId.isEmpty);
+
+    // A leg whose partner arrived *after* the owner had already answered.
+    //
+    // Banks do not settle together: one side alerts immediately, the other
+    // an hour later or not at all. Somebody who fixes the first alert by
+    // hand -- "this was a move to my other account" -- has answered the
+    // question, and their answer is locked. When the second leg finally
+    // turns up there is no longer a candidate for it to pair with, so it
+    // used to stand alone and post as income. The transfer was counted and
+    // then the same money was counted again as money earned: five thousand
+    // moved, ten thousand in the ledger.
+    //
+    // So a late leg that corroborates an answered transfer is filed as more
+    // evidence for it, not as a second event.
+    final settled = existing
+        .where(
+          (item) =>
+              item.kind == TransactionKind.transfer &&
+              (item.locked || item.origin == TransactionOrigin.manual),
+        )
+        .toList();
+    final lateEvidence = <String, Set<String>>{};
+    // Which account and direction each piece of evidence speaks for, so a
+    // transfer can tell whether a side is already accounted for.
+    final sideOfEvidence = <String, String>{
+      for (final leg in legs)
+        for (final id in leg.evidenceIds)
+          id: '${leg.primary.accountId}|${leg.primary.direction.name}',
+    };
+
+    for (final item in unpaired) {
+      final corroborated = _corroborates(item.leg, settled, sideOfEvidence);
+      if (corroborated != null) {
+        lateEvidence
+            .putIfAbsent(corroborated.id, () => <String>{})
+            .addAll(item.leg.evidenceIds);
+        decisions.add(
+          _decision(
+            ReconciliationDecisionType.pairTransfer,
+            [item.leg],
+            1,
+            [
+              'Late leg of a transfer the owner had already confirmed; '
+                  'attached as evidence rather than posted again.',
+            ],
+          ),
+        );
+        continue;
+      }
+      transactions.add(
+        _single(
+          item.leg,
+          needsReview: item.ambiguous,
+          bankCodes: bankCodes,
+        ),
+      );
+    }
+
     // User-created and locked records are immutable. Evidence may only attach
     // to an editable automatic transaction with the same stable identity.
     for (final old in existing) {
       final index = transactions.indexWhere((fresh) => fresh.id == old.id);
       if (index < 0) {
-        transactions.add(old);
+        final late = lateEvidence[old.id];
+        transactions.add(
+          late == null
+              ? old
+              : old.copyWith(evidenceIds: {...old.evidenceIds, ...late}),
+        );
       } else if (old.locked || old.origin == TransactionOrigin.manual) {
-        transactions[index] = old;
+        // The owner's answer stands; only the evidence behind it grows.
+        transactions[index] = old.copyWith(
+          evidenceIds: {...old.evidenceIds, ...?lateEvidence[old.id]},
+        );
       } else {
         transactions[index] = transactions[index].copyWith(
           evidenceIds: {...old.evidenceIds, ...transactions[index].evidenceIds},
@@ -197,8 +290,16 @@ final class Reconciler {
             _duplicateWindow(first, candidate)) {
       return false;
     }
-    if (first.reference != null || candidate.reference != null) {
-      return first.reference != null && first.reference == candidate.reference;
+    // Two references that disagree are two different payments, and that is
+    // the whole of what a reference can settle. A reference on one side and
+    // none on the other says nothing at all -- yet this used to read it as a
+    // mismatch and stop, which quietly made one whole class of duplicate
+    // impossible to detect: a bank's SMS always carries a TID and the wallet
+    // app reporting the same card tap never does, so every such pair was
+    // declared distinct before any other signal was looked at, and the
+    // payment landed in the ledger twice.
+    if (first.reference != null && candidate.reference != null) {
+      return first.reference == candidate.reference;
     }
     if (first.observation.evidenceFingerprint ==
         candidate.observation.evidenceFingerprint) {
@@ -208,16 +309,46 @@ final class Reconciler {
         first.observation.sourcePackage !=
             candidate.observation.sourcePackage ||
         first.observation.kind != candidate.observation.kind;
-    final sameCounterparty =
-        _normalized(first.counterparty).isNotEmpty &&
-        _normalized(first.counterparty) == _normalized(candidate.counterparty);
-    final sameDescription =
-        _normalized(first.description).isNotEmpty &&
-        _normalized(first.description) == _normalized(candidate.description);
     return distinctChannels &&
-        (sameCounterparty || sameDescription) &&
+        _namesTheSameParty(first, candidate) &&
         _difference(first.occurredAt, candidate.occurredAt) <=
             const Duration(seconds: 90);
+  }
+
+  /// Whether two legs are talking about the same shop or person.
+  ///
+  /// Compared across both fields rather than field-for-field, because two
+  /// apps rarely put a name in the same place: a bank's SMS names the
+  /// merchant as the counterparty, the wallet app reporting the same card tap
+  /// puts it in the notification's title and has no counterparty at all.
+  ///
+  /// One name containing the other counts, because the same shop arrives
+  /// spelled differently and usually truncated -- "CORNER BAKERY L" on the
+  /// SMS against "CORNER & BAKERY" from the wallet, which is the pair that
+  /// put one
+  /// payment into the ledger twice. Containment is allowed only from six
+  /// characters up, so a three-letter fragment cannot marry two unrelated
+  /// merchants, and only under everything demanded above: the same account,
+  /// the same direction, the same amount, two different apps, ninety
+  /// seconds.
+  bool _namesTheSameParty(EventCandidate a, EventCandidate b) {
+    final left = {
+      _normalized(a.counterparty),
+      _normalized(a.description),
+    }..removeWhere((value) => value.isEmpty);
+    final right = {
+      _normalized(b.counterparty),
+      _normalized(b.description),
+    }..removeWhere((value) => value.isEmpty);
+    for (final one in left) {
+      for (final other in right) {
+        if (one == other) return true;
+        final shorter = one.length <= other.length ? one : other;
+        final longer = identical(shorter, one) ? other : one;
+        if (shorter.length >= 6 && longer.contains(shorter)) return true;
+      }
+    }
+    return false;
   }
 
   Duration _duplicateWindow(EventCandidate a, EventCandidate b) =>
@@ -285,7 +416,108 @@ final class Reconciler {
       (ownIdentity.matchesOwnName(a.counterparty) ? 1 : 0) +
       (ownIdentity.matchesOwnName(b.counterparty) ? 1 : 0);
 
-  CanonicalTransaction _single(_Leg leg, {required bool needsReview}) {
+  /// The answered transfer this lone leg is the other half of, if any.
+  ///
+  /// The strictest rule in this file, because getting it wrong *hides* money
+  /// rather than duplicating it, and nothing on screen would ever say so. An
+  /// early, looser version of it swallowed a stranger's payment of the same
+  /// amount and a second payment out of the same account. Five conditions,
+  /// and every one of them earned:
+  ///
+  /// 1. The amount matches exactly.
+  /// 2. The leg is not already part of this transfer. The leg the owner
+  ///    corrected is still a candidate on every later run; it regenerates
+  ///    its own id and is preserved by the merge below, and absorbing it
+  ///    here would delete the entry into itself.
+  /// 3. It points the right way for one side of the transfer.
+  /// 4. That side is not already accounted for. Without this, a *second*
+  ///    payment out of the same account looks exactly like the first.
+  /// 5. The far side names the owner. This is what separates the other half
+  ///    of your own transfer from somebody else paying you the same amount
+  ///    in the same hour.
+  CanonicalTransaction? _corroborates(
+    _Leg leg,
+    List<CanonicalTransaction> settled,
+    Map<String, String> sideOfEvidence,
+  ) {
+    final item = leg.primary;
+    if (!ownIdentity.matchesOwnName(item.counterparty)) return null;
+    final side = '${item.accountId}|${item.direction.name}';
+    final window = ownAccountTransferWindow > transferWindow
+        ? ownAccountTransferWindow
+        : transferWindow;
+
+    final matches = settled.where((transfer) {
+      if (transfer.amount != item.amount) return false;
+      if (_difference(transfer.occurredAt, item.occurredAt) > window) {
+        return false;
+      }
+      if (transfer.evidenceIds.intersection(leg.evidenceIds).isNotEmpty) {
+        return false;
+      }
+      final belongs = item.direction == EntryDirection.debit
+          ? transfer.fromAccountId == item.accountId
+          : transfer.toAccountId == item.accountId;
+      if (!belongs) return false;
+      final covered = transfer.evidenceIds
+          .map((id) => sideOfEvidence[id])
+          .whereType<String>()
+          .toSet();
+      return !covered.contains(side);
+    }).toList();
+
+    // Two answered transfers of the same amount between the same accounts
+    // inside the window: nothing here can say which one this belongs to,
+    // and guessing would hide a real second movement.
+    return matches.length == 1 ? matches.single : null;
+  }
+
+  /// The text of every alert behind a leg, so a rule may read what the bank
+  /// actually wrote and not only the fields the parser lifted out of it.
+  String _text(_Leg leg) => leg.candidates
+      .map(
+        (item) => [
+          item.observation.title ?? '',
+          item.observation.body,
+          item.counterparty ?? '',
+        ].join(' '),
+      )
+      .join(' ');
+
+  /// The one other account of the owner's that this leg's own text names
+  /// outright, or null when it names none or names more than one.
+  ///
+  /// More than one is the case that matters: three wallets opened against the
+  /// same phone number carry the same four-digit tail, so a message quoting
+  /// it names all three and therefore none of them.
+  String? _namedOppositeAccount(_Leg leg) {
+    final named = ownIdentity
+        .accountsNamedWithNumber(_text(leg))
+        .where((id) => id != leg.primary.accountId)
+        .toSet();
+    return named.length == 1 ? named.single : null;
+  }
+
+  /// The bank-identifying head of every IBAN in a piece of text.
+  ///
+  /// An IBAN opens with a country code, two check digits and the bank's own
+  /// identifier -- "PK11SBNK..." -- and banks print that head even when they
+  /// mask everything after it. The head alone says which bank, never which
+  /// customer, which is exactly why it is only ever used alongside a name.
+  static final RegExp _ibanHead = RegExp(
+    r'(?<![A-Za-z0-9])([A-Z]{2}[0-9]{2}[A-Z]{4})[0-9A-Zx*\u2022]*',
+    caseSensitive: false,
+  );
+
+  Iterable<String> _bankCodes(String text) => _ibanHead
+      .allMatches(text)
+      .map((match) => match.group(1)!.toUpperCase());
+
+  CanonicalTransaction _single(
+    _Leg leg, {
+    required bool needsReview,
+    Map<String, String> bankCodes = const {},
+  }) {
     final item = leg.primary;
     // Money withdrawn as cash did not leave the owner, it changed pocket. It
     // is the one transfer the app asserts from a single alert rather than by
@@ -312,6 +544,64 @@ final class Reconciler {
             : ReconciliationState.probable,
       );
     }
+    // One alert can name both ends by itself. A wallet top-up says which
+    // account funded it -- "Rs. 10,000 loaded through Northbank-9001 linked
+    // account" -- and the funding bank sends nothing at all, so the opposing
+    // leg the pairing pass is waiting for will never arrive. Booking it as
+    // income was not merely a missing transfer: it counted money the owner
+    // already had as money they had just earned.
+    // Second way one alert names both ends: the owner's own name beside a
+    // bank code already proven to be one of their accounts. Both halves are
+    // required and neither is optional -- a bank code on its own belongs to
+    // every customer of that bank, so "R.STRANGER PK11SBNKxx070" is a payment
+    // to a stranger who banks where the owner also banks, and reading it as
+    // a transfer would hide real money leaving.
+    final viaBankCode = ownIdentity.matchesOwnName(item.counterparty)
+        ? _bankCodes(_text(leg))
+              .map((code) => bankCodes[code])
+              .whereType<String>()
+              .where((id) => id != item.accountId)
+              .toSet()
+        : const <String>{};
+
+    final opposite =
+        _namedOppositeAccount(leg) ??
+        (viaBankCode.length == 1 ? viaBankCode.single : null);
+    if (opposite != null) {
+      final incoming = item.direction == EntryDirection.credit;
+      return CanonicalTransaction(
+        id: _stableId('self', [
+          item.accountId,
+          opposite,
+          item.direction.name,
+          '${item.amount.minorUnits}',
+          _identity(leg),
+        ]),
+        kind: TransactionKind.transfer,
+        amount: item.amount,
+        occurredAt: _earliest(leg.candidates),
+        evidenceIds: leg.evidenceIds,
+        fromAccountId: incoming ? opposite : item.accountId,
+        toAccountId: incoming ? item.accountId : opposite,
+        description: item.description,
+        needsReview: needsReview || item.confidence < 0.8,
+        reconciliationState: needsReview || item.confidence < 0.8
+            ? ReconciliationState.needsReview
+            : ReconciliationState.probable,
+      );
+    }
+
+    // Money arriving from the account holder themselves, with no opposing leg
+    // to pair it against. It is almost certainly their own money moving --
+    // the far side simply did not send an alert, which is routine -- but
+    // nothing here says which account it left, so there is no transfer to
+    // assert. What must not happen is the old behaviour: filing it as income
+    // at full confidence, which inflated a month by the whole amount and gave
+    // the owner nothing to notice. Asking is cheap; the question is precise.
+    final fromSelf =
+        item.direction == EntryDirection.credit &&
+        ownIdentity.matchesOwnName(item.counterparty);
+
     return CanonicalTransaction(
       id: _stableId('single', [
         item.accountId,
@@ -327,8 +617,8 @@ final class Reconciler {
       evidenceIds: leg.evidenceIds,
       accountId: item.accountId,
       description: item.description,
-      needsReview: needsReview || item.confidence < 0.8,
-      reconciliationState: needsReview || item.confidence < 0.8
+      needsReview: needsReview || fromSelf || item.confidence < 0.8,
+      reconciliationState: needsReview || fromSelf || item.confidence < 0.8
           ? ReconciliationState.needsReview
           : (leg.candidates.length > 1
                 ? ReconciliationState.confirmed
@@ -437,6 +727,21 @@ final class Reconciler {
       reasons: reasons,
     );
   }
+}
+
+/// A leg that found no partner, held back until pairing has finished.
+final class _Unpaired {
+  const _Unpaired(this.leg, this.ambiguous);
+  final _Leg leg;
+  final bool ambiguous;
+}
+
+/// The text of one half of a confirmed transfer, against the account that
+/// half was describing.
+final class _PairedText {
+  const _PairedText(this.accountId, this.text);
+  final String accountId;
+  final String text;
 }
 
 final class _Leg {

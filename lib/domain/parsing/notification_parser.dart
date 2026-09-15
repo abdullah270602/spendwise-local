@@ -1,24 +1,48 @@
 import '../../core/money.dart';
+import '../../core/money_text.dart';
 import '../models/event_candidate.dart';
 import '../models/raw_observation.dart';
 import '../parsers/pakistan/default_parsers.dart';
 import 'parser_definition.dart';
 
 final class NotificationParser {
-  const NotificationParser({this.registry});
+  const NotificationParser({this.registry, this.currencies = const {'PKR'}});
   final ParserRegistry? registry;
 
-  static final RegExp _moneyPattern = RegExp(
-    r'(?<![A-Za-z])(?:[+-]\s*)?(?:PKR|Rs\.?|₨)\s*[+-]?\s*(?:(?:\d{1,3}(?:,\d{3})+)|\d+)(?:\.\d{1,2})?',
-    caseSensitive: false,
-  );
+  /// The currencies the owner actually holds.
+  ///
+  /// Used only to settle a shared marker: "Rs" names four currencies in
+  /// general and exactly one for somebody with a single Pakistani account.
+  /// A marker that names a currency outright is read whether or not it is
+  /// in this set, because a dollar charge on a rupee card is still a real
+  /// charge.
+  final Set<String> currencies;
+
+  MoneyTextReader get _money => MoneyTextReader(currencies: currencies);
+
   // Bank SMS nearly always quote the running balance beside the transaction
   // amount ("...debited PKR 80. Avl Bal: PKR 12,345"). Matched against the
   // text *preceding* an amount: a balance label, then anything but a digit,
   // so "Bal: ", "Avbl Bal ", and "new balance is Rs. " all qualify while an
   // earlier, unrelated number cannot be skipped over.
+  /// Labels a bank puts in front of a figure that is not the payment.
+  ///
+  /// Every term here was counted in a corpus of 9,874 real transactional
+  /// messages from 25 banks, not guessed. The list used to be `bal` or
+  /// `balance` alone, and the single commonest label in that corpus --
+  /// "Avlbl Amt", 1,212 occurrences -- contains neither: one bank's
+  /// standard message quotes the payment, then "Total Bal", then "Avlbl
+  /// Amt", so one of the two balances was always left in and the alert was
+  /// thrown out as having two amounts. That single gap accounted for 73%
+  /// of everything the parser could not read.
+  ///
+  /// "Amount" needs the availability word in front of it, because a bare
+  /// "amount of Rs.X has been debited" is the payment itself.
   static final RegExp _balanceLabelBefore = RegExp(
-    r'\bbal(?:ance)?\b[^0-9]{0,15}$',
+    r'(?:\bbal(?:ance)?\b'
+    r'|\b(?:avl|avbl|avlbl|aval|avail|available|remaining|closing|opening)\.?\s*(?:amt|amount|lmt|limit)\b'
+    r'|\b(?:credit\s+)?(?:lmt|limit)\b)'
+    r'[^0-9]{0,15}$',
     caseSensitive: false,
   );
 
@@ -76,13 +100,32 @@ final class NotificationParser {
     // "credited to <someone> from your account" is money leaving. Marking
     // the source side as a debit signal makes such wording read as
     // contradictory, so it goes to review instead of being booked as income.
-    r'from\s+your\s+(?:account|a\/?c))\b',
+    // Banks abbreviate, and "frm A/c X to Y" is money leaving just as
+    // plainly as "from your account". Without the short form, one
+    // bank's entire internet-banking receipt read as having no
+    // direction at all.
+    r'(?:from|frm)\s+(?:your\s+)?(?:a\/?c|acct|account)\b)',
     caseSensitive: false,
   );
   // "Credit Card" names the instrument, not the direction. Counting it as
   // money-in filed card purchases as income.
   static final RegExp _creditWords = RegExp(
-    r'\b(?:credited|received|deposited|refunded|transfer(?:red)?\s+from|'
+    // "transferred from" is money arriving only when what follows is a
+    // person. "Rs.X transferred from A/c ...1234 to:UPI/567" is money
+    // leaving, and reading it both ways at once made one bank's
+    // commonest message contradict itself -- 797 alerts in a 25-bank
+    // corpus, every one of them a payment the owner had made.
+    r'\b(?:credited|received|deposited|refunded|'
+    r'transfer(?:red)?\s+from(?!\s+(?:your\s+)?(?:a\/?c|acct|account)\b)|'
+    // A wallet reports money arriving from a linked bank in its own
+    // words: "Rs. 10,000 loaded through Northbank-9001 linked account".
+    // Nothing in that sentence is a banking verb, so the alert used to
+    // read as having no direction at all and went unparsed. The
+    // preposition is what settles it, and why this is not simply the word
+    // "loaded": "topped up WITH Rs.500" is money leaving, and stays a
+    // debit above.
+    r'(?:loaded|funded|top(?:ped)?(?:\s*-?\s*up)?|added)\s+'
+    r'(?:through|from|via|using)\b|'
     r'credit(?!\s+card\b))\b',
     caseSensitive: false,
   );
@@ -137,6 +180,13 @@ final class NotificationParser {
   /// alert reports a settlement that already occurred.
   static final RegExp _settlementWords = RegExp(
     r'\b(?:debited|credited|withdrawn|deposited|purchased?|'
+    // "sent" belongs here and its absence was expensive. A message
+    // carrying a link is treated as marketing unless it also reports a
+    // settlement, and a wallet's standard receipt -- "Rs.25 sent to X
+    // from your a/c. View your past payments at https://..." -- says
+    // "sent" and nothing else. Measured on a corpus of 25 banks, that
+    // one missing word discarded 201 real payments as advertising.
+    r'sent|'
     r'paid|spent|charged|received|transferred|refunded|'
     r'avbl\s*bal|available\s+balance|closing\s+balance)\b',
     caseSensitive: false,
@@ -300,7 +350,7 @@ final class NotificationParser {
         confidence: 0,
         reasons: [
           if (amountMatches.isEmpty)
-            'No PKR amount was found in this alert.'
+            'No amount was found in this alert.'
           else
             'Found ${amountMatches.length} amounts and could not tell which is the transaction.',
         ],
@@ -311,13 +361,13 @@ final class NotificationParser {
       final result = _applyDefinition(
         definition,
         observation,
-        amountMatches.single.group(0)!,
+        amountMatches.single.money,
       );
       if (result != null) return result;
     }
 
-    final money = Money.tryParsePkr(amountMatches.single.group(0)!);
-    if (money == null || money.isZero) {
+    final money = amountMatches.single.money;
+    if (money.isZero) {
       return const ParserResult(
         status: ParseStatus.invalid,
         parserId: 'pk.generic.fallback',
@@ -330,7 +380,17 @@ final class NotificationParser {
     final hasDebit = _debitWords.hasMatch(text) || money.isNegative;
     final hasCredit =
         _creditWords.hasMatch(text) ||
-        amountMatches.single.group(0)!.trimLeft().startsWith('+');
+        // A leading plus is a direction signal in its own right, and in much
+        // of the world it is the *only* one: a terse log line says "+1,500
+        // RUB" and nothing else. Read from the matched span rather than from
+        // a parsed sign, because the sign may sit either side of the marker.
+        text
+            .substring(
+              amountMatches.single.start,
+              amountMatches.single.end,
+            )
+            .trimLeft()
+            .startsWith('+');
     if (hasDebit == hasCredit && assumeDirection == null) {
       return ParserResult(
         status: ParseStatus.ambiguous,
@@ -465,8 +525,8 @@ final class NotificationParser {
   /// Amounts that could be the transaction itself, with balance figures set
   /// aside. Falls back to every match when filtering leaves nothing, so an
   /// unusual phrasing degrades to "ambiguous" rather than to a wrong read.
-  static List<RegExpMatch> _transactionAmounts(String text) {
-    final all = _moneyPattern.allMatches(text).toList();
+  List<MoneyMatch> _transactionAmounts(String text) {
+    final all = _money.findAll(text);
     if (all.length <= 1) return all;
     final withoutBalances = all
         .where(
@@ -497,7 +557,7 @@ final class NotificationParser {
   ParserResult? _applyDefinition(
     ParserDefinition definition,
     RawObservation observation,
-    String transactionAmountText,
+    Money transactionAmount,
   ) {
     final text =
         observation.snapshot?.combinedText ??
@@ -519,8 +579,10 @@ final class NotificationParser {
       // 20,000"). The prescreen already set balance figures aside and left
       // exactly one plausible transaction amount, so that value wins; the
       // rule still supplies direction, counterparty, and reference.
-      final ruleAmount = Money.tryParsePkr(named(rule.amountGroup) ?? '');
-      final amount = Money.tryParsePkr(transactionAmountText) ?? ruleAmount;
+      final ruleAmount = _money
+          .findOnly(named(rule.amountGroup) ?? '')
+          ?.money;
+      final amount = transactionAmount.isZero ? ruleAmount : transactionAmount;
       if (amount == null || amount.isZero) continue;
       final candidate = EventCandidate(
         id: 'candidate:${observation.id}',
