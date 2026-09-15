@@ -20,6 +20,16 @@ class _ManualTransactionSheetState extends State<ManualTransactionSheet> {
   final note = TextEditingController();
   TransactionKind kind = TransactionKind.expense;
   String? accountId;
+
+  /// The currency of the account this entry is being filed against, so
+  /// the field is labelled and parsed as the same thing. It used to be
+  /// labelled with the account's currency and parsed as rupees.
+  String get _currency =>
+      widget.viewModel.accounts
+          .where((account) => account.id == accountId)
+          .firstOrNull
+          ?.currency ??
+      'PKR';
   String? toAccountId;
   String category = 'Other';
   bool saving = false;
@@ -100,12 +110,15 @@ class _ManualTransactionSheetState extends State<ManualTransactionSheet> {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Amount',
-                    prefixText: 'PKR ',
+                    prefixText: '$_currency ',
                   ),
                   validator: (v) {
-                    final parsed = Money.tryParsePkr('PKR ${v ?? ''}');
+                    final parsed = Money.tryParseTyped(
+                      v ?? '',
+                      currency: _currency,
+                    );
                     return parsed == null || parsed.isZero || parsed.isNegative
                         ? 'Enter a positive amount (up to 2 decimals)'
                         : null;
@@ -183,7 +196,10 @@ class _ManualTransactionSheetState extends State<ManualTransactionSheet> {
   Future<void> _save() async {
     if (!formKey.currentState!.validate()) return;
     setState(() => saving = true);
-    final units = Money.parsePkr('PKR ${amount.text}').minorUnits;
+    final units = Money.tryParseTyped(
+      amount.text,
+      currency: _currency,
+    )!.minorUnits;
     try {
       await widget.viewModel.saveManualTransaction(
         ManualTransactionDraft(

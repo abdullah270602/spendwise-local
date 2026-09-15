@@ -470,6 +470,11 @@ class _LandingState extends State<_Landing> {
   static const types = ['Bank', 'Wallet', 'Cash', 'Credit card', 'Savings'];
 
   SpendWiseViewModel get viewModel => widget.viewModel;
+  /// The currency this first account will be opened in. There is no
+  /// account to read it from yet, and an existing one is the best
+  /// available answer -- a second account is rarely in a new currency.
+  String get _openingCurrency =>
+      viewModel.accounts.firstOrNull?.balance.currency ?? 'PKR';
 
   @override
   void dispose() {
@@ -481,7 +486,13 @@ class _LandingState extends State<_Landing> {
 
   Future<void> _add() async {
     if (!formKey.currentState!.validate()) return;
-    final opening = Money.tryParsePkr('PKR ${balance.text.trim()}');
+    // Onboarding has no account yet, so the ledger's own currency stands
+    // in. It is PKR today; it is a setting the moment a second country is
+    // supported, and this reads it rather than assuming it.
+    final opening = Money.tryParseTyped(
+      balance.text.trim(),
+      currency: _openingCurrency,
+    );
     setState(() => saving = true);
     try {
       await viewModel.uiAddDetailedAccount(
@@ -608,14 +619,18 @@ class _LandingState extends State<_Landing> {
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Balance now',
-                prefixText: 'PKR ',
+                prefixText: '$_openingCurrency ',
               ),
               validator: (value) {
                 final text = (value ?? '').trim();
                 if (text.isEmpty) return null;
-                return Money.tryParsePkr('PKR $text') == null
+                return Money.tryParseTyped(
+                      text,
+                      currency: _openingCurrency,
+                    ) ==
+                    null
                     ? 'Not an amount'
                     : null;
               },

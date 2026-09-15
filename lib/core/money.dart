@@ -1,3 +1,5 @@
+import 'currency.dart';
+
 /// An exact monetary value stored as minor units (paisa for PKR).
 final class Money implements Comparable<Money> {
   const Money({required this.minorUnits, this.currency = 'PKR'})
@@ -12,31 +14,44 @@ final class Money implements Comparable<Money> {
   bool get isZero => minorUnits == 0;
   Money get absolute => Money(minorUnits: minorUnits.abs(), currency: currency);
 
-  /// Parses explicit Pakistani-rupee amounts such as `PKR 10,000`,
-  /// `Rs. 1,250.50`, and `-PKR 500`. Bare numbers and malformed grouping are
-  /// deliberately rejected so notification prose is not mistaken for money.
-  static Money? tryParsePkr(String input) {
+  /// Reads an amount a person typed into a field, in the currency that
+  /// field is labelled with.
+  ///
+  /// Separate from reading a bank's sentence, which is [MoneyTextReader]'s
+  /// job: there is no marker to find and no ambiguity about which currency
+  /// is meant, because the field says so. What there is, and what the old
+  /// code got wrong, is how many minor units the currency has. Every typed
+  /// amount was multiplied by a hundred, so a yen balance was entered a
+  /// hundred times too large and a dinar balance ten times too small -- in
+  /// a field that was already displaying the right currency code beside it.
+  static Money? tryParseTyped(String input, {required String currency}) {
+    final digits = minorDigitsFor(currency);
+    // A currency with no minor unit cannot take a decimal at all, and
+    // `{1,0}` is not a valid quantifier, so the fraction group only exists
+    // when there is a fraction to hold.
+    final fraction = digits == 0 ? '' : '(?:[.,](\\d{1,$digits}))?';
     final match = RegExp(
-      r'^\s*([+-])?\s*(?:PKR|Rs\.?|₨)\s*([+-])?\s*((?:\d{1,3}(?:,\d{3})+)|\d+)(?:\.(\d{1,2}))?\s*$',
-      caseSensitive: false,
+      '^\\s*([+-])?\\s*((?:\\d{1,3}(?:,\\d{3})+)|\\d+)'
+      '$fraction'
+      '\\s*\$',
     ).firstMatch(input);
     if (match == null) return null;
-    final leadingSign = match.group(1);
-    final trailingSign = match.group(2);
-    if (leadingSign != null && trailingSign != null) return null;
-    final whole = int.tryParse(match.group(3)!.replaceAll(',', ''));
+    final whole = int.tryParse(match.group(2)!.replaceAll(',', ''));
     if (whole == null) return null;
-    final fractionText = match.group(4);
-    final fraction = fractionText == null
+    final fractionText = digits == 0 ? null : match.group(3);
+    final minor = fractionText == null
         ? 0
-        : int.parse(fractionText.padRight(2, '0'));
-    final sign = (leadingSign ?? trailingSign) == '-' ? -1 : 1;
-    return Money.pkr(sign * ((whole * 100) + fraction));
+        : int.parse(fractionText.padRight(digits, '0'));
+    var multiplier = 1;
+    for (var i = 0; i < digits; i++) {
+      multiplier *= 10;
+    }
+    final sign = match.group(1) == '-' ? -1 : 1;
+    return Money(
+      minorUnits: sign * ((whole * multiplier) + minor),
+      currency: currency,
+    );
   }
-
-  static Money parsePkr(String input) =>
-      tryParsePkr(input) ??
-      (throw FormatException('Invalid PKR amount', input));
 
   Money operator +(Money other) {
     _requireSameCurrency(other);

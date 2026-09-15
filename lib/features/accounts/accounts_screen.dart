@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../app/failure_text.dart';
 import '../../app/theme.dart';
+import '../../core/currency.dart';
 import '../../core/money.dart';
 import '../../widgets/controller_scope.dart';
 import '../../widgets/shape_kit.dart';
@@ -16,6 +17,18 @@ import '../shell/spendwise_view_model.dart';
 /// is its share of the total, so the account holding most of it is literally
 /// the largest thing on screen. `Map / Plain` swaps in a straight list for a
 /// clean view, and the choice sticks.
+/// What a valid amount looks like in this currency.
+///
+/// Not always two decimals: a yen or a won takes none, and a dinar takes
+/// three. The field used to say "up to 2 decimals" whatever it was
+/// labelled with, and then rejected what it had just asked for.
+String _amountHint(String currency) {
+  final digits = minorDigitsFor(currency);
+  return digits == 0
+      ? 'Enter a whole number of $currency'
+      : 'Enter a valid amount with up to $digits decimals';
+}
+
 class AccountsScreen extends StatefulWidget {
   const AccountsScreen({super.key, required this.viewModel});
 
@@ -527,8 +540,12 @@ class _AccountsScreenState extends State<AccountsScreen> {
                         prefixText: '${account.currency} ',
                       ),
                       validator: (value) =>
-                          Money.tryParsePkr('PKR ${value ?? ''}') == null
-                          ? 'Enter a valid amount with up to 2 decimals'
+                          Money.tryParseTyped(
+                            value ?? '',
+                            currency: account.currency,
+                          ) ==
+                              null
+                          ? _amountHint(account.currency)
                           : null,
                     ),
                   ],
@@ -546,8 +563,9 @@ class _AccountsScreenState extends State<AccountsScreen> {
                       ? null
                       : () async {
                           if (!adjustmentKey.currentState!.validate()) return;
-                          final parsed = Money.tryParsePkr(
-                            'PKR ${balance.text}',
+                          final parsed = Money.tryParseTyped(
+                            balance.text,
+                            currency: account.currency,
                           )!;
                           setDialogState(() => adjusting = true);
                           try {
@@ -997,11 +1015,15 @@ class _AccountsScreenState extends State<AccountsScreen> {
                       ],
                       decoration: const InputDecoration(
                         labelText: 'Opening balance',
-                        prefixText: 'PKR ',
+                        prefixText: '$currency ',
                       ),
                       validator: (value) =>
-                          Money.tryParsePkr('PKR ${value ?? ''}') == null
-                          ? 'Enter a valid amount with up to 2 decimals'
+                          Money.tryParseTyped(
+                            value ?? '',
+                            currency: currency,
+                          ) ==
+                              null
+                          ? _amountHint(currency)
                           : null,
                     ),
                     if (viewModel.sources.isNotEmpty) ...[
@@ -1058,8 +1080,9 @@ class _AccountsScreenState extends State<AccountsScreen> {
                             ? null
                             : () async {
                                 if (!formKey.currentState!.validate()) return;
-                                final parsed = Money.tryParsePkr(
-                                  'PKR ${balance.text}',
+                                final parsed = Money.tryParseTyped(
+                                  balance.text,
+                                  currency: currency,
                                 );
                                 if (parsed != null) {
                                   setState(() => saving = true);
