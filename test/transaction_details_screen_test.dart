@@ -38,6 +38,15 @@ void main() {
     isSettled: false,
   );
 
+  /// The three stories live behind one hairline disclosure now rather than
+  /// as three permanent buttons, so nothing under it exists until it opens.
+  Future<void> openWhoseMoney(WidgetTester tester) async {
+    await tester.ensureVisible(find.text('Whose money was this?'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Whose money was this?'));
+    await tester.pumpAndSettle();
+  }
+
   Widget host(_FakeViewModel model, TransactionViewData tx) => MaterialApp(
     theme: SpendWiseTheme.dark,
     home: TransactionDetailsScreen(viewModel: model, transaction: tx),
@@ -96,16 +105,25 @@ void main() {
   });
 
   testWidgets(
-    'the third story is offered up front, not only after a wrong guess',
+    'the two stories the direction allows are offered, and not the third',
     (tester) async {
+      // This used to assert all three were on screen at once, which was the
+      // defect underneath it: three permanent full-width buttons meant money
+      // *arriving* in an account was offered "I lent it out". A bank alert
+      // cannot tell spending from lending, but it can tell which way the
+      // money went, and that rules one of the three out every time.
       final model = _FakeViewModel(debts: const []);
       await tester.pumpWidget(host(model, transaction()));
       await tester.pumpAndSettle();
 
-      // All three, visible without tapping anything first.
-      expect(find.text('I lent it out'), findsOneWidget);
+      await openWhoseMoney(tester);
       expect(find.text('I borrowed it'), findsOneWidget);
       expect(find.text("I'm holding it for someone"), findsOneWidget);
+      expect(
+        find.text('I lent it out'),
+        findsNothing,
+        reason: 'this money arrived; it cannot be money the owner lent out',
+      );
     },
   );
 
@@ -116,6 +134,7 @@ void main() {
     await tester.pumpWidget(host(model, transaction()));
     await tester.pumpAndSettle();
 
+    await openWhoseMoney(tester);
     await tester.ensureVisible(find.text("I'm holding it for someone"));
     await tester.pumpAndSettle();
     await tester.tap(find.text("I'm holding it for someone"));
@@ -218,22 +237,25 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
 
-    // Opening the one piece of evidence is the widest this screen gets.
+    // Opening the evidence is the widest this screen gets. It used to be a
+    // per-item tile with its own chevron; it is one hairline row at the foot
+    // of the page now, and every alert behind it is drawn open.
+    //
     // Scrolled to rather than found outright: a plain ListView still only
-    // mounts the sliver children near the viewport, so the evidence card
-    // below the fold does not exist in the tree until something scrolls it
-    // into range.
+    // mounts the sliver children near the viewport, so the row below the
+    // fold does not exist in the tree until something scrolls it into range.
     await tester.dragUntilVisible(
-      find.text('Meezan Bank notification'),
+      find.text('Where this came from'),
       find.byType(Scrollable),
       const Offset(0, -200),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Meezan Bank notification'));
+    await tester.tap(find.text('Where this came from'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
+    expect(find.text('Meezan Bank notification'), findsOneWidget);
     // Title and body of the raw evidence share one Text node, so this
-    // opened the tile rather than merely finding a header still collapsed.
+    // opened the row rather than merely finding it still collapsed.
     expect(find.textContaining('Debit alert'), findsOneWidget);
   });
 }

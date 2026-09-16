@@ -18,7 +18,6 @@ enum DebtKind {
   lent(
     id: 'lent',
     title: 'I lent it out',
-    detail: 'It went out, and it is coming back. Still yours meanwhile.',
     categoryId: 'lent',
     categoryName: 'Lent out',
     partyLabel: 'Who owes you',
@@ -29,7 +28,6 @@ enum DebtKind {
   borrowed(
     id: 'borrowed',
     title: 'I borrowed it',
-    detail: 'It came in and goes back later. Yours to spend until then.',
     categoryId: 'borrowed',
     categoryName: 'Borrowed',
     partyLabel: 'Who you owe',
@@ -40,9 +38,6 @@ enum DebtKind {
   holding(
     id: 'holding',
     title: "I'm holding it for someone",
-    detail:
-        'It landed in your account but it is not yours to spend. Passing it '
-        'on is not spending, and it stays out of what you can spend.',
     categoryId: 'holding',
     categoryName: 'Held for someone',
     partyLabel: 'Who it belongs to',
@@ -52,7 +47,6 @@ enum DebtKind {
   const DebtKind({
     required this.id,
     required this.title,
-    required this.detail,
     required this.categoryId,
     required this.categoryName,
     required this.partyLabel,
@@ -61,7 +55,6 @@ enum DebtKind {
 
   final String id;
   final String title;
-  final String detail;
   final String categoryId;
   final String categoryName;
 

@@ -118,8 +118,10 @@ class _MarkLoanSheetState extends State<_MarkLoanSheet> {
           const Eyebrow('Whose money was it'),
           const SizedBox(height: 8),
           // Three stacked rather than side by side: a third option does not
-          // fit across a 360dp phone without the labels turning to stumps,
-          // and the difference between them lives in the detail line.
+          // fit across a 360dp phone without the labels turning to stumps.
+          // Each is its own sentence already -- "I lent it out" says the
+          // whole thing, and the line of explanation that used to sit under
+          // it only restated the title at greater length.
           for (final option in DebtKind.values)
             _KindRow(
               kind: option,
@@ -252,22 +254,12 @@ class _KindRow extends StatelessWidget {
                 ),
               ),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      kind.title,
-                      style: SpendWiseType.rowStrong.copyWith(
-                        fontSize: 14,
-                        color: selected ? tone : SpendWiseColors.fg,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      kind.detail,
-                      style: SpendWiseType.body.copyWith(fontSize: 12),
-                    ),
-                  ],
+                child: Text(
+                  kind.title,
+                  style: SpendWiseType.rowStrong.copyWith(
+                    fontSize: 14,
+                    color: selected ? tone : SpendWiseColors.fg,
+                  ),
                 ),
               ),
             ],

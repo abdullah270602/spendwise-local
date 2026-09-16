@@ -214,10 +214,19 @@ in `AGENTS.md`. In particular:
   hairlines. They were redrawn flat in one pass and the owner asked for the
   boxy version back after seeing it on the device. `AGENTS.md` says not to
   redo it; a review will keep proposing it.
-- The transaction details screen and the debt sheets follow the same rule, and
-  all three debt stories are offered where the record is made. Deleting from a
-  transaction's own screen offers the same Undo the Review inbox does, and
-  "Not a loan" — which discards a debt's whole history — asks first.
+- The transaction details screen and the debt sheets follow the same rule. The
+  entry screen is a receipt: the kind on one eyebrow, the title, the figure,
+  one mono line of category and time, then the balance either side worked
+  downward, and everything else behind hairline disclosures at the foot. It
+  states no fact twice — it used to state the type twice, the category twice
+  and the account three times — and a test counts the mentions. "Whose money
+  was this?" is one folded question offering the two stories the direction
+  allows rather than three permanent buttons offering "I lent it out" to money
+  that arrived. An entry attached to a loan shows the loan's own arithmetic
+  and its instalments, with a 2px tone rule down its left edge that the
+  balance block never has. Deleting from a transaction's own screen offers the
+  same Undo the Review inbox does, and "Not a loan" — which discards a debt's
+  whole history — asks first.
 - Every empty state that promises alerts will arrive says so when they
   cannot: Home, the Ledger, Review and Insights all report a capture gap --
   access never granted, or granted with every source switched off -- and each

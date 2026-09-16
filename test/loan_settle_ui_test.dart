@@ -111,6 +111,11 @@ void main() {
     final model = _Fake(debts: [loan()], transactions: [repayment]);
     await pumpEntry(tester, model, repayment);
 
+    // The balance block is worked downward now, and these fixtures carry no
+    // balances at all, so the block says so at some length and the prompt
+    // below it starts past the fold on an 800dp phone.
+    await tester.ensureVisible(find.text('Record it against this loan'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Record it against this loan'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Record it'));
@@ -136,12 +141,22 @@ void main() {
     final model = _Fake(debts: [loan()], transactions: [repayment]);
     await pumpEntry(tester, model, repayment);
 
+    // The balance block is worked downward now, and these fixtures carry no
+    // balances at all, so the block says so at some length and the prompt
+    // below it starts past the fold on an 800dp phone.
+    await tester.ensureVisible(find.text('Record it against this loan'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Record it against this loan'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Record it'));
     await tester.pumpAndSettle();
 
     expect(find.text('Is this Sana paying you back?'), findsNothing);
+    // Reaching the prompt scrolled the list, and a ListView keeps only what
+    // is near the viewport, so the eyebrow at the top of the page has to be
+    // brought back before it can be found.
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 600));
+    await tester.pumpAndSettle();
     expect(find.text('LENT OUT'), findsOneWidget);
   });
 
@@ -184,7 +199,16 @@ void main() {
 
     expect(find.textContaining('money coming back on a loan'), findsNothing);
     expect(find.textContaining('money going back on a loan'), findsNothing);
+    // The three stories used to be three permanent full-width buttons on
+    // every ordinary entry. They are one folded question now, so the answers
+    // exist only once it is opened -- and money that went out is offered two
+    // of the three, never "I borrowed it".
+    await tester.ensureVisible(find.text('Whose money was this?'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Whose money was this?'));
+    await tester.pumpAndSettle();
     expect(find.text('I lent it out'), findsOneWidget);
+    expect(find.text('I borrowed it'), findsNothing);
   });
 
   testWidgets('an entry already on a loan is never asked about again', (
@@ -195,7 +219,9 @@ void main() {
     await pumpEntry(tester, model, attached);
 
     expect(find.text('Is this Sana paying you back?'), findsNothing);
-    expect(find.text('WHOSE MONEY WAS THIS?'), findsNothing);
+    // Named as it is now written: the question is a disclosure row in
+    // sentence case, not an uppercase section heading.
+    expect(find.text('Whose money was this?'), findsNothing);
     expect(find.text('LENT OUT'), findsOneWidget);
   });
 
@@ -456,6 +482,12 @@ class _Fake extends ChangeNotifier implements SpendWiseAdvancedViewModel {
 
   @override
   List<DebtViewData> get debts => _debts;
+
+  /// Read on every build now: the screen asks which account the money landed
+  /// in to tell a cash withdrawal from any other transfer, and to notice an
+  /// entry charged in a currency the account does not keep.
+  @override
+  List<AccountViewData> get accounts => const [];
 
   @override
   Future<void> settleDebt({
