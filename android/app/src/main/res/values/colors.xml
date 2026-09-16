@@ -1,10 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- The launcher icon's ground, and deliberately NOT night-qualified.
+         An app icon is drawn on somebody's wallpaper in a launcher that
+         caches it; a colour that followed the system theme would give the
+         same install two different icons and no way to predict which one is
+         on screen. -->
     <color name="spendwise_background">#0F1113</color>
+
+    <!-- The window behind the app between tapping the icon and Flutter's
+         first frame. This one IS night-qualified — see values-night. -->
+    <color name="spendwise_splash">#FAF9F6</color>
+    <!-- The mark drawn on it. #17191A is the app's paper ink and #A74B25 is
+         the default palette's clay relit for paper, so the window a person
+         sees for a quarter of a second is already the app. -->
+    <color name="spendwise_splash_kept">#17191A</color>
+    <color name="spendwise_splash_spent">#A74B25</color>
+
     <color name="spendwise_keep">#9FB2AC</color>
     <color name="spendwise_spend">#C97A5A</color>
     <!-- The default palette's "mine" tone — the fallback used only for the
          first draw before the app has ever published a colour of its own,
-         the same reason spendwise_keep and spendwise_spend above exist. -->
+         the same reason spendwise_keep and spendwise_spend above exist.
+         Not night-qualified either: the widget draws on a wallpaper, and the
+         app publishes it the graphite palette whatever ground it is on. -->
     <color name="spendwise_mine">#6E8496</color>
 </resources>

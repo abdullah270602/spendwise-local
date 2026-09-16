@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@color/spendwise_background" />
+    <item android:drawable="@color/spendwise_splash" />
     <item
         android:width="88dp"
         android:height="88dp"
         android:gravity="center"
-        android:drawable="@drawable/spendwise_icon_foreground" />
+        android:drawable="@drawable/spendwise_splash_mark" />
 </layer-list>
