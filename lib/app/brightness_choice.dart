@@ -13,22 +13,15 @@ import 'ground.dart';
 enum BrightnessChoice {
   /// The default, and the only one that can change without anyone touching
   /// the app.
-  system(
-    'system',
-    'Follow the system',
-    'Whatever the phone is doing, including when it changes at dusk.',
-  ),
-  light('light', 'Light', 'Warm paper — the ground an exported report prints on.'),
-  dark('dark', 'Dark', 'Graphite. The ground SpendWise was drawn in.');
+  system('system', 'Follow the system'),
+  light('light', 'Light'),
+  dark('dark', 'Dark');
 
-  const BrightnessChoice(this.id, this.title, this.blurb);
+  const BrightnessChoice(this.id, this.title);
 
   /// Stored, so it has to survive a rename of the enum member.
   final String id;
   final String title;
-
-  /// One line in the picker.
-  final String blurb;
 
   /// The stored view preference this is written to.
   static const preferenceKey = 'brightness';

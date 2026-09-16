@@ -64,8 +64,11 @@ class _BrightnessScreenState extends State<BrightnessScreen> {
           children: [
             for (final choice in BrightnessChoice.values)
               ChoiceRow(
+                // No line of explanation under each. "Light", "Dark" and
+                // "Follow the system" are three words nobody needs helped
+                // with, and the swatch beside each one is already showing
+                // the answer.
                 title: choice.title,
-                detail: choice.blurb,
                 selected: choice == brightnessChoice.value,
                 leading: _GroundSwatch(choice: choice),
                 onTap: () => _choose(choice),

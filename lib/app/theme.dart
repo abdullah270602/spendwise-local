@@ -352,21 +352,41 @@ abstract final class SpendWiseTheme {
         thickness: 1,
         space: 1,
       ),
+      // Every entry names its own ink.
+      //
+      // These used to be handed over without one: `copyWith` replaces the
+      // whole style, so the colour Flutter's own light or dark base had put
+      // there went with it, and anything reading `titleLarge` or `bodyLarge`
+      // got a style with a null colour. On graphite that came out right by
+      // accident. On paper it did not, and the symptom was the worst kind --
+      // a settings heading, a list tile's title, an app's name in the source
+      // picker, all still drawn in the old ground's ink on the new ground.
+      //
+      // A text theme whose colours depend on which ground was applied last
+      // is a text theme that will do this again, so each one is stated.
       textTheme: base.textTheme.copyWith(
-        displaySmall: SpendWiseType.figure,
-        headlineMedium: SpendWiseType.statement,
-        headlineSmall: SpendWiseType.title,
-        titleLarge: SpendWiseType.title,
-        titleMedium: SpendWiseType.lead,
-        bodyLarge: SpendWiseType.row,
+        displaySmall: SpendWiseType.figure.copyWith(color: SpendWiseColors.fg),
+        headlineMedium: SpendWiseType.statement.copyWith(
+          color: SpendWiseColors.fg,
+        ),
+        headlineSmall: SpendWiseType.title.copyWith(color: SpendWiseColors.fg),
+        titleLarge: SpendWiseType.title.copyWith(color: SpendWiseColors.fg),
+        titleMedium: SpendWiseType.lead.copyWith(color: SpendWiseColors.fg),
+        bodyLarge: SpendWiseType.row.copyWith(color: SpendWiseColors.fg),
         bodyMedium: SpendWiseType.body.copyWith(color: SpendWiseColors.fg),
-        bodySmall: SpendWiseType.body,
-        labelLarge: const TextStyle(
+        // Deliberately the quieter ink: this is the one the app reaches for
+        // when it wants a second line under a first.
+        bodySmall: SpendWiseType.body.copyWith(color: SpendWiseColors.dim),
+        labelLarge: TextStyle(
           fontFamily: SpendWiseType.sans,
           fontSize: 14,
           fontWeight: FontWeight.w700,
+          color: SpendWiseColors.fg,
         ),
-        labelSmall: SpendWiseType.metaTight,
+        labelMedium: SpendWiseType.meta.copyWith(color: SpendWiseColors.dim),
+        labelSmall: SpendWiseType.metaTight.copyWith(
+          color: SpendWiseColors.dim,
+        ),
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: SpendWiseColors.bg,
@@ -399,8 +419,14 @@ abstract final class SpendWiseTheme {
       ),
       listTileTheme: ListTileThemeData(
         iconColor: SpendWiseColors.dim,
-        titleTextStyle: SpendWiseType.row,
-        subtitleTextStyle: SpendWiseType.meta,
+        // Both name their ink. A list tile builds its own DefaultTextStyle
+        // from these, so a null colour here is not inherited from anywhere --
+        // it is simply absent, and every app name in the source picker was
+        // drawn without one.
+        titleTextStyle: SpendWiseType.row.copyWith(color: SpendWiseColors.fg),
+        subtitleTextStyle: SpendWiseType.meta.copyWith(
+          color: SpendWiseColors.dim,
+        ),
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 2),
       ),
       inputDecorationTheme: InputDecorationTheme(
