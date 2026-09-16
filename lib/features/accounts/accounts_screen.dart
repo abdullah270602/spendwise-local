@@ -541,9 +541,9 @@ class _AccountsScreenState extends State<AccountsScreen> {
                       ),
                       validator: (value) =>
                           Money.tryParseTyped(
-                            value ?? '',
-                            currency: account.currency,
-                          ) ==
+                                value ?? '',
+                                currency: account.currency,
+                              ) ==
                               null
                           ? _amountHint(account.currency)
                           : null,
@@ -1019,9 +1019,9 @@ class _AccountsScreenState extends State<AccountsScreen> {
                       ),
                       validator: (value) =>
                           Money.tryParseTyped(
-                            value ?? '',
-                            currency: currency,
-                          ) ==
+                                value ?? '',
+                                currency: currency,
+                              ) ==
                               null
                           ? _amountHint(currency)
                           : null,

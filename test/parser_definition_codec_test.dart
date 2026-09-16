@@ -51,7 +51,8 @@ void main() {
           expect(
             after.pattern.isCaseSensitive,
             before.pattern.isCaseSensitive,
-            reason: 'case sensitivity is not part of the pattern string, and '
+            reason:
+                'case sensitivity is not part of the pattern string, and '
                 'losing it silently doubles what a rule matches',
           );
           expect(after.direction, before.direction);

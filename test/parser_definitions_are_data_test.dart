@@ -83,7 +83,8 @@ void main() {
     expect(
       ledger.snapshot().transactions,
       isEmpty,
-      reason: 'no shipped rule reads "towards", and the generic fallback has '
+      reason:
+          'no shipped rule reads "towards", and the generic fallback has '
           'no direction word to go on either',
     );
 

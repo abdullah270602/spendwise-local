@@ -33,9 +33,8 @@ void main() {
   }
 
   Color colour(String source, String name) {
-    final match = RegExp(
-      '<color name="$name">#([0-9A-Fa-f]{6})</color>',
-    ).firstMatch(source);
+    final match = RegExp('<color name="$name">#([0-9A-Fa-f]{6})</color>')
+        .firstMatch(source);
     expect(match, isNotNull, reason: 'no $name declared');
     return Color(0xFF000000 | int.parse(match!.group(1)!, radix: 16));
   }

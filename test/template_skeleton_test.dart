@@ -31,7 +31,8 @@ void main() {
       expect(
         first,
         contains('from <account>'),
-        reason: 'the account is a slot of its own; letting the name run '
+        reason:
+            'the account is a slot of its own; letting the name run '
             'swallow it hid it from the rule that knows how to read it',
       );
     });
@@ -81,7 +82,9 @@ void main() {
     });
 
     test('money in and money out stay different', () {
-      final out = signatureOf('Northbank PKR 500 sent to A PAYEE on 01-Jan-2026');
+      final out = signatureOf(
+        'Northbank PKR 500 sent to A PAYEE on 01-Jan-2026',
+      );
       final into = signatureOf(
         'Northbank PKR 500 received from A PAYEE on 01-Jan-2026',
       );
@@ -142,7 +145,8 @@ void main() {
     expect(
       first.signature,
       isNot(second.signature),
-      reason: 'when this starts passing, the limitation has been fixed and '
+      reason:
+          'when this starts passing, the limitation has been fixed and '
           'this test should be replaced rather than deleted',
     );
   });

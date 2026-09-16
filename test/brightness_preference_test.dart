@@ -27,30 +27,36 @@ void main() {
     SpendWiseColors.apply(SpendWisePalette.sage, on: Ground.graphite);
   });
 
-  test('a fresh install follows the system, because nobody has said otherwise', () {
-    final fixture = LightModeFixture();
-    addTearDown(fixture.ledger.close);
+  test(
+    'a fresh install follows the system, because nobody has said otherwise',
+    () {
+      final fixture = LightModeFixture();
+      addTearDown(fixture.ledger.close);
 
-    expect(
-      fixture.viewPreference(BrightnessChoice.preferenceKey),
-      isNull,
-      reason: 'nothing has been stored yet',
-    );
-    expect(
-      BrightnessChoice.fromId(
+      expect(
         fixture.viewPreference(BrightnessChoice.preferenceKey),
-      ),
-      BrightnessChoice.system,
-    );
-  });
+        isNull,
+        reason: 'nothing has been stored yet',
+      );
+      expect(
+        BrightnessChoice.fromId(
+          fixture.viewPreference(BrightnessChoice.preferenceKey),
+        ),
+        BrightnessChoice.system,
+      );
+    },
+  );
 
-  test('a ledger written before this setting existed also follows the system', () {
-    // Upgrades are the other fresh install: an unknown id has to land
-    // somewhere, and landing on an override would mean a person who never
-    // opened Appearance gets a ground they never chose.
-    expect(BrightnessChoice.fromId('twilight'), BrightnessChoice.system);
-    expect(BrightnessChoice.fromId(''), BrightnessChoice.system);
-  });
+  test(
+    'a ledger written before this setting existed also follows the system',
+    () {
+      // Upgrades are the other fresh install: an unknown id has to land
+      // somewhere, and landing on an override would mean a person who never
+      // opened Appearance gets a ground they never chose.
+      expect(BrightnessChoice.fromId('twilight'), BrightnessChoice.system);
+      expect(BrightnessChoice.fromId(''), BrightnessChoice.system);
+    },
+  );
 
   test('each choice resolves the platform the way its name says', () {
     expect(BrightnessChoice.system.resolve(Brightness.light), Brightness.light);
@@ -95,33 +101,34 @@ void main() {
     expect(relaunched.groundFor(Brightness.dark), Ground.paper);
   });
 
-  testWidgets('in System, the phone changing its mind at dusk changes the app', (
-    tester,
-  ) async {
-    tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
-    addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+  testWidgets(
+    'in System, the phone changing its mind at dusk changes the app',
+    (tester) async {
+      tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
+      addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
 
-    final grounds = <Ground>[];
-    await tester.pumpWidget(
-      BrightnessScope(
-        builder: (context, ground) {
-          grounds.add(ground);
-          return const SizedBox.shrink();
-        },
-      ),
-    );
-    expect(grounds.last, Ground.paper);
+      final grounds = <Ground>[];
+      await tester.pumpWidget(
+        BrightnessScope(
+          builder: (context, ground) {
+            grounds.add(ground);
+            return const SizedBox.shrink();
+          },
+        ),
+      );
+      expect(grounds.last, Ground.paper);
 
-    tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
-    await tester.pump();
-    expect(
-      grounds.last,
-      Ground.graphite,
-      reason:
-          'the platform changed while the app was running and System did not '
-          'follow it — which is the one thing System is for',
-    );
-  });
+      tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+      await tester.pump();
+      expect(
+        grounds.last,
+        Ground.graphite,
+        reason:
+            'the platform changed while the app was running and System did not '
+            'follow it — which is the one thing System is for',
+      );
+    },
+  );
 
   testWidgets('an override does not drift back when the phone changes', (
     tester,

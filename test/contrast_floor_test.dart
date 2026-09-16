@@ -32,7 +32,9 @@ import 'package:spendwise/app/theme.dart';
 /// asked, so graphite is held to the large-text floor and its last ramp slot
 /// is named as the exception rather than quietly skipped.
 void main() {
-  tearDown(() => SpendWiseColors.apply(SpendWisePalette.sage, on: Ground.graphite));
+  tearDown(
+    () => SpendWiseColors.apply(SpendWisePalette.sage, on: Ground.graphite),
+  );
 
   /// WCAG 2.1, written out rather than imported: a contrast test that shares
   /// its arithmetic with the thing it is testing proves only that the code
@@ -58,7 +60,8 @@ void main() {
       'keep': drawn.keep,
       'spend': drawn.spend,
       'mine': drawn.mine,
-      for (var i = 0; i < drawn.ramp.length; i++) 'ramp ${i + 1}': drawn.ramp[i],
+      for (var i = 0; i < drawn.ramp.length; i++)
+        'ramp ${i + 1}': drawn.ramp[i],
     };
   }
 
@@ -173,21 +176,37 @@ void main() {
     final branches = <String, List<double>>{
       'kept': [
         ratio(
-          composited(sage.keep, Ground.graphite.keptBranchAlpha, Ground.graphite),
+          composited(
+            sage.keep,
+            Ground.graphite.keptBranchAlpha,
+            Ground.graphite,
+          ),
           Ground.graphite.bg,
         ),
         ratio(
-          composited(paperSage.keep, Ground.paper.keptBranchAlpha, Ground.paper),
+          composited(
+            paperSage.keep,
+            Ground.paper.keptBranchAlpha,
+            Ground.paper,
+          ),
           Ground.paper.bg,
         ),
       ],
       'spent': [
         ratio(
-          composited(sage.spend, Ground.graphite.spentBranchAlpha, Ground.graphite),
+          composited(
+            sage.spend,
+            Ground.graphite.spentBranchAlpha,
+            Ground.graphite,
+          ),
           Ground.graphite.bg,
         ),
         ratio(
-          composited(paperSage.spend, Ground.paper.spentBranchAlpha, Ground.paper),
+          composited(
+            paperSage.spend,
+            Ground.paper.spentBranchAlpha,
+            Ground.paper,
+          ),
           Ground.paper.bg,
         ),
       ],
@@ -223,9 +242,11 @@ void main() {
     // 0.000, leaving three greys a person cannot tell apart. The hex values
     // are not the assertion; the spread is, because the spread is the palette.
     double spread(SpendWisePalette palette) {
-      final lightnesses = [palette.keep, palette.spend, palette.mine]
-          .map((tone) => HSLColor.fromColor(tone).lightness)
-          .toList();
+      final lightnesses = [
+        palette.keep,
+        palette.spend,
+        palette.mine,
+      ].map((tone) => HSLColor.fromColor(tone).lightness).toList();
       return lightnesses.reduce(math.max) - lightnesses.reduce(math.min);
     }
 

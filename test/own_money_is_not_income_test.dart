@@ -102,9 +102,8 @@ void main() {
             'direction at all and the alert went unparsed',
       );
 
-      final result = const Reconciler(
-        ownIdentity: identity,
-      ).reconcile([candidate]);
+      final result = const Reconciler(ownIdentity: identity)
+          .reconcile([candidate]);
       final entry = result.transactions.single;
       expect(entry.kind, TransactionKind.transfer);
       expect(entry.fromAccountId, bank);
@@ -133,9 +132,8 @@ void main() {
         DateTime.utc(2026, 5, 1, 10),
         accountId: wallet,
       );
-      final result = const Reconciler(
-        ownIdentity: shared,
-      ).reconcile([candidateOf(observation)]);
+      final result = const Reconciler(ownIdentity: shared)
+          .reconcile([candidateOf(observation)]);
       expect(result.transactions.single.kind, isNot(TransactionKind.transfer));
     });
   });
@@ -159,9 +157,8 @@ void main() {
     );
 
     test('it is held for review rather than posted', () {
-      final result = const Reconciler(
-        ownIdentity: identity,
-      ).reconcile([lonelyCredit()]);
+      final result = const Reconciler(ownIdentity: identity)
+          .reconcile([lonelyCredit()]);
       final entry = result.transactions.single;
       expect(entry.kind, TransactionKind.income);
       expect(
@@ -198,9 +195,8 @@ void main() {
         ),
       );
 
-      final result = const Reconciler(
-        ownIdentity: identity,
-      ).reconcile([sent, arrived, lonelyCredit()]);
+      final result = const Reconciler(ownIdentity: identity)
+          .reconcile([sent, arrived, lonelyCredit()]);
 
       final lone = result.transactions.firstWhere(
         (item) => item.amount.minorUnits == 4000000,
@@ -249,9 +245,8 @@ void main() {
         ),
       );
 
-      final result = const Reconciler(
-        ownIdentity: identity,
-      ).reconcile([sent, arrived, toStranger]);
+      final result = const Reconciler(ownIdentity: identity)
+          .reconcile([sent, arrived, toStranger]);
       final payment = result.transactions.firstWhere(
         (item) => item.amount.minorUnits == 600000,
       );
@@ -300,10 +295,8 @@ void main() {
       type: CandidateType.purchase,
     );
 
-    final result = const Reconciler(ownIdentity: identity).reconcile([
-      sms,
-      walletApp,
-    ]);
+    final result = const Reconciler(ownIdentity: identity)
+        .reconcile([sms, walletApp]);
     expect(
       result.transactions,
       hasLength(1),

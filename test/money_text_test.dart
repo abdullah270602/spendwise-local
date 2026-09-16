@@ -151,7 +151,8 @@ void main() {
       expect(
         text.substring(all.last.start, all.last.end),
         'PKR 12,345.00',
-        reason: 'the balance label sits just before this span, which is how '
+        reason:
+            'the balance label sits just before this span, which is how '
             'it gets excluded',
       );
     });

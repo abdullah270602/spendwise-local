@@ -105,7 +105,10 @@ class ParserDefinitionCodec {
         .where((value) => value.name == raw['direction'])
         .firstOrNull;
     if (direction == null) {
-      return (rule: null, refusal: 'Rule "$id" does not say which way money moved.');
+      return (
+        rule: null,
+        refusal: 'Rule "$id" does not say which way money moved.',
+      );
     }
     final RegExp compiled;
     try {
@@ -114,7 +117,10 @@ class ParserDefinitionCodec {
         caseSensitive: raw['caseSensitive'] as bool? ?? true,
       );
     } on FormatException catch (error) {
-      return (rule: null, refusal: 'Rule "$id" will not compile: ${error.message}');
+      return (
+        rule: null,
+        refusal: 'Rule "$id" will not compile: ${error.message}',
+      );
     }
     final confidence = (raw['confidence'] as num?)?.toDouble() ?? 0.9;
     return (
@@ -129,7 +135,8 @@ class ParserDefinitionCodec {
             CandidateType.unknown,
         amountGroup: raw['amountGroup'] as String? ?? 'amount',
         referenceGroup: raw['referenceGroup'] as String? ?? 'reference',
-        counterpartyGroup: raw['counterpartyGroup'] as String? ?? 'counterparty',
+        counterpartyGroup:
+            raw['counterpartyGroup'] as String? ?? 'counterparty',
         // Out-of-range confidence would trip an assertion deep inside
         // EventCandidate, far from the row that caused it.
         confidence: confidence.clamp(0.0, 1.0),
@@ -163,7 +170,10 @@ class ParserDefinitionCodec {
       );
     }
     if (rules is! List) {
-      return (definition: null, refusals: ['Definition "$id" has no rule list.']);
+      return (
+        definition: null,
+        refusals: ['Definition "$id" has no rule list.'],
+      );
     }
 
     final decoded = <ParserRule>[];

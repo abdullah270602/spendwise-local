@@ -895,8 +895,8 @@ final class LocalLedger {
       // Without this the pass re-attributes every wallet top-up to the bank
       // the wallet happens to mention, and does it again on each upgrade.
       final attached = _singleAccountForSource(row['source_id'] as String?);
-      final reroute = routed != null &&
-          (attached == null || routed.namesAccountNumber);
+      final reroute =
+          routed != null && (attached == null || routed.namesAccountNumber);
       final accountId =
           (reroute ? routed.accountId : attached) ??
           row['account_id'] as String?;
@@ -1474,7 +1474,10 @@ final class LocalLedger {
       final span = spans[id];
       spans[id] = span == null
           ? [first, last]
-          : [first < span[0] ? first : span[0], last > span[1] ? last : span[1]];
+          : [
+              first < span[0] ? first : span[0],
+              last > span[1] ? last : span[1],
+            ];
     }
 
     // Enabled sources that have never produced an alert. Absent from the
@@ -1669,10 +1672,7 @@ final class LocalLedger {
         accountOverride: (row['account_id'] as String?) ?? accountId,
       );
       if (raw.accountId == null) continue;
-      final result = _parser.parseDetailed(
-        raw,
-        assumeDirection: direction,
-      );
+      final result = _parser.parseDetailed(raw, assumeDirection: direction);
       final candidate = result.candidate;
       _db.execute(
         'UPDATE raw_observations SET account_id = ?, parse_status = ?, '
@@ -2895,8 +2895,7 @@ final class LocalLedger {
     // out of, which then read as income there. Only the text naming an
     // account by its registered number outranks the attachment; a bank's
     // name appearing in the sentence does not.
-    final accountId =
-        (attached != null && routed?.namesAccountNumber != true)
+    final accountId = (attached != null && routed?.namesAccountNumber != true)
         ? attached
         : (routed?.accountId ?? attached);
     final postedAt =
@@ -3399,12 +3398,10 @@ final class LocalLedger {
   OwnIdentity _ownIdentity() {
     final suffixes = <String, String>{};
     final aliases = <String, Set<String>>{};
-    for (final row in _db.select(
-      '''
+    for (final row in _db.select('''
       SELECT id, name, institution_name, account_suffix FROM accounts
       WHERE account_suffix IS NOT NULL AND account_suffix != ''
-      ''',
-    )) {
+      ''')) {
       final digits = (row['account_suffix'] as String).replaceAll(
         RegExp(r'\D'),
         '',

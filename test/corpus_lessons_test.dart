@@ -14,17 +14,16 @@ import 'package:spendwise/domain/parsing/template_skeleton.dart';
 /// The fixtures below are invented. What is real is the *shape* of each
 /// failure and the count beside it.
 void main() {
-  EventCandidate? parse(String text) => const NotificationParser(
-    currencies: {'INR'},
-  ).parse(
-    RawObservation(
-      id: 'x',
-      kind: ObservationKind.notification,
-      observedAt: DateTime.utc(2026, 1, 1),
-      body: text,
-      accountId: 'acct',
-    ),
-  );
+  EventCandidate? parse(String text) =>
+      const NotificationParser(currencies: {'INR'}).parse(
+        RawObservation(
+          id: 'x',
+          kind: ObservationKind.notification,
+          observedAt: DateTime.utc(2026, 1, 1),
+          body: text,
+          accountId: 'acct',
+        ),
+      );
 
   group('a balance is not always labelled "balance"', () {
     test('"Avlbl Amt" is a balance', () {
@@ -106,12 +105,16 @@ void main() {
       // sentence appeared under two signatures purely because the handles
       // differed.
       final first = skeletonizer
-          .of('Your VPA payer-one@examplepay is debited for Rs.110.00 '
-              'and credited to shop-a@otherpay')
+          .of(
+            'Your VPA payer-one@examplepay is debited for Rs.110.00 '
+            'and credited to shop-a@otherpay',
+          )
           .signature;
       final second = skeletonizer
-          .of('Your VPA payer-two@otherpay is debited for Rs.700.00 '
-              'and credited to shop-b@examplepay')
+          .of(
+            'Your VPA payer-two@otherpay is debited for Rs.700.00 '
+            'and credited to shop-b@examplepay',
+          )
           .signature;
       expect(first, second);
     });

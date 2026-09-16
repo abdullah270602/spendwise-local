@@ -470,6 +470,7 @@ class _LandingState extends State<_Landing> {
   static const types = ['Bank', 'Wallet', 'Cash', 'Credit card', 'Savings'];
 
   SpendWiseViewModel get viewModel => widget.viewModel;
+
   /// The currency this first account will be opened in. There is no
   /// account to read it from yet, and an existing one is the best
   /// available answer -- a second account is rarely in a new currency.
@@ -626,11 +627,8 @@ class _LandingState extends State<_Landing> {
               validator: (value) {
                 final text = (value ?? '').trim();
                 if (text.isEmpty) return null;
-                return Money.tryParseTyped(
-                      text,
-                      currency: _openingCurrency,
-                    ) ==
-                    null
+                return Money.tryParseTyped(text, currency: _openingCurrency) ==
+                        null
                     ? 'Not an amount'
                     : null;
               },

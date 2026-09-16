@@ -136,10 +136,7 @@ void main() {
         minor: 500000,
         at: DateTime(2026, 8, 24),
       );
-      final model = _Fake(
-        debts: [loan()],
-        transactions: [lending(), back],
-      );
+      final model = _Fake(debts: [loan()], transactions: [lending(), back]);
       await pump(tester, model, back);
 
       expect(find.text('PRINCIPAL'), findsOneWidget);
@@ -167,10 +164,7 @@ void main() {
         minor: 500000,
         at: DateTime(2026, 8, 24),
       );
-      final model = _Fake(
-        debts: [loan()],
-        transactions: [lending(), back],
-      );
+      final model = _Fake(debts: [loan()], transactions: [lending(), back]);
       await pump(tester, model, back);
 
       expect(
@@ -195,10 +189,7 @@ void main() {
         minor: 500000,
         at: DateTime(2026, 8, 24),
       );
-      final model = _Fake(
-        debts: [loan()],
-        transactions: [lending(), back],
-      );
+      final model = _Fake(debts: [loan()], transactions: [lending(), back]);
       await pump(tester, model, back);
 
       final rules = tester
@@ -227,16 +218,15 @@ void main() {
     );
     final second = repayment(id: 'tx-second', minor: 500000, at: closed);
     final model = _Fake(
-      debts: [
-        loan(settled: 1000000, isSettled: true, closedAt: closed),
-      ],
+      debts: [loan(settled: 1000000, isSettled: true, closedAt: closed)],
       transactions: [lending(), first, second],
     );
     await pump(tester, model, second);
 
     expect(find.text('SETTLED 12 SEP'), findsOneWidget);
     expect(
-      find.textContaining('ALL 10,000 BACK'), findsOneWidget,
+      find.textContaining('ALL 10,000 BACK'),
+      findsOneWidget,
       reason: 'a finished loan is history, and one line carries the outcome',
     );
     expect(find.textContaining('2 PAYMENTS'), findsOneWidget);
@@ -286,10 +276,7 @@ void main() {
     });
 
     testWidgets('a loan with nothing back draws an empty rule', (tester) async {
-      final model = _Fake(
-        debts: [loan(settled: 0)],
-        transactions: [lending()],
-      );
+      final model = _Fake(debts: [loan(settled: 0)], transactions: [lending()]);
       await pump(tester, model, lending());
 
       expect(find.text('NOTHING BACK YET'), findsOneWidget);

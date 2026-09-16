@@ -205,8 +205,7 @@ class _ScrimPainter extends CustomPainter with GroundAware {
   }
 
   @override
-  bool shouldRepaint(_ScrimPainter old) =>
-      groundMoved(old) || old.hole != hole;
+  bool shouldRepaint(_ScrimPainter old) => groundMoved(old) || old.hole != hole;
 }
 
 class _Card extends StatelessWidget {

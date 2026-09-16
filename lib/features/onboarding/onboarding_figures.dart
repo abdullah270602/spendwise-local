@@ -214,8 +214,7 @@ class _FunnelPainter extends CustomPainter with GroundAware {
   }
 
   @override
-  bool shouldRepaint(_FunnelPainter old) =>
-      groundMoved(old) || old.lit != lit;
+  bool shouldRepaint(_FunnelPainter old) => groundMoved(old) || old.lit != lit;
 }
 
 /// A line that runs into a wall.
@@ -308,11 +307,7 @@ class _SourceTile extends StatelessWidget {
             border: Border.all(color: SpendWiseColors.edge),
           ),
           child: icon == null
-              ? Icon(
-                  Icons.apps_rounded,
-                  size: 18,
-                  color: SpendWiseColors.dim,
-                )
+              ? Icon(Icons.apps_rounded, size: 18, color: SpendWiseColors.dim)
               : Image.memory(icon!, filterQuality: FilterQuality.medium),
         ),
         const SizedBox(height: 6),

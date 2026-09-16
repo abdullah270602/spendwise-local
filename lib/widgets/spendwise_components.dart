@@ -90,8 +90,7 @@ class _SplitMarkPainter extends CustomPainter with GroundAware {
   }
 
   @override
-  bool shouldRepaint(_SplitMarkPainter oldDelegate) =>
-      groundMoved(oldDelegate);
+  bool shouldRepaint(_SplitMarkPainter oldDelegate) => groundMoved(oldDelegate);
 }
 
 class SectionHeading extends StatelessWidget {

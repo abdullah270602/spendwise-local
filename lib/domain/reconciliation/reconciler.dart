@@ -241,11 +241,7 @@ final class Reconciler {
         continue;
       }
       transactions.add(
-        _single(
-          item.leg,
-          needsReview: item.ambiguous,
-          bankCodes: bankCodes,
-        ),
+        _single(item.leg, needsReview: item.ambiguous, bankCodes: bankCodes),
       );
     }
 
@@ -332,14 +328,10 @@ final class Reconciler {
   /// the same direction, the same amount, two different apps, ninety
   /// seconds.
   bool _namesTheSameParty(EventCandidate a, EventCandidate b) {
-    final left = {
-      _normalized(a.counterparty),
-      _normalized(a.description),
-    }..removeWhere((value) => value.isEmpty);
-    final right = {
-      _normalized(b.counterparty),
-      _normalized(b.description),
-    }..removeWhere((value) => value.isEmpty);
+    final left = {_normalized(a.counterparty), _normalized(a.description)}
+      ..removeWhere((value) => value.isEmpty);
+    final right = {_normalized(b.counterparty), _normalized(b.description)}
+      ..removeWhere((value) => value.isEmpty);
     for (final one in left) {
       for (final other in right) {
         if (one == other) return true;
@@ -509,9 +501,8 @@ final class Reconciler {
     caseSensitive: false,
   );
 
-  Iterable<String> _bankCodes(String text) => _ibanHead
-      .allMatches(text)
-      .map((match) => match.group(1)!.toUpperCase());
+  Iterable<String> _bankCodes(String text) =>
+      _ibanHead.allMatches(text).map((match) => match.group(1)!.toUpperCase());
 
   CanonicalTransaction _single(
     _Leg leg, {

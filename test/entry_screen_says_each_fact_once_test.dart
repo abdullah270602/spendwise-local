@@ -173,7 +173,8 @@ void main() {
       expect(
         mentions(tester, 'groceries'),
         1,
-        reason: 'the header subtitle and the "Category:" row said the same '
+        reason:
+            'the header subtitle and the "Category:" row said the same '
             'word within four lines of each other',
       );
       expect(find.textContaining('GROCERIES'), findsOneWidget);
@@ -282,10 +283,7 @@ void main() {
     );
 
     expect(find.text('NO LOAN IS OFFERED HERE'), findsOneWidget);
-    expect(
-      find.textContaining('not somebody paying you back'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('not somebody paying you back'), findsOneWidget);
     expect(find.text('Record it against this loan'), findsNothing);
     expect(find.textContaining('money coming back on a loan'), findsNothing);
     expect(
@@ -360,7 +358,8 @@ void main() {
         tester,
         _Fake(),
         entry(
-          title: 'Shahrah-e-Faisal Motorway Service Plaza and Filling '
+          title:
+              'Shahrah-e-Faisal Motorway Service Plaza and Filling '
               'Station (North Bound)',
         ),
       );

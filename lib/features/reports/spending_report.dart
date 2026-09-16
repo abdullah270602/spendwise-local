@@ -314,7 +314,8 @@ class ReportData {
         firstDay.day == 1 &&
         lastDay.day == DateTime(lastDay.year, lastDay.month + 1, 0).day &&
         !lastDay.isBefore(firstDay);
-    final monthsSpanned = (lastDay.year - firstDay.year) * 12 +
+    final monthsSpanned =
+        (lastDay.year - firstDay.year) * 12 +
         lastDay.month -
         firstDay.month +
         1;

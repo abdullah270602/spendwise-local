@@ -385,10 +385,7 @@ final class NotificationParser {
         // RUB" and nothing else. Read from the matched span rather than from
         // a parsed sign, because the sign may sit either side of the marker.
         text
-            .substring(
-              amountMatches.single.start,
-              amountMatches.single.end,
-            )
+            .substring(amountMatches.single.start, amountMatches.single.end)
             .trimLeft()
             .startsWith('+');
     if (hasDebit == hasCredit && assumeDirection == null) {
@@ -635,9 +632,7 @@ final class NotificationParser {
       // 20,000"). The prescreen already set balance figures aside and left
       // exactly one plausible transaction amount, so that value wins; the
       // rule still supplies direction, counterparty, and reference.
-      final ruleAmount = _money
-          .findOnly(named(rule.amountGroup) ?? '')
-          ?.money;
+      final ruleAmount = _money.findOnly(named(rule.amountGroup) ?? '')?.money;
       final amount = transactionAmount.isZero ? ruleAmount : transactionAmount;
       if (amount == null || amount.isZero) continue;
       final candidate = EventCandidate(

@@ -52,7 +52,9 @@ void main() {
     await pump(
       tester,
       ParserHealth(
-        sources: [coverage(label: 'Northbank', parsed: 7, review: 3, ignored: 5)],
+        sources: [
+          coverage(label: 'Northbank', parsed: 7, review: 3, ignored: 5),
+        ],
       ),
     );
 

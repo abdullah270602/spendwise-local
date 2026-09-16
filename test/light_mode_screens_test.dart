@@ -85,39 +85,40 @@ void main() {
     expect(find.text('Chenab Grocers'), findsOneWidget);
   });
 
-  testWidgets('the light theme really is the paper ground, not a tinted dark one', (
-    tester,
-  ) async {
-    // The failure worth naming: `ThemeData` and the `SpendWiseColors` statics
-    // are two halves of one answer, and a screen where they disagree is one
-    // where the scaffold is paper and everything painted on it is still
-    // graphite. Asking the built theme rather than the constants is what makes
-    // this a check on the wiring rather than on `Ground.paper`.
-    onAPhone(tester);
-    late ThemeData theme;
-    await tester.pumpWidget(
-      onPaper(
-        Builder(
-          builder: (context) {
-            theme = Theme.of(context);
-            return const SizedBox.shrink();
-          },
+  testWidgets(
+    'the light theme really is the paper ground, not a tinted dark one',
+    (tester) async {
+      // The failure worth naming: `ThemeData` and the `SpendWiseColors` statics
+      // are two halves of one answer, and a screen where they disagree is one
+      // where the scaffold is paper and everything painted on it is still
+      // graphite. Asking the built theme rather than the constants is what makes
+      // this a check on the wiring rather than on `Ground.paper`.
+      onAPhone(tester);
+      late ThemeData theme;
+      await tester.pumpWidget(
+        onPaper(
+          Builder(
+            builder: (context) {
+              theme = Theme.of(context);
+              return const SizedBox.shrink();
+            },
+          ),
         ),
-      ),
-    );
+      );
 
-    expect(theme.brightness, Brightness.light);
-    expect(theme.scaffoldBackgroundColor, Ground.paper.bg);
-    expect(theme.colorScheme.onSurface, Ground.paper.fg);
-    expect(SpendWiseColors.bg, Ground.paper.bg);
-    expect(
-      SpendWiseColors.keep,
-      SpendWisePalette.sage.onPaper.keep,
-      reason:
-          'the semantic tones have to be the relit ones — the graphite trio '
-          'on paper is three washes',
-    );
-  });
+      expect(theme.brightness, Brightness.light);
+      expect(theme.scaffoldBackgroundColor, Ground.paper.bg);
+      expect(theme.colorScheme.onSurface, Ground.paper.fg);
+      expect(SpendWiseColors.bg, Ground.paper.bg);
+      expect(
+        SpendWiseColors.keep,
+        SpendWisePalette.sage.onPaper.keep,
+        reason:
+            'the semantic tones have to be the relit ones — the graphite trio '
+            'on paper is three washes',
+      );
+    },
+  );
 
   testWidgets('asking for the dark theme afterwards puts the ground back', (
     tester,

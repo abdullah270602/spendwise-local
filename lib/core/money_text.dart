@@ -130,12 +130,15 @@ class MoneyTextReader {
   /// Every amount in [text], in the order they appear.
   List<MoneyMatch> findAll(String text) {
     final byMarker = {
-      for (final entry in _markers()) entry.marker.toLowerCase(): entry.currency,
+      for (final entry in _markers())
+        entry.marker.toLowerCase(): entry.currency,
     };
     final matches = <MoneyMatch>[];
     for (final match in _pattern().allMatches(text)) {
       final leads = match.namedGroup('lead') != null;
-      final marker = leads ? match.namedGroup('lead')! : match.namedGroup('trail')!;
+      final marker = leads
+          ? match.namedGroup('lead')!
+          : match.namedGroup('trail')!;
       final number = leads
           ? match.namedGroup('leadNumber')!
           : match.namedGroup('trailNumber')!;
@@ -151,8 +154,7 @@ class MoneyTextReader {
       // and guessing it once pointed this check at a space and read
       // the letter before it as if it were glued to the marker.
       final markerAt =
-          match.start +
-          match[0]!.toLowerCase().indexOf(marker.toLowerCase());
+          match.start + match[0]!.toLowerCase().indexOf(marker.toLowerCase());
       if (leads && markerAt > 0 && _isWordish(text[markerAt - 1])) {
         continue;
       }

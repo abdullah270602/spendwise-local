@@ -270,11 +270,7 @@ class _CategoryField extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: Text(value, style: SpendWiseType.row)),
-          Icon(
-            Icons.expand_more_rounded,
-            size: 18,
-            color: SpendWiseColors.dim,
-          ),
+          Icon(Icons.expand_more_rounded, size: 18, color: SpendWiseColors.dim),
         ],
       ),
     ),

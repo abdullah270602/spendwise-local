@@ -127,7 +127,12 @@ void main() {
         tester,
         _Fake(
           transactions: [
-            earn('From a sample payer', thisMonthOn(1), 10000000, debtId: 'held-1'),
+            earn(
+              'From a sample payer',
+              thisMonthOn(1),
+              10000000,
+              debtId: 'held-1',
+            ),
           ],
           spendableMinor: 10000000,
           debts: [held('held-1', 10000000)],
@@ -148,7 +153,12 @@ void main() {
         tester,
         _Fake(
           transactions: [
-            earn('From a sample payer', thisMonthOn(1), 10000000, debtId: 'held-1'),
+            earn(
+              'From a sample payer',
+              thisMonthOn(1),
+              10000000,
+              debtId: 'held-1',
+            ),
           ],
           spendableMinor: 10000000,
           debts: [held('held-1', 10000000, settledMinor: 10000000)],
@@ -253,7 +263,12 @@ void main() {
         tester,
         _Fake(
           transactions: [
-            earn('From a sample payer', thisMonthOn(10), 5000000, debtId: 'held-1'),
+            earn(
+              'From a sample payer',
+              thisMonthOn(10),
+              5000000,
+              debtId: 'held-1',
+            ),
           ],
           spendableMinor: 15000000,
           debts: [held('held-1', 5000000)],

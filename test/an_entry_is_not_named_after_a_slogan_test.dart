@@ -36,7 +36,8 @@ void main() {
         expect(
           nameOf(slogan, '$slogan Rs. 1,500 debited from your wallet'),
           isNull,
-          reason: 'the ledger falls back to "Payment", which at least does '
+          reason:
+              'the ledger falls back to "Payment", which at least does '
               'not pretend to name anybody',
         );
       });
@@ -46,19 +47,20 @@ void main() {
   group('but a real name still wins', () {
     test('the counterparty, whenever there is one', () {
       expect(
-        nameOf('Off it goes 💸', 'Off it goes 💸 Rs. 110 sent to A Sample Payee.'),
+        nameOf(
+          'Off it goes 💸',
+          'Off it goes 💸 Rs. 110 sent to A Sample Payee.',
+        ),
         'A Sample Payee',
-        reason: 'the slogan rule must never reach a transaction that named '
+        reason:
+            'the slogan rule must never reach a transaction that named '
             'somebody',
       );
     });
 
     test('a bank name in the title, when nobody else is named', () {
       expect(
-        nameOf(
-          'Northbank',
-          'Northbank PKR 141.00 debited from your account',
-        ),
+        nameOf('Northbank', 'Northbank PKR 141.00 debited from your account'),
         'Northbank',
       );
     });

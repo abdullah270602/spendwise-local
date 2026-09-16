@@ -18,16 +18,28 @@ import 'package:spendwise/core/money.dart';
 void main() {
   group('a typed amount is read in the currency of its field', () {
     test('two decimals, as most currencies have', () {
-      expect(Money.tryParseTyped('10,000', currency: 'PKR')!.minorUnits, 1000000);
-      expect(Money.tryParseTyped('1,250.5', currency: 'PKR')!.minorUnits, 125050);
+      expect(
+        Money.tryParseTyped('10,000', currency: 'PKR')!.minorUnits,
+        1000000,
+      );
+      expect(
+        Money.tryParseTyped('1,250.5', currency: 'PKR')!.minorUnits,
+        125050,
+      );
       expect(Money.tryParseTyped('42', currency: 'PKR')!.minorUnits, 4200);
-      expect(Money.tryParseTyped('-500.25', currency: 'PKR')!.minorUnits, -50025);
+      expect(
+        Money.tryParseTyped('-500.25', currency: 'PKR')!.minorUnits,
+        -50025,
+      );
     });
 
     test('none at all, for a currency that has no minor unit', () {
       // Five hundred yen is five hundred, not fifty thousand.
       expect(Money.tryParseTyped('500', currency: 'JPY')!.minorUnits, 500);
-      expect(Money.tryParseTyped('1,014,145', currency: 'KRW')!.minorUnits, 1014145);
+      expect(
+        Money.tryParseTyped('1,014,145', currency: 'KRW')!.minorUnits,
+        1014145,
+      );
     });
 
     test('three, for a currency that counts in thousandths', () {

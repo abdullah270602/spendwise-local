@@ -125,11 +125,7 @@ const currencyTable = <Currency>[
   ),
 
   // South-East and East Asia. Three of these have no minor unit.
-  Currency(
-    code: 'MYR',
-    minorDigits: 2,
-    markers: {'MYR', 'RM'},
-  ),
+  Currency(code: 'MYR', minorDigits: 2, markers: {'MYR', 'RM'}),
   Currency(
     code: 'SGD',
     minorDigits: 2,
@@ -192,9 +188,7 @@ const currencyTable = <Currency>[
   Currency(code: 'UZS', minorDigits: 2, markers: {'UZS'}),
 ];
 
-final _byCode = {
-  for (final currency in currencyTable) currency.code: currency,
-};
+final _byCode = {for (final currency in currencyTable) currency.code: currency};
 
 /// The currency with this ISO code, or null.
 Currency? currencyForCode(String code) => _byCode[code.toUpperCase()];

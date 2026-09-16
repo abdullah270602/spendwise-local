@@ -18,18 +18,21 @@ void main() {
     return ledger;
   }
 
-  String arrive(LocalLedger ledger, int minor, {String from = 'A Sample Payer'}) =>
-      ledger.addManualTransaction(
-        kind: TransactionKind.income,
-        amountMinor: minor,
-        occurredAt: DateTime.utc(2026, 9, 2, 12),
-        accountId: ledger
-            .snapshot()
-            .accounts
-            .firstWhere((a) => a.type != AccountType.cash)
-            .id,
-        description: from,
-      );
+  String arrive(
+    LocalLedger ledger,
+    int minor, {
+    String from = 'A Sample Payer',
+  }) => ledger.addManualTransaction(
+    kind: TransactionKind.income,
+    amountMinor: minor,
+    occurredAt: DateTime.utc(2026, 9, 2, 12),
+    accountId: ledger
+        .snapshot()
+        .accounts
+        .firstWhere((a) => a.type != AccountType.cash)
+        .id,
+    description: from,
+  );
 
   String handOver(LocalLedger ledger, int minor, {String to = 'My father'}) =>
       ledger.addManualTransaction(

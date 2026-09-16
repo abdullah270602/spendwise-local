@@ -88,11 +88,7 @@ void main() {
 
     await tester.pumpWidget(onPaper(SpendWiseShell(viewModel: fixture)));
     await tester.pumpAndSettle();
-    expect(
-      unreadableIn(tester),
-      isEmpty,
-      reason: 'Home, on paper',
-    );
+    expect(unreadableIn(tester), isEmpty, reason: 'Home, on paper');
 
     for (final tab in ['Ledger', 'Review', 'Insights', 'Accounts']) {
       await tester.tap(find.text(tab));

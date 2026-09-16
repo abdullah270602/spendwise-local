@@ -13,8 +13,16 @@ void main() {
   LocalLedger ledgerWithTwoBanks() {
     final ledger = LocalLedger.openInMemoryForTests();
     ledger.rememberAndroidSources([
-      {'packageName': 'com.example.north', 'label': 'Northbank', 'configured': true},
-      {'packageName': 'com.example.south', 'label': 'Southbank', 'configured': true},
+      {
+        'packageName': 'com.example.north',
+        'label': 'Northbank',
+        'configured': true,
+      },
+      {
+        'packageName': 'com.example.south',
+        'label': 'Southbank',
+        'configured': true,
+      },
     ]);
     final sources = ledger.sources();
     ledger.addAccount(
@@ -133,14 +141,16 @@ void main() {
     expect(
       north.parsers.keys.single,
       'pk.card.purchase',
-      reason: 'the report names the parser, so a person can see that this '
+      reason:
+          'the report names the parser, so a person can see that this '
           'bank is recognised by sentence shape and not by anything written '
           'for it',
     );
     expect(
       north.onLastResort,
       0,
-      reason: 'a shape rule did match, so this alert was not scraped by the '
+      reason:
+          'a shape rule did match, so this alert was not scraped by the '
           'amount-and-a-verb parser of last resort',
     );
   });
@@ -191,7 +201,8 @@ void main() {
     expect(
       south.coverage,
       isNull,
-      reason: 'zero out of zero is not zero, and printing 0% would send '
+      reason:
+          'zero out of zero is not zero, and printing 0% would send '
           'somebody hunting a parser bug that does not exist',
     );
   });

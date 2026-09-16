@@ -181,10 +181,7 @@ void main() {
       ),
     );
 
-    expect(
-      find.text('Charged in USD. The account keeps PKR.'),
-      findsOneWidget,
-    );
+    expect(find.text('Charged in USD. The account keeps PKR.'), findsOneWidget);
     expect(find.textContaining('will not guess a rate'), findsOneWidget);
     expect(
       find.text('−USD 42'),

@@ -116,8 +116,7 @@ final class ParserHealth {
 
   /// Sources sending money alerts the app cannot read. The working list for
   /// deciding what the parser learns next.
-  List<SourceCoverage> get needingWork => sources
-      .where((item) => item.review + item.error > 0)
-      .toList()
-    ..sort((a, b) => (b.review + b.error).compareTo(a.review + a.error));
+  List<SourceCoverage> get needingWork =>
+      sources.where((item) => item.review + item.error > 0).toList()
+        ..sort((a, b) => (b.review + b.error).compareTo(a.review + a.error));
 }

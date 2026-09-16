@@ -19,33 +19,39 @@ import 'package:spendwise/features/reports/spending_report.dart';
 /// every tone at once, and the only place it shows is a printout next to a
 /// phone.
 void main() {
-  test('every palette tone relights to the same colour on screen as on paper', () {
-    for (final palette in SpendWisePalette.all) {
-      final tones = <String, Color>{
-        'keep': palette.keep,
-        'spend': palette.spend,
-        'mine': palette.mine,
-        for (var i = 0; i < palette.ramp.length; i++) 'ramp ${i + 1}':
-            palette.ramp[i],
-      };
-      for (final entry in tones.entries) {
-        expect(
-          paperCap(entry.value).toARGB32(),
-          paperTone(entry.value).toInt(),
-          reason:
-              '${palette.name} ${entry.key}: the screen and the exporter '
-              'relight the same tone differently',
-        );
+  test(
+    'every palette tone relights to the same colour on screen as on paper',
+    () {
+      for (final palette in SpendWisePalette.all) {
+        final tones = <String, Color>{
+          'keep': palette.keep,
+          'spend': palette.spend,
+          'mine': palette.mine,
+          for (var i = 0; i < palette.ramp.length; i++)
+            'ramp ${i + 1}': palette.ramp[i],
+        };
+        for (final entry in tones.entries) {
+          expect(
+            paperCap(entry.value).toARGB32(),
+            paperTone(entry.value).toInt(),
+            reason:
+                '${palette.name} ${entry.key}: the screen and the exporter '
+                'relight the same tone differently',
+          );
+        }
       }
-    }
-  });
+    },
+  );
 
-  test('the screen and the exporter print on the same ground and the same ink', () {
-    // Both constants are hard-coded on either side, so this is the only thing
-    // holding them level. The design note that chose this ground chose it
-    // because it is `_paper` byte for byte; that claim is worth a test.
-    expect(Ground.paper.bg.toARGB32(), 0xFFFAF9F6);
-    expect(Ground.paper.fg.toARGB32(), 0xFF17191A);
-    expect(Ground.paper.dim.toARGB32(), 0xFF6B7176);
-  });
+  test(
+    'the screen and the exporter print on the same ground and the same ink',
+    () {
+      // Both constants are hard-coded on either side, so this is the only thing
+      // holding them level. The design note that chose this ground chose it
+      // because it is `_paper` byte for byte; that claim is worth a test.
+      expect(Ground.paper.bg.toARGB32(), 0xFFFAF9F6);
+      expect(Ground.paper.fg.toARGB32(), 0xFF17191A);
+      expect(Ground.paper.dim.toARGB32(), 0xFF6B7176);
+    },
+  );
 }

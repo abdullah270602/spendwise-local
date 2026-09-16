@@ -26,72 +26,75 @@ import 'package:spendwise/widgets/spendwise_components.dart';
 /// the second says it is wired into the painters that exist, and the third
 /// says a painter added later cannot quietly skip it.
 void main() {
-  tearDown(() => SpendWiseColors.apply(SpendWisePalette.sage, on: Ground.graphite));
+  tearDown(
+    () => SpendWiseColors.apply(SpendWisePalette.sage, on: Ground.graphite),
+  );
 
-  testWidgets('a painter built on one ground repaints when it is asked to draw on another', (
-    tester,
-  ) async {
-    // Three real painters, reached through the three widgets that are public:
-    // the Home ribbon, the balance line, and the app's own mark.
-    Future<List<CustomPainter>> pump(Ground on) async {
-      SpendWiseColors.apply(SpendWisePalette.sage, on: on);
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: on.isLight ? SpendWiseTheme.light : SpendWiseTheme.dark,
-          home: Scaffold(
-            body: Column(
-              children: [
-                FlowShape(
-                  receivedMinor: 400000,
-                  keptMinor: 250000,
-                  spentMinor: 150000,
-                  animate: false,
-                ),
-                BalanceLine(points: const [10, 40, 30, 90, 70]),
-                SpendWiseMark(size: 24),
-              ],
+  testWidgets(
+    'a painter built on one ground repaints when it is asked to draw on another',
+    (tester) async {
+      // Three real painters, reached through the three widgets that are public:
+      // the Home ribbon, the balance line, and the app's own mark.
+      Future<List<CustomPainter>> pump(Ground on) async {
+        SpendWiseColors.apply(SpendWisePalette.sage, on: on);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: on.isLight ? SpendWiseTheme.light : SpendWiseTheme.dark,
+            home: Scaffold(
+              body: Column(
+                children: [
+                  FlowShape(
+                    receivedMinor: 400000,
+                    keptMinor: 250000,
+                    spentMinor: 150000,
+                    animate: false,
+                  ),
+                  BalanceLine(points: const [10, 40, 30, 90, 70]),
+                  SpendWiseMark(size: 24),
+                ],
+              ),
             ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      return tester
-          .widgetList<CustomPaint>(find.byType(CustomPaint))
-          .map((paint) => paint.painter)
-          .whereType<CustomPainter>()
-          .toList();
-    }
+        );
+        await tester.pumpAndSettle();
+        return tester
+            .widgetList<CustomPaint>(find.byType(CustomPaint))
+            .map((paint) => paint.painter)
+            .whereType<CustomPainter>()
+            .toList();
+      }
 
-    final onGraphite = await pump(Ground.graphite);
-    final onPaper = await pump(Ground.paper);
+      final onGraphite = await pump(Ground.graphite);
+      final onPaper = await pump(Ground.paper);
 
-    expect(
-      onGraphite.length,
-      onPaper.length,
-      reason:
-          'the same widgets were pumped twice, so the same painters should '
-          'have been built — pair them by position below',
-    );
-    expect(onGraphite, isNotEmpty);
-
-    for (var i = 0; i < onGraphite.length; i++) {
-      final before = onGraphite[i];
-      final after = onPaper[i];
       expect(
-        after.runtimeType,
-        before.runtimeType,
-        reason: 'painter $i changed type between the two pumps',
-      );
-      expect(
-        after.shouldRepaint(before),
-        isTrue,
+        onGraphite.length,
+        onPaper.length,
         reason:
-            '${after.runtimeType} was built on paper, was handed the painter '
-            'that drew it on graphite, and said nothing needed redrawing — '
-            'which leaves the old pixels on screen',
+            'the same widgets were pumped twice, so the same painters should '
+            'have been built — pair them by position below',
       );
-    }
-  });
+      expect(onGraphite, isNotEmpty);
+
+      for (var i = 0; i < onGraphite.length; i++) {
+        final before = onGraphite[i];
+        final after = onPaper[i];
+        expect(
+          after.runtimeType,
+          before.runtimeType,
+          reason: 'painter $i changed type between the two pumps',
+        );
+        expect(
+          after.shouldRepaint(before),
+          isTrue,
+          reason:
+              '${after.runtimeType} was built on paper, was handed the painter '
+              'that drew it on graphite, and said nothing needed redrawing — '
+              'which leaves the old pixels on screen',
+        );
+      }
+    },
+  );
 
   test('a painter that has not moved is still left alone', () {
     // The other half of the contract, and the one a blunt `=> true` would

@@ -228,16 +228,15 @@ final class SpendWisePalette {
   ///
   /// Cached, because it is asked for on every repaint and the relight walks
   /// a lightness loop per tone.
-  SpendWisePalette get onPaper =>
-      _paperTwins[id] ??= SpendWisePalette(
-        id: id,
-        name: name,
-        blurb: blurb,
-        keep: relitForPaper(keep),
-        spend: relitForPaper(spend),
-        mine: relitForPaper(mine),
-        ramp: [for (final tone in ramp) relitForPaper(tone)],
-      );
+  SpendWisePalette get onPaper => _paperTwins[id] ??= SpendWisePalette(
+    id: id,
+    name: name,
+    blurb: blurb,
+    keep: relitForPaper(keep),
+    spend: relitForPaper(spend),
+    mine: relitForPaper(mine),
+    ramp: [for (final tone in ramp) relitForPaper(tone)],
+  );
 
   static final Map<String, SpendWisePalette> _paperTwins = {
     slate.id: slateOnPaper,
