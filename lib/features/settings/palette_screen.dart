@@ -63,7 +63,7 @@ class _PaletteScreenState extends State<PaletteScreen> {
                 title: palette.name,
                 detail: palette.blurb,
                 selected: palette.id == SpendWiseColors.palette.id,
-                tone: palette.keep,
+                tone: SpendWiseColors.lit(palette).keep,
                 leading: _Swatch(palette: palette),
                 onTap: () => _choose(palette),
               ),
@@ -81,18 +81,24 @@ class _Swatch extends StatelessWidget {
   final SpendWisePalette palette;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 34,
-    height: 22,
-    // Stretch, or a childless ColoredBox inside Expanded gets a tight width
-    // and the swatch collapses to nothing.
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(flex: 5, child: ColoredBox(color: palette.keep)),
-        Expanded(flex: 2, child: ColoredBox(color: palette.mine)),
-        Expanded(flex: 3, child: ColoredBox(color: palette.spend)),
-      ],
-    ),
-  );
+  Widget build(BuildContext context) {
+    // The swatch has to show the palette as this ground will actually draw
+    // it. A row of pale dark-ground tones on paper is a picture of a
+    // different app, and choosing by it means choosing blind.
+    final drawn = SpendWiseColors.lit(palette);
+    return SizedBox(
+      width: 34,
+      height: 22,
+      // Stretch, or a childless ColoredBox inside Expanded gets a tight width
+      // and the swatch collapses to nothing.
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(flex: 5, child: ColoredBox(color: drawn.keep)),
+          Expanded(flex: 2, child: ColoredBox(color: drawn.mine)),
+          Expanded(flex: 3, child: ColoredBox(color: drawn.spend)),
+        ],
+      ),
+    );
+  }
 }

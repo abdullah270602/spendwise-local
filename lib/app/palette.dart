@@ -1,4 +1,50 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+
+import 'ground.dart';
+
+/// The lowest contrast a tone a person reads as text may have against the
+/// paper ground: WCAG AA for body copy.
+///
+/// It is a floor on the *light* palettes only. The graphite ones shipped
+/// years ago with two tones under it (Slate's `mine` at 3.90:1, Brass's
+/// `spend` at 4.35:1) and relighting is not the moment to restyle them
+/// without being asked.
+const paperBodyFloor = 4.5;
+
+/// A dark-ground tone, capped for paper.
+///
+/// This is `paperTone` from `lib/features/reports/spending_report.dart`, line
+/// for line, minus the conversion to a `PdfColor`. It is repeated rather than
+/// shared because the exporter is correct as it stands and is not a file this
+/// change is allowed to edit; `paper_relight_matches_the_exporter_test.dart`
+/// reads both and fails if they ever stop agreeing.
+Color paperCap(Color source) {
+  final hsl = HSLColor.fromColor(source);
+  final lightness = math.min(hsl.lightness, 0.40);
+  final saturation = (hsl.saturation * 1.25).clamp(0.0, 1.0);
+  return hsl.withLightness(lightness).withSaturation(saturation).toColor();
+}
+
+/// A dark-ground tone, re-lit for paper and then made legible on it.
+///
+/// The cap alone leaves five of the fifty-five tones short of AA against
+/// `Ground.paper.bg`: Brass's `keep` at 4.11:1, its ramp's fifth and seventh
+/// at 3.88 and 4.08, and Tide's `keep` and second ramp slot at 3.74 and 4.47.
+/// Each of those could be hand-picked, and the design note that chose this
+/// ground proposes exactly that. Walking the lightness down until the tone
+/// clears the floor lands on the same five tones and no others, costs six
+/// lines, and means the sixth palette somebody adds cannot arrive under AA
+/// without anyone noticing -- which is the whole failure this is guarding.
+Color relitForPaper(Color source) {
+  var hsl = HSLColor.fromColor(paperCap(source));
+  while (hsl.lightness > 0 &&
+      contrastRatio(hsl.toColor(), Ground.paper.bg) < paperBodyFloor) {
+    hsl = hsl.withLightness(math.max(0, hsl.lightness - 0.005));
+  }
+  return hsl.toColor();
+}
 
 /// The one thing a user can restyle.
 ///
@@ -8,6 +54,11 @@ import 'package:flutter/material.dart';
 /// derived from it. Every palette here is low-chroma on a dark ground and
 /// tested against the same background, so none of them can make the app ugly:
 /// this is a choice of temperament, not a theme engine.
+///
+/// "The same background" is what a light mode takes away, so each palette now
+/// has a twin: [onPaper], relit through [relitForPaper]. The twin is derived
+/// rather than declared, except for Slate, which the derivation destroys --
+/// see [slateOnPaper].
 @immutable
 final class SpendWisePalette {
   const SpendWisePalette({
@@ -131,8 +182,64 @@ final class SpendWisePalette {
     ],
   );
 
+  /// Slate, hand-built for paper rather than derived.
+  ///
+  /// Slate's entire identity is lightness spread: its blurb says direction
+  /// reads from weight, not hue, and its three tones sit 0.306 apart in
+  /// lightness on graphite. [paperCap] holds lightness to 0.40, and all three
+  /// of Slate's tones are above that, so all three land on 0.40 -- a spread
+  /// of 0.000 and three greys nobody can tell apart. The one palette whose
+  /// argument is weight is the one palette the relight has nothing to say
+  /// about.
+  ///
+  /// So it is built by hand, and built inverted: on graphite `keep` is the
+  /// lightest of the three because light is what separates a tone from a
+  /// near-black ground, and on paper it is the darkest for the same reason.
+  /// The ladder runs from lightness 0.23 to 0.44 -- narrower than graphite's
+  /// 0.306 because paper allows less room before a tone stops clearing AA,
+  /// but a real ladder, and in the same order. The ramp mirrors the dark
+  /// ramp's own rungs onto that range, so the sixth slot still jumps back
+  /// toward the heavy end exactly as it does on graphite.
+  static const slateOnPaper = SpendWisePalette(
+    id: 'slate',
+    name: 'Slate',
+    blurb: 'Almost no colour at all. Direction reads from weight, not hue.',
+    keep: Color(0xFF333D42),
+    spend: Color(0xFF4E595F),
+    mine: Color(0xFF677379),
+    ramp: [
+      Color(0xFF333D42),
+      Color(0xFF404B51),
+      Color(0xFF475259),
+      Color(0xFF4E5A61),
+      Color(0xFF566269),
+      Color(0xFF3B464B),
+      Color(0xFF5D696F),
+      Color(0xFF68747B),
+    ],
+  );
+
   static const all = <SpendWisePalette>[sage, ink, brass, tide, slate];
 
   static SpendWisePalette byId(String? id) =>
       all.firstWhere((item) => item.id == id, orElse: () => sage);
+
+  /// This palette as it is drawn on [Ground.paper].
+  ///
+  /// Cached, because it is asked for on every repaint and the relight walks
+  /// a lightness loop per tone.
+  SpendWisePalette get onPaper =>
+      _paperTwins[id] ??= SpendWisePalette(
+        id: id,
+        name: name,
+        blurb: blurb,
+        keep: relitForPaper(keep),
+        spend: relitForPaper(spend),
+        mine: relitForPaper(mine),
+        ramp: [for (final tone in ramp) relitForPaper(tone)],
+      );
+
+  static final Map<String, SpendWisePalette> _paperTwins = {
+    slate.id: slateOnPaper,
+  };
 }
