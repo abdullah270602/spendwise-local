@@ -269,6 +269,23 @@ class TransactionDetailsScreen extends StatelessWidget {
         ),
       );
     }
+    // Reconciliation rebuilds automatic entries from stored evidence on
+    // every run, so an owner who has corrected one has every reason to
+    // wonder whether the next sync will quietly undo them. This is the
+    // promise worth printing, in the `mine` hue rather than an alarm colour,
+    // because nothing here is wrong.
+    if (entry.isLocked && entry.evidenceCount > 0 && entry.debtId == null) {
+      flags.add(
+        _Flag(
+          tone: SpendWiseColors.mine,
+          heading: 'Your answer stands',
+          body: 'You settled something about this entry by hand. SpendWise '
+              're-reads stored alerts every time it reconciles and will not '
+              'touch this one again — and the alert underneath is kept '
+              'exactly as it arrived.',
+        ),
+      );
+    }
     // Two currencies in one entry is the one arithmetic on this page the
     // owner cannot check, so it is named rather than quietly performed.
     final held = accounts
@@ -1788,7 +1805,12 @@ class _Evidence extends StatelessWidget {
         : items.map((item) => item.confidence).reduce((a, b) => a > b ? a : b);
     return [
       '$count ALERT${count == 1 ? '' : 'S'}',
-      if (items.isNotEmpty && items.first.sourceLabel.isNotEmpty)
+      // What the reader thought is history the moment somebody overrides it,
+      // and the percentage is left visible rather than deleted: it is what
+      // explains why the correction was needed.
+      if (transaction.isLocked && transaction.debtId == null)
+        'ANSWERED BY YOU'
+      else if (items.isNotEmpty && items.first.sourceLabel.isNotEmpty)
         items.first.sourceLabel.toUpperCase(),
       if (best != null) '${(best * 100).round()}%',
     ].join('  ·  ');

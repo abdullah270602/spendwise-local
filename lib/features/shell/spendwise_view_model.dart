@@ -47,6 +47,7 @@ class TransactionViewData {
     this.note = '',
     this.evidenceCount = 1,
     this.isReviewed = true,
+    this.isLocked = false,
     this.accountId,
     this.toAccountId,
     this.evidence = const [],
@@ -64,6 +65,15 @@ class TransactionViewData {
   final String note;
   final int evidenceCount;
   final bool isReviewed;
+
+  /// Whether reconciliation has been told to leave this entry alone.
+  ///
+  /// Reconciliation rebuilds automatic entries from stored evidence on every
+  /// run, so an entry somebody has answered a question about — corrected,
+  /// reviewed, or attached to a loan — has to be exempt or the next sync
+  /// would quietly undo them. An owner who has corrected an entry once wants
+  /// to know it will not revert, and this is the fact that says so.
+  final bool isLocked;
   final String? accountId;
   final String? toAccountId;
   final List<EvidenceViewData> evidence;

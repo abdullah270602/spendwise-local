@@ -431,6 +431,7 @@ final class SpendWiseController extends ChangeNotifier
                 })
                 .toList(growable: false),
             isReviewed: !item.needsReview,
+            isLocked: item.locked,
             debtId: item.debtId,
             balances: [
               for (final entry
