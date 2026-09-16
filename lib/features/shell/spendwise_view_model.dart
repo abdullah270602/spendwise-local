@@ -634,6 +634,9 @@ abstract class SpendWiseAdvancedViewModel implements SpendWiseViewModel {
   /// Alerts that read like money but reached no account.
   List<AlertViewData> get unroutedAlerts;
 
+  /// Alerts a source sent that were judged not to be about money.
+  List<AlertViewData> skippedAlerts({String? packageName});
+
   /// Apps that carry more than one institution, so they are never bound to a
   /// single account.
   bool isSharedSource(String packageName);
@@ -740,6 +743,8 @@ extension SpendWiseAdvancedAccess on SpendWiseViewModel {
       const [];
   List<AlertViewData> get uiUnroutedAlerts =>
       _advanced?.unroutedAlerts ?? const [];
+  List<AlertViewData> uiSkippedAlerts({String? packageName}) =>
+      _advanced?.skippedAlerts(packageName: packageName) ?? const [];
   bool uiIsSharedSource(String packageName) =>
       _advanced?.isSharedSource(packageName) ?? false;
   ParserHealth uiParserHealth() =>

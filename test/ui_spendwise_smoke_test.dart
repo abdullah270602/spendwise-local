@@ -511,6 +511,9 @@ class _BatchImportViewModel extends _FakeViewModel
   ParserHealth parserHealth() => const ParserHealth(sources: []);
 
   @override
+  List<AlertViewData> skippedAlerts({String? packageName}) => const [];
+
+  @override
   List<AccountViewData> get accounts => const [
     AccountViewData(
       id: 'bank',

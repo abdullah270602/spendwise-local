@@ -1123,6 +1123,14 @@ final class SpendWiseController extends ChangeNotifier
       .map(_alertView)
       .toList(growable: false);
 
+  /// Not cached: opened rarely, and a page-stale answer to "what did you
+  /// skip" would be worse than no answer.
+  @override
+  List<AlertViewData> skippedAlerts({String? packageName}) => _ledger
+      .skippedAlerts(packageName: packageName)
+      .map(_alertView)
+      .toList(growable: false);
+
   @override
   bool isSharedSource(String packageName) =>
       _ledger.isSharedSource(packageName);

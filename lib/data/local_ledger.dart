@@ -1537,6 +1537,22 @@ final class LocalLedger {
     return ParserHealth(sources: List.unmodifiable(sources));
   }
 
+  /// Alerts a source sent that the app decided were not about money.
+  ///
+  /// The counterpart to the reading-accuracy report. That report can say a
+  /// source sent twenty-one alerts and none of them were money; it cannot
+  /// say whether that is right. Only the alerts themselves can, and until
+  /// now nothing showed them: Review lists what is still unanswered, and a
+  /// skipped alert is by definition answered.
+  ///
+  /// Reads, never writes. Nothing here re-files anything.
+  List<StoredAlert> skippedAlerts({String? packageName, int limit = 100}) =>
+      _alertQuery(
+        where: "r.parse_status = 'ignored'",
+        packageName: packageName,
+        limit: limit,
+      );
+
   /// Alerts that look like money but never reached an account, newest first.
   /// These are the ones a shared source produces when the text names no
   /// institution SpendWise recognises -- answerable, not unreadable.
