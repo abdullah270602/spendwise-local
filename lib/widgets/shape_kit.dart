@@ -674,7 +674,7 @@ _FlowGeometry _buildFlowGeometry({
   );
 }
 
-class _FlowShapePainter extends CustomPainter {
+class _FlowShapePainter extends CustomPainter with GroundAware {
   _FlowShapePainter({
     required this.keptFraction,
     required this.savedOfKept,
@@ -755,6 +755,7 @@ class _FlowShapePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_FlowShapePainter old) =>
+      groundMoved(old) ||
       old.keptFraction != keptFraction ||
       old.savedOfKept != savedOfKept ||
       old.saved != saved ||
@@ -792,7 +793,7 @@ class BalanceLine extends StatelessWidget {
   );
 }
 
-class _BalanceLinePainter extends CustomPainter {
+class _BalanceLinePainter extends CustomPainter with GroundAware {
   _BalanceLinePainter(this.points, this.color);
 
   final List<int> points;
@@ -861,7 +862,7 @@ class _BalanceLinePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_BalanceLinePainter old) =>
-      old.points != points || old.color != color;
+      groundMoved(old) || old.points != points || old.color != color;
 }
 
 /// Proportional stacked bar. Segments carry the category ramp in order, so the

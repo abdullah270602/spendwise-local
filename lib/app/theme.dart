@@ -55,6 +55,15 @@ abstract final class SpendWiseColors {
   /// The ground in force.
   static Ground ground = Ground.graphite;
 
+  /// What is currently being drawn with, as one comparable value.
+  ///
+  /// Derived rather than incremented, because [apply] runs on every
+  /// `MaterialApp` rebuild and a counter would tell every painter in the app
+  /// that its colours had moved several times a second. Ground and palette
+  /// between them decide every colour on this class, so their two ids decide
+  /// this.
+  static int get stamp => Object.hash(ground.id, palette.id);
+
   /// [of] as it is drawn on the ground in force.
   static SpendWisePalette lit(SpendWisePalette of) =>
       ground.isLight ? of.onPaper : of;
@@ -165,6 +174,28 @@ abstract final class SpendWiseColors {
   static Color get expense => spend;
   static Color warning = Ground.graphite.warning;
   static Color get textSecondary => dim;
+}
+
+/// A painter that notices the ground moving under it.
+///
+/// A `CustomPainter` repaints when `shouldRepaint` says so, and every painter
+/// in this app was written against the only ground there was -- so not one of
+/// them compared a colour, and five of them returned `false` outright. That
+/// was correct while the colours could not change mid-frame. It stopped being
+/// correct the moment a person could flip the phone to light mode with Home
+/// on screen: the widgets around the ribbon would relight and the ribbon
+/// itself would sit there in graphite, which reads as a rendering bug rather
+/// than as a setting.
+///
+/// Mixing this in adds the one comparison every one of them was missing. It
+/// covers a palette change too, which was the same latent fault with a rarer
+/// trigger.
+mixin GroundAware on CustomPainter {
+  final int groundStamp = SpendWiseColors.stamp;
+
+  /// True when [old] was painted with colours that are no longer in force.
+  bool groundMoved(CustomPainter old) =>
+      old is! GroundAware || old.groundStamp != groundStamp;
 }
 
 /// Type is the other half of the identity: Archivo set tight and heavy for

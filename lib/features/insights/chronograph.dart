@@ -344,7 +344,7 @@ class _Dial extends StatelessWidget {
   }
 }
 
-class _ChronographPainter extends CustomPainter {
+class _ChronographPainter extends CustomPainter with GroundAware {
   _ChronographPainter({
     required this.categories,
     required this.tones,
@@ -557,6 +557,7 @@ class _ChronographPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_ChronographPainter old) =>
+      groundMoved(old) ||
       old.categories != categories ||
       old.selected != selected ||
       old.prevSelected != prevSelected ||

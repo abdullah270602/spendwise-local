@@ -705,7 +705,7 @@ Path _dashPath(Path source, {required double dash, required double gap}) {
   return dashed;
 }
 
-class _SeismographPainter extends CustomPainter {
+class _SeismographPainter extends CustomPainter with GroundAware {
   _SeismographPainter({
     required this.rows,
     required this.centerX,
@@ -842,6 +842,7 @@ class _SeismographPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _SeismographPainter old) =>
+      groundMoved(old) ||
       old.rows != rows ||
       old.centerX != centerX ||
       old.maxDeviation != maxDeviation ||

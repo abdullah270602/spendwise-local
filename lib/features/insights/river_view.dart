@@ -274,7 +274,7 @@ class _Spine extends StatelessWidget {
   );
 }
 
-class _SpinePainter extends CustomPainter {
+class _SpinePainter extends CustomPainter with GroundAware {
   _SpinePainter({
     required this.tone,
     required this.first,
@@ -314,6 +314,7 @@ class _SpinePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_SpinePainter old) =>
+      groundMoved(old) ||
       old.tone != tone ||
       old.first != first ||
       old.last != last ||

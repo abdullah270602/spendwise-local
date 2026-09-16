@@ -44,7 +44,7 @@ class SpendWiseMark extends StatelessWidget {
   );
 }
 
-class _SplitMarkPainter extends CustomPainter {
+class _SplitMarkPainter extends CustomPainter with GroundAware {
   /// Authored on the 64-unit grid used in `design/brand.html`; content spans
   /// x 10..52 and y 8..56, so it is fitted rather than simply scaled.
   static const _contentLeft = 10.0;
@@ -90,7 +90,8 @@ class _SplitMarkPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_SplitMarkPainter oldDelegate) => false;
+  bool shouldRepaint(_SplitMarkPainter oldDelegate) =>
+      groundMoved(oldDelegate);
 }
 
 class SectionHeading extends StatelessWidget {

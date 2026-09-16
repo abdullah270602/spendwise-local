@@ -177,8 +177,8 @@ class _SpotlightLayer extends StatelessWidget {
 ///
 /// One path with an even-odd fill rather than a saveLayer and BlendMode.clear:
 /// no offscreen layer per frame, and any number of holes for free.
-class _ScrimPainter extends CustomPainter {
-  const _ScrimPainter(this.hole);
+class _ScrimPainter extends CustomPainter with GroundAware {
+  _ScrimPainter(this.hole);
 
   final Rect? hole;
 
@@ -205,7 +205,8 @@ class _ScrimPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_ScrimPainter old) => old.hole != hole;
+  bool shouldRepaint(_ScrimPainter old) =>
+      groundMoved(old) || old.hole != hole;
 }
 
 class _Card extends StatelessWidget {

@@ -334,7 +334,7 @@ class _Arrow extends StatelessWidget {
   );
 }
 
-class _ArrowPainter extends CustomPainter {
+class _ArrowPainter extends CustomPainter with GroundAware {
   @override
   void paint(Canvas canvas, Size size) {
     final x = size.width / 2;
@@ -354,5 +354,5 @@ class _ArrowPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_ArrowPainter old) => false;
+  bool shouldRepaint(_ArrowPainter old) => groundMoved(old);
 }
