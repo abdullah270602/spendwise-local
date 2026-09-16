@@ -238,9 +238,16 @@ void main() {
     expect(find.text('PocketPay wallet'), findsOneWidget);
   });
 
-  testWidgets('an answered entry promises the next sync will not undo it', (
+  testWidgets('an answered entry still shows the reading it corrected', (
     tester,
   ) async {
+    // This used to assert a "Your answer stands" flag as well, promising
+    // that the next reconciliation would not undo a hand correction. True,
+    // and removed: you are looking at an entry you edited, showing what you
+    // edited it to, so the promise answered a question nobody had. What is
+    // still worth asserting is everything underneath it -- the entry is
+    // marked as answered by you, and the original reading survives.
+
     await pump(
       tester,
       entry(
@@ -256,7 +263,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Your answer stands'), findsOneWidget);
+    expect(find.text('Your answer stands'), findsNothing);
     expect(find.textContaining('ANSWERED BY YOU'), findsOneWidget);
     expect(
       find.textContaining('71%'),

@@ -272,24 +272,11 @@ class TransactionDetailsScreen extends StatelessWidget {
         ),
       );
     }
-    // Reconciliation rebuilds automatic entries from stored evidence on
-    // every run, so an owner who has corrected one has every reason to
-    // wonder whether the next sync will quietly undo them. This is the
-    // promise worth printing, in the `mine` hue rather than an alarm colour,
-    // because nothing here is wrong.
-    if (entry.isLocked && entry.evidenceCount > 0 && entry.debtId == null) {
-      flags.add(
-        _Flag(
-          tone: SpendWiseColors.mine,
-          heading: 'Your answer stands',
-          body:
-              'You settled something about this entry by hand. SpendWise '
-              're-reads stored alerts every time it reconciles and will not '
-              'touch this one again — and the alert underneath is kept '
-              'exactly as it arrived.',
-        ),
-      );
-    }
+    // No flag for an entry somebody corrected by hand. It said the app
+    // would not undo the correction on the next sync, which is true and
+    // which nobody wondered about: you are looking at an entry you edited,
+    // and it says what you edited it to. A promise nobody asked for is
+    // three lines of the app talking about itself.
     // Two currencies in one entry is the one arithmetic on this page the
     // owner cannot check, so it is named rather than quietly performed.
     final held = accounts
