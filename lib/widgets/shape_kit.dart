@@ -564,10 +564,16 @@ _FlowGeometry _buildFlowGeometry({
   final savedBotW = asBranch ? keptW * savedOfKept : 0.0;
   final gap = (asBranch && savedBotW > 0) ? siblingGapDp * reveal : 0.0;
 
+  // Every alpha here belongs to the ground rather than to the ribbon, because
+  // a translucent fill points at whatever is behind it. On graphite it walks
+  // the tone toward near-black, away from the text, and the branch gains
+  // presence; on paper the same number walks it toward the ground and the
+  // branch loses a fifth of its separation. See `Ground.keptBranchAlpha`.
+  final ground = SpendWiseColors.ground;
   final kept = <_FlowPiece>[
     _FlowPiece(
       ribbon(topX, topX + liveKeptW, keptBotX, keptBotX + liveKeptW),
-      SpendWiseColors.keep.withValues(alpha: .30),
+      SpendWiseColors.keep.withValues(alpha: ground.keptBranchAlpha),
     ),
   ];
   final savedPieces = <_FlowPiece>[];
@@ -580,14 +586,14 @@ _FlowGeometry _buildFlowGeometry({
           keptBotX + liveKeptW + gap,
           keptBotX + liveKeptW + gap + savedBotW,
         ),
-        SpendWiseColors.mine.withValues(alpha: .34),
+        SpendWiseColors.mine.withValues(alpha: ground.savedBranchAlpha),
       ),
     );
   }
   final spend = <_FlowPiece>[
     _FlowPiece(
       ribbon(splitX, topX + topW, spentBotX, spentBotX + spentW),
-      SpendWiseColors.spend.withValues(alpha: .48),
+      SpendWiseColors.spend.withValues(alpha: ground.spentBranchAlpha),
     ),
   ];
 
@@ -604,7 +610,7 @@ _FlowGeometry _buildFlowGeometry({
           keptBotX + keptW - seamW,
           keptBotX + keptW,
         ),
-        SpendWiseColors.mine.withValues(alpha: .30),
+        SpendWiseColors.mine.withValues(alpha: ground.seamAlpha),
       ),
     );
   }
