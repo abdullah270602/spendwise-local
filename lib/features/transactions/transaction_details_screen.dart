@@ -1193,7 +1193,11 @@ class _LoanSection extends StatelessWidget {
   /// dim, and this is none of the three. The absence of the colour is the
   /// statement.
   Widget _refusal(BuildContext context) {
-    final open = viewModel.uiDebts
+    final debts = viewModel.uiDebts;
+    // Only worth saying to somebody who has loans. A refusal is an answer to
+    // a question, and an owner who has never recorded one is not asking it.
+    if (debts.isEmpty) return const SizedBox.shrink();
+    final open = debts
         .where((item) => !item.isSettled && item.outstanding.minorUnits > 0)
         .toList();
     return Column(

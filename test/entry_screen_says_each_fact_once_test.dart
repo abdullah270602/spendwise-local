@@ -297,6 +297,27 @@ void main() {
     );
   });
 
+  testWidgets('and it is silent about the refusal to somebody with no loans', (
+    tester,
+  ) async {
+    // A refusal is the answer to a question, and an owner who has never
+    // recorded a loan is not asking it. Saying "SpendWise will not suggest a
+    // loan against this" to somebody who has none is the app explaining a
+    // feature on a screen that is not about it.
+    phone(tester);
+    await pump(
+      tester,
+      _Fake(),
+      entry(
+        kind: TransactionKind.transfer,
+        category: 'Between your accounts',
+        balances: transferBalances,
+      ),
+    );
+
+    expect(find.text('NO LOAN IS OFFERED HERE'), findsNothing);
+  });
+
   group('it lays out on a 360dp phone', () {
     /// Scrolls the whole page past the viewport, because an overflow only
     /// happens where something is actually laid out.
