@@ -95,7 +95,7 @@ class _TopicRow extends StatelessWidget {
     onTap: onTap,
     child: Container(
       padding: const EdgeInsets.symmetric(vertical: 15),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: SpendWiseColors.line)),
       ),
       child: Row(
@@ -120,7 +120,7 @@ class _TopicRow extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(
+          Icon(
             Icons.chevron_right_rounded,
             size: 18,
             color: SpendWiseColors.dim,

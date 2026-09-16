@@ -164,7 +164,7 @@ class _MixingDeskState extends State<MixingDesk>
                 ),
                 const SizedBox(height: 10),
                 DecoratedBox(
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     border: Border(
                       top: BorderSide(color: SpendWiseColors.line),
                     ),
@@ -700,7 +700,7 @@ class _PatchBay extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: DecoratedBox(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 border: Border(top: BorderSide(color: SpendWiseColors.line)),
               ),
               child: Padding(

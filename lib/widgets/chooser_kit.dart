@@ -58,7 +58,7 @@ class ChooserScreen extends StatelessWidget {
           Container(
             width: double.infinity,
             padding: _previewPadding,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(bottom: BorderSide(color: SpendWiseColors.line)),
             ),
             child: _PinnedPreview(

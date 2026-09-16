@@ -91,10 +91,10 @@ class _SourceSelectionScreenState extends State<SourceSelectionScreen> {
                     color: SpendWiseColors.surfaceRaised,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
-                      side: const BorderSide(color: SpendWiseColors.warning),
+                      side: BorderSide(color: SpendWiseColors.warning),
                     ),
                     child: ListTile(
-                      leading: const Icon(
+                      leading: Icon(
                         Icons.notifications_off_outlined,
                         color: SpendWiseColors.warning,
                       ),

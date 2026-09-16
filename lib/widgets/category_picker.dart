@@ -334,7 +334,7 @@ class _CategoryRow extends StatelessWidget {
   Widget build(BuildContext context) => InkWell(
     onTap: onTap,
     child: Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: SpendWiseColors.line)),
       ),
       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -359,7 +359,7 @@ class _CategoryRow extends StatelessWidget {
               onPressed: onRemove,
               tooltip: 'Remove ${category.name}',
               visualDensity: VisualDensity.compact,
-              icon: const Icon(
+              icon: Icon(
                 Icons.close_rounded,
                 size: 16,
                 color: SpendWiseColors.dim,

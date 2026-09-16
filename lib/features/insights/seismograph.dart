@@ -88,7 +88,7 @@ class Seismograph extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Eyebrow(
+        Eyebrow(
           'What changed',
           trailing: Text('VS LAST PERIOD', style: SpendWiseType.eyebrow),
         ),

@@ -44,7 +44,7 @@ class _ExportScreenState extends State<ExportScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(
+                Icon(
                   Icons.warning_amber_rounded,
                   color: SpendWiseColors.warning,
                 ),

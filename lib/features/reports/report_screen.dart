@@ -364,7 +364,7 @@ class _Preview extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.only(top: 14),
-    decoration: const BoxDecoration(
+    decoration: BoxDecoration(
       border: Border(top: BorderSide(color: SpendWiseColors.edge)),
     ),
     child: Column(

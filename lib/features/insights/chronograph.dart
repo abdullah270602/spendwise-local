@@ -786,7 +786,7 @@ class _PlateRow extends StatelessWidget {
           decoration: BoxDecoration(
             color: isSelected ? SpendWiseColors.fg : Colors.transparent,
             border: showDivider
-                ? const Border(bottom: BorderSide(color: SpendWiseColors.line))
+                ? Border(bottom: BorderSide(color: SpendWiseColors.line))
                 : null,
           ),
           child: Padding(

@@ -166,7 +166,7 @@ class PrivacyBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     padding: EdgeInsets.only(top: compact ? 10 : 13),
-    decoration: const BoxDecoration(
+    decoration: BoxDecoration(
       border: Border(top: BorderSide(color: SpendWiseColors.edge)),
     ),
     child: Row(

@@ -109,7 +109,7 @@ class _Underneath extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.only(top: 11),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(top: BorderSide(color: SpendWiseColors.line)),
       ),
       child: switch (extra) {

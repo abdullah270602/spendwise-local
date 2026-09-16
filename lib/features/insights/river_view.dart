@@ -96,7 +96,7 @@ class RiverHeading extends StatelessWidget {
     ),
     child: Container(
       padding: const EdgeInsets.only(bottom: 9),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: SpendWiseColors.edge)),
       ),
       child: Row(

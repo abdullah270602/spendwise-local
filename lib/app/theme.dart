@@ -10,19 +10,25 @@ import 'palette.dart';
 /// user already owns (mine). Nothing else in the app is allowed to carry colour.
 abstract final class SpendWiseColors {
   /// Ground. Everything sits on this; there is no second surface colour.
-  static const bg = Color(0xFF0F1113);
+  ///
+  /// Not const, and neither are the four below it. They were, for as long as
+  /// the app had exactly one ground; a light mode gives it two, and a value
+  /// baked into a `const` expression at every call site cannot be swapped at
+  /// runtime. Losing the keyword costs roughly 230 `const` expressions across
+  /// the app and buys the ability to repaint the ground under all of them.
+  static Color bg = const Color(0xFF0F1113);
 
   /// Primary text and the only "solid block" fill.
-  static const fg = Color(0xFFE9E7E2);
+  static Color fg = const Color(0xFFE9E7E2);
 
   /// Secondary text, axis labels, metadata.
-  static const dim = Color(0xFF7A8084);
+  static Color dim = const Color(0xFF7A8084);
 
   /// Hairline between rows -- barely there on purpose.
-  static const line = Color(0xFF1C2023);
+  static Color line = const Color(0xFF1C2023);
 
   /// Visible edge: borders that must read as a boundary.
-  static const edge = Color(0xFF282D31);
+  static Color edge = const Color(0xFF282D31);
 
   /// Money that stayed: income, balances, the kept share of the month.
   /// Not const: these three are the one thing a user can restyle, and the
@@ -85,16 +91,16 @@ abstract final class SpendWiseColors {
   // ---- Legacy aliases -------------------------------------------------
   // Kept so screens still being migrated keep compiling; they resolve to the
   // new palette, so nothing renders in the old colours.
-  static const background = bg;
-  static const surface = bg;
-  static const surfaceRaised = Color(0xFF15181B);
-  static const border = edge;
+  static Color get background => bg;
+  static Color get surface => bg;
+  static Color surfaceRaised = const Color(0xFF15181B);
+  static Color get border => edge;
   static Color get accent => keep;
-  static const accentMuted = Color(0xFF1A2321);
+  static Color accentMuted = const Color(0xFF1A2321);
   static Color get income => keep;
   static Color get expense => spend;
-  static const warning = Color(0xFFC9A45A);
-  static const textSecondary = dim;
+  static Color warning = const Color(0xFFC9A45A);
+  static Color get textSecondary => dim;
 }
 
 /// Type is the other half of the identity: Archivo set tight and heavy for
@@ -162,7 +168,7 @@ abstract final class SpendWiseType {
     fontFeatures: [FontFeature.tabularFigures()],
   );
 
-  static const body = TextStyle(
+  static TextStyle get body => TextStyle(
     fontFamily: sans,
     fontSize: 14,
     height: 1.45,
@@ -170,7 +176,7 @@ abstract final class SpendWiseType {
   );
 
   /// Uppercase tracked eyebrow, e.g. SEPTEMBER / WHAT HAPPENED TO IT.
-  static const eyebrow = TextStyle(
+  static TextStyle get eyebrow => TextStyle(
     fontFamily: sans,
     fontSize: 11,
     fontWeight: FontWeight.w600,
@@ -180,7 +186,7 @@ abstract final class SpendWiseType {
   );
 
   /// Data, not prose: day headers, account digits, evidence text.
-  static const meta = TextStyle(
+  static TextStyle get meta => TextStyle(
     fontFamily: mono,
     fontSize: 11,
     letterSpacing: .5,
@@ -188,7 +194,7 @@ abstract final class SpendWiseType {
     color: SpendWiseColors.dim,
   );
 
-  static const metaTight = TextStyle(
+  static TextStyle get metaTight => TextStyle(
     fontFamily: mono,
     fontSize: 10,
     letterSpacing: 1.4,
@@ -225,7 +231,7 @@ abstract final class SpendWiseTheme {
 
     return base.copyWith(
       dividerColor: SpendWiseColors.line,
-      dividerTheme: const DividerThemeData(
+      dividerTheme: DividerThemeData(
         color: SpendWiseColors.line,
         thickness: 1,
         space: 1,
@@ -246,7 +252,7 @@ abstract final class SpendWiseTheme {
         ),
         labelSmall: SpendWiseType.metaTight,
       ),
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: SpendWiseColors.bg,
         surfaceTintColor: Colors.transparent,
         foregroundColor: SpendWiseColors.fg,
@@ -265,7 +271,7 @@ abstract final class SpendWiseTheme {
       // Cards are square-cornered outlines, never raised panels: the design
       // reads as printed matter, and a rounded radius on every block is what
       // made the old build read as a generic app.
-      cardTheme: const CardThemeData(
+      cardTheme: CardThemeData(
         color: SpendWiseColors.bg,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
@@ -275,13 +281,13 @@ abstract final class SpendWiseTheme {
           side: BorderSide(color: SpendWiseColors.edge),
         ),
       ),
-      listTileTheme: const ListTileThemeData(
+      listTileTheme: ListTileThemeData(
         iconColor: SpendWiseColors.dim,
         titleTextStyle: SpendWiseType.row,
         subtitleTextStyle: SpendWiseType.meta,
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 2),
       ),
-      inputDecorationTheme: const InputDecorationTheme(
+      inputDecorationTheme: InputDecorationTheme(
         filled: false,
         hintStyle: TextStyle(color: SpendWiseColors.dim),
         contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -344,7 +350,7 @@ abstract final class SpendWiseTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: SpendWiseColors.fg,
           minimumSize: const Size(48, 48),
-          side: const BorderSide(color: SpendWiseColors.edge),
+          side: BorderSide(color: SpendWiseColors.edge),
           shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
           textStyle: const TextStyle(
             fontFamily: SpendWiseType.sans,
@@ -368,21 +374,21 @@ abstract final class SpendWiseTheme {
         backgroundColor: SpendWiseColors.bg,
         selectedColor: SpendWiseColors.fg,
         checkmarkColor: SpendWiseColors.bg,
-        side: const BorderSide(color: SpendWiseColors.edge),
+        side: BorderSide(color: SpendWiseColors.edge),
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
         labelStyle: const TextStyle(
           fontFamily: SpendWiseType.sans,
           fontSize: 12,
           fontWeight: FontWeight.w600,
         ),
-        secondaryLabelStyle: const TextStyle(
+        secondaryLabelStyle: TextStyle(
           fontFamily: SpendWiseType.sans,
           fontSize: 12,
           fontWeight: FontWeight.w700,
           color: SpendWiseColors.bg,
         ),
       ),
-      dialogTheme: const DialogThemeData(
+      dialogTheme: DialogThemeData(
         backgroundColor: SpendWiseColors.bg,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
@@ -392,13 +398,13 @@ abstract final class SpendWiseTheme {
         titleTextStyle: SpendWiseType.lead,
         contentTextStyle: SpendWiseType.body,
       ),
-      bottomSheetTheme: const BottomSheetThemeData(
+      bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: SpendWiseColors.bg,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
         dragHandleColor: SpendWiseColors.edge,
       ),
-      snackBarTheme: const SnackBarThemeData(
+      snackBarTheme: SnackBarThemeData(
         backgroundColor: SpendWiseColors.fg,
         contentTextStyle: TextStyle(
           fontFamily: SpendWiseType.sans,
@@ -420,7 +426,7 @@ abstract final class SpendWiseTheme {
               ? SpendWiseColors.keep
               : Colors.transparent,
         ),
-        trackOutlineColor: const WidgetStatePropertyAll(SpendWiseColors.edge),
+        trackOutlineColor: WidgetStatePropertyAll(SpendWiseColors.edge),
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(
         color: SpendWiseColors.keep,

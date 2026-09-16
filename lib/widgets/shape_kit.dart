@@ -1100,7 +1100,7 @@ class RegisterRow extends StatelessWidget {
         onTap: onTap,
         child: ExcludeSemantics(
           child: Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(bottom: BorderSide(color: SpendWiseColors.line)),
             ),
             padding: const EdgeInsets.symmetric(vertical: 9),
@@ -1319,7 +1319,7 @@ class PrimaryAction extends StatelessWidget {
                 ),
               ),
               if (busy)
-                const SizedBox(
+                SizedBox(
                   width: 14,
                   height: 14,
                   child: CircularProgressIndicator(
@@ -1328,7 +1328,7 @@ class PrimaryAction extends StatelessWidget {
                   ),
                 )
               else
-                const Text(
+                Text(
                   '→',
                   style: TextStyle(
                     fontSize: 16,

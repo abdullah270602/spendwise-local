@@ -307,7 +307,7 @@ class _SourceTile extends StatelessWidget {
             border: Border.all(color: SpendWiseColors.edge),
           ),
           child: icon == null
-              ? const Icon(
+              ? Icon(
                   Icons.apps_rounded,
                   size: 18,
                   color: SpendWiseColors.dim,
@@ -489,7 +489,7 @@ class _Chip extends StatelessWidget {
                 width: 18,
                 height: 18,
                 child: icon == null
-                    ? const Icon(
+                    ? Icon(
                         Icons.apps_rounded,
                         size: 14,
                         color: SpendWiseColors.dim,

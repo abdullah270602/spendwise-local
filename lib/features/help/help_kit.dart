@@ -238,7 +238,7 @@ class HelpWhere extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Icon(
+            Icon(
               Icons.north_east_rounded,
               size: 14,
               color: SpendWiseColors.dim,
@@ -251,7 +251,7 @@ class HelpWhere extends StatelessWidget {
               ),
             ),
             if (onTap != null)
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
                 size: 18,
                 color: SpendWiseColors.dim,

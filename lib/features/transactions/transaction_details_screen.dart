@@ -317,7 +317,7 @@ class TransactionDetailsScreen extends StatelessWidget {
                         Expanded(
                           child: Text(category, style: SpendWiseType.row),
                         ),
-                        const Icon(
+                        Icon(
                           Icons.expand_more_rounded,
                           size: 18,
                           color: SpendWiseColors.dim,
@@ -554,7 +554,7 @@ class _EvidenceCardState extends State<_EvidenceCard> {
                               turns: _open ? .5 : 0,
                               duration: duration,
                               curve: Curves.easeOutQuint,
-                              child: const Icon(
+                              child: Icon(
                                 Icons.expand_more_rounded,
                                 size: 18,
                                 color: SpendWiseColors.dim,
@@ -692,7 +692,7 @@ class _Detail extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(vertical: 13),
-    decoration: const BoxDecoration(
+    decoration: BoxDecoration(
       border: Border(bottom: BorderSide(color: SpendWiseColors.line)),
     ),
     child: Row(
@@ -761,9 +761,9 @@ class _LoanSection extends StatelessWidget {
             decoration: BoxDecoration(
               border: Border(
                 left: BorderSide(color: tone, width: 2),
-                top: const BorderSide(color: SpendWiseColors.line),
-                right: const BorderSide(color: SpendWiseColors.line),
-                bottom: const BorderSide(color: SpendWiseColors.line),
+                top: BorderSide(color: SpendWiseColors.line),
+                right: BorderSide(color: SpendWiseColors.line),
+                bottom: BorderSide(color: SpendWiseColors.line),
               ),
             ),
             child: Row(
@@ -783,7 +783,7 @@ class _LoanSection extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Text('→', style: TextStyle(color: SpendWiseColors.dim)),
+                Text('→', style: TextStyle(color: SpendWiseColors.dim)),
               ],
             ),
           ),
@@ -898,9 +898,9 @@ class _Suggestion extends StatelessWidget {
       decoration: BoxDecoration(
         border: Border(
           left: BorderSide(color: tone, width: 2),
-          top: const BorderSide(color: SpendWiseColors.line),
-          right: const BorderSide(color: SpendWiseColors.line),
-          bottom: const BorderSide(color: SpendWiseColors.line),
+          top: BorderSide(color: SpendWiseColors.line),
+          right: BorderSide(color: SpendWiseColors.line),
+          bottom: BorderSide(color: SpendWiseColors.line),
         ),
       ),
       child: Column(
@@ -1011,7 +1011,7 @@ class _BalanceTrail extends StatelessWidget {
                             : SpendWiseColors.keep,
                       ),
                     ),
-                    const Text(
+                    Text(
                       '=',
                       style: TextStyle(color: SpendWiseColors.dim),
                     ),
