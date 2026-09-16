@@ -650,10 +650,19 @@ class _HubSelected extends StatelessWidget {
         style: SpendWiseType.metaTight,
       ),
       const SizedBox(height: 3),
-      RichText(
-        text: TextSpan(
+      // `Text.rich`, not `RichText`. `RichText` paints the span exactly as
+      // given and inherits nothing, so a style carrying no colour -- which
+      // `SpendWiseType.amount` does not -- fell through to Flutter's own
+      // default and drew this figure white. On graphite that was invisibly
+      // wrong; on paper it was white on paper, which is the number a person
+      // opens this screen to read.
+      Text.rich(
+        TextSpan(
           text: (data.fraction * 100).toStringAsFixed(1),
-          style: SpendWiseType.amount.copyWith(fontSize: 21),
+          style: SpendWiseType.amount.copyWith(
+            fontSize: 21,
+            color: SpendWiseColors.fg,
+          ),
           children: [
             TextSpan(
               text: '%',
