@@ -8,6 +8,8 @@ import '../insights/insights_layout.dart';
 import '../insights/insights_sections_screen.dart';
 import '../insights/spending_analytics.dart';
 import '../shell/spendwise_view_model.dart';
+import '../../app/brightness_choice.dart';
+import 'brightness_screen.dart';
 import 'home_categories_screen.dart';
 import 'home_period_screen.dart';
 import 'home_savings_screen.dart';
@@ -145,11 +147,22 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
         const SectionHeading('Everywhere'),
         const SizedBox(height: 8),
         Card(
-          child: _Entry(
-            icon: Icons.palette_outlined,
-            title: 'Colour',
-            value: SpendWiseColors.palette.name,
-            onTap: () => _open(PaletteScreen(viewModel: viewModel)),
+          child: Column(
+            children: [
+              _Entry(
+                icon: Icons.contrast_rounded,
+                title: 'Light or dark',
+                value: brightnessChoice.value.title,
+                onTap: () => _open(BrightnessScreen(viewModel: viewModel)),
+              ),
+              const Divider(height: 1, indent: 56),
+              _Entry(
+                icon: Icons.palette_outlined,
+                title: 'Colour',
+                value: SpendWiseColors.palette.name,
+                onTap: () => _open(PaletteScreen(viewModel: viewModel)),
+              ),
+            ],
           ),
         ),
       ],
