@@ -127,6 +127,10 @@ is locked in.
 **Locks, if you want.** A PIN of any length, with a fingerprint as the fast
 path.
 
+**Light or dark, or neither.** It follows your phone by default and changes
+with it, at dusk, while it is open. Override it either way if you would rather
+it did not. The light ground is the one the exported PDF has always printed on.
+
 <div align="center">
 <br>
 <img src="assets/screenshots/accounts.png" width="30%" alt="Savings held back from available to spend">
