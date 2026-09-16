@@ -100,14 +100,25 @@ void main() {
         ),
       ),
     );
+    // The bordered panel with a tinted icon whose whole content was the
+    // words "No linked evidence" is gone. The absence is a summary line on
+    // the one row that offers the alert, and opening it is what says why
+    // there is nothing behind this entry.
     await tester.scrollUntilVisible(
-      find.text('No linked evidence'),
+      find.text('Where this came from'),
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('No linked evidence'), findsOneWidget);
+    expect(find.text('YOU  ·  NO ALERT'), findsOneWidget);
+    await tester.tap(find.text('Where this came from'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('You typed this'), findsOneWidget);
     expect(find.textContaining('one supporting observation'), findsNothing);
-    expect(find.text('Expense'), findsOneWidget);
+    // The kind used to be printed twice: an eyebrow saying "expense" and a
+    // "Type: Expense" row four lines under it. The eyebrow is the one that
+    // survived.
+    expect(find.text('EXPENSE'), findsOneWidget);
+    expect(find.text('Expense'), findsNothing);
   });
 
   testWidgets('transaction edit recovers from a stale account assignment', (

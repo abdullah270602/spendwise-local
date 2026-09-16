@@ -122,7 +122,11 @@ void main() {
 
     expect(find.text('BALANCE AROUND THIS'), findsOneWidget);
     expect(find.text('100,000'), findsWidgets, reason: 'before');
-    expect(find.text('15,000'), findsWidgets, reason: 'what moved');
+    // Used to read a bare '15,000' with a drawn '−' in its own Text between
+    // the cells. Worked downward there is nothing between the cells to draw
+    // a sign on, so the sign rides on the figure and the rule above the
+    // total is what says the three of them are a sum.
+    expect(find.text('− 15,000'), findsWidgets, reason: 'what moved');
     expect(find.text('85,000'), findsWidgets, reason: 'after');
   });
 
@@ -164,11 +168,18 @@ void main() {
     );
   });
 
-  testWidgets('an entry that reached no account claims no balance', (
+  testWidgets('an entry that reached no account says so where the figures go', (
     tester,
   ) async {
     // An alert that matched nothing has no balance to have moved. Printing a
     // zero would be the app asserting something it cannot know.
+    //
+    // This used to assert that the whole section disappeared. It now stays,
+    // under the same heading and in the same place, saying plainly that
+    // there is nothing to show — because a section that silently fails to
+    // render and a section that has nothing to say look identical, and only
+    // one of them is a bug. The figures are still absent, which is the part
+    // that was ever load-bearing.
     final ledger = LocalLedger.openInMemoryForTests();
     addTearDown(ledger.close);
     ledger.addAccount(
@@ -186,6 +197,15 @@ void main() {
     addTearDown(controller.dispose);
     await pump(tester, controller, orphan);
 
-    expect(find.text('BALANCE AROUND THIS'), findsNothing);
+    expect(find.text('BALANCE AROUND THIS'), findsOneWidget);
+    expect(find.text('No account'), findsOneWidget);
+    expect(
+      find.text('BEFORE'),
+      findsNothing,
+      reason: 'no account means no figures, not invented ones',
+    );
+    expect(find.text('9,000'), findsNothing);
+    // The month is still right; only the reconciliation check is missing.
+    expect(find.textContaining("STILL COUNTED IN"), findsOneWidget);
   });
 }
