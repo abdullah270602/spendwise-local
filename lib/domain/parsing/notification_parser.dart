@@ -485,12 +485,68 @@ final class NotificationParser {
     caseSensitive: false,
   );
 
+  /// Whether a notification's title is the app talking rather than naming
+  /// anybody.
+  ///
+  /// A bank titles its alerts with its own name, which is a reasonable thing
+  /// to call an entry when nothing better is known. A wallet titles them with
+  /// copy -- "Off it goes", "Cha-Ching!", "Card in action", "Money sent" --
+  /// and using that as the name filled a real ledger with entries called
+  /// "Money sent", three in a row, telling the owner nothing about where the
+  /// money went.
+  ///
+  /// Detected by what slogans carry and names do not: a pictograph or an
+  /// exclamation mark. Checked by code point rather than by regex so that
+  /// Arabic, Urdu and CJK names -- which are names -- are untouched, and so
+  /// that no escape has to survive being written into this file.
+  static bool _isSlogan(String heading) {
+    if (heading.contains('!')) return true;
+    for (final rune in heading.runes) {
+      final pictographic =
+          (rune >= 0x2190 && rune <= 0x2BFF) ||
+          (rune >= 0x1F000 && rune <= 0x1FAFF) ||
+          rune == 0xFE0F;
+      if (pictographic) return true;
+    }
+    return false;
+  }
+
   static String? _describe(String? title, String? counterparty) {
     final name = _displayName(counterparty);
     if (name != null && name.isNotEmpty) return name;
     final heading = title?.trim();
     if (heading == null || heading.isEmpty) return null;
-    return RegExp(r'[A-Za-z]{2,}').hasMatch(heading) ? heading : null;
+    // Nothing is better than something wrong here: the ledger already falls
+    // back to "Payment" or "Money received", which at least does not pretend
+    // to name a party.
+    if (_isSlogan(heading)) return null;
+    return _hasWords(heading) ? heading : null;
+  }
+
+  /// Whether a title contains a word, in any script.
+  ///
+  /// The point of the check is to reject a title that is only a sender's
+  /// short code -- "18258" tells a reader nothing. It used to ask for two
+  /// Latin letters, which also rejected every bank that titles its alerts in
+  /// Arabic, Urdu, Hindi or Chinese, and named those entries "Payment"
+  /// instead. Written over code points rather than as a character class so
+  /// it holds for scripts nobody thought to list.
+  static bool _hasWords(String heading) {
+    var run = 0;
+    for (final rune in heading.runes) {
+      final separator =
+          rune <= 0x2F ||
+          (rune >= 0x30 && rune <= 0x40) ||
+          (rune >= 0x5B && rune <= 0x60) ||
+          (rune >= 0x7B && rune <= 0x7E);
+      if (separator) {
+        run = 0;
+        continue;
+      }
+      run++;
+      if (run >= 2) return true;
+    }
+    return false;
   }
 
   /// The counterparty as stored keeps every identifier, because that is what
