@@ -155,7 +155,7 @@ class _MarkLoanSheetState extends State<_MarkLoanSheet> {
           const SizedBox(height: 22),
           Container(
             padding: const EdgeInsets.only(top: 13),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(top: BorderSide(color: SpendWiseColors.line)),
             ),
             child: Row(
@@ -405,7 +405,7 @@ class _DebtSheetState extends State<_DebtSheet> {
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.only(left: 11),
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   border: Border(
                     left: BorderSide(color: SpendWiseColors.edge, width: 2),
                   ),
@@ -769,7 +769,7 @@ class _SettleFromEntrySheetState extends State<_SettleFromEntrySheet> {
             const SizedBox(height: 14),
             Container(
               padding: const EdgeInsets.only(top: 13),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 border: Border(top: BorderSide(color: SpendWiseColors.line)),
               ),
               child: Row(
@@ -1019,9 +1019,9 @@ class _MatchingEntries extends StatelessWidget {
                 decoration: BoxDecoration(
                   border: Border(
                     left: BorderSide(color: tone, width: 2),
-                    top: const BorderSide(color: SpendWiseColors.line),
-                    right: const BorderSide(color: SpendWiseColors.line),
-                    bottom: const BorderSide(color: SpendWiseColors.line),
+                    top: BorderSide(color: SpendWiseColors.line),
+                    right: BorderSide(color: SpendWiseColors.line),
+                    bottom: BorderSide(color: SpendWiseColors.line),
                   ),
                 ),
                 child: Row(

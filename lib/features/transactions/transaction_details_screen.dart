@@ -117,10 +117,7 @@ class TransactionDetailsScreen extends StatelessWidget {
           // this screen was redrawn to remove.
           Eyebrow(_story(live, debt, cash: cash), color: storyTone),
           const SizedBox(height: 8),
-          Text(
-            live.title,
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
+          Text(live.title, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 10),
           // The title may wrap; the figure may not — a wrapped amount reads
           // as two amounts. Past eleven characters the type steps down one
@@ -133,20 +130,20 @@ class TransactionDetailsScreen extends StatelessWidget {
               printed,
               maxLines: 1,
               softWrap: false,
-              style: (printed.length > 11
-                      ? SpendWiseType.figure.copyWith(
-                          fontSize: 28,
-                          letterSpacing: -.9,
-                        )
-                      : SpendWiseType.figure)
-                  .copyWith(color: figureTone),
+              style:
+                  (printed.length > 11
+                          ? SpendWiseType.figure.copyWith(
+                              fontSize: 28,
+                              letterSpacing: -.9,
+                            )
+                          : SpendWiseType.figure)
+                      .copyWith(color: figureTone),
             ),
           ),
           const SizedBox(height: 10),
           Text(_factLine(live, debt), style: SpendWiseType.meta),
           if (live.note.isNotEmpty) _Quoted(live.note),
-          if (_settlementNote(live, debt) case final String said)
-            _Quoted(said),
+          if (_settlementNote(live, debt) case final String said) _Quoted(said),
           ..._flags(live, accounts, cash: cash),
           const SizedBox(height: 24),
           _BalanceTrail(
@@ -201,7 +198,8 @@ class TransactionDetailsScreen extends StatelessWidget {
   /// said TRANSFER — and on a debt entry, where the category is the story.
   static String _factLine(TransactionViewData entry, DebtViewData? debt) {
     final at = entry.occurredAt.toLocal();
-    final says = entry.kind != TransactionKind.transfer &&
+    final says =
+        entry.kind != TransactionKind.transfer &&
         debt == null &&
         entry.category.isNotEmpty;
     return [
@@ -214,7 +212,10 @@ class TransactionDetailsScreen extends StatelessWidget {
 
   /// What attaching this entry to a loan did to the month, for the entry that
   /// paid into one rather than the entry that opened it.
-  static String? _settlementNote(TransactionViewData entry, DebtViewData? debt) {
+  static String? _settlementNote(
+    TransactionViewData entry,
+    DebtViewData? debt,
+  ) {
     if (debt == null) return null;
     // The opening leg of a loan moves the same way the loan does; a payment
     // into it moves the other way. That is the only thing telling the two
@@ -245,7 +246,8 @@ class TransactionDetailsScreen extends StatelessWidget {
         _Flag(
           tone: SpendWiseColors.mine,
           heading: 'Not spending. Not yet.',
-          body: 'This left the bank but it never left you — it is in a '
+          body:
+              'This left the bank but it never left you — it is in a '
               'pocket. It becomes spending only when you record what the '
               'cash went on.',
         ),
@@ -255,15 +257,16 @@ class TransactionDetailsScreen extends StatelessWidget {
       final read = entry.evidence.isEmpty
           ? null
           : entry.evidence
-              .map((item) => item.confidence)
-              .reduce((a, b) => a > b ? a : b);
+                .map((item) => item.confidence)
+                .reduce((a, b) => a > b ? a : b);
       flags.add(
         _Flag(
           tone: SpendWiseColors.spend,
           heading: read != null && read < .8
               ? 'Posted, but only ${(read * 100).round()}% sure'
               : 'Posted, but not confirmed yet',
-          body: 'It is in your ledger and counted in the month. Below 80% '
+          body:
+              'It is in your ledger and counted in the month. Below 80% '
               'SpendWise marks the entry rather than trusting it. Review is '
               'where it gets confirmed; Edit is where it gets corrected.',
         ),
@@ -279,7 +282,8 @@ class TransactionDetailsScreen extends StatelessWidget {
         _Flag(
           tone: SpendWiseColors.mine,
           heading: 'Your answer stands',
-          body: 'You settled something about this entry by hand. SpendWise '
+          body:
+              'You settled something about this entry by hand. SpendWise '
               're-reads stored alerts every time it reconciles and will not '
               'touch this one again — and the alert underneath is kept '
               'exactly as it arrived.',
@@ -296,9 +300,11 @@ class TransactionDetailsScreen extends StatelessWidget {
       flags.add(
         _Flag(
           tone: SpendWiseColors.spend,
-          heading: 'Charged in ${entry.amount.currency}. '
+          heading:
+              'Charged in ${entry.amount.currency}. '
               'The account keeps $held.',
-          body: 'SpendWise does not convert currencies and will not guess a '
+          body:
+              'SpendWise does not convert currencies and will not guess a '
               'rate. The balance below moves by the figure as it was read, '
               'not by what this cost in $held.',
         ),
@@ -473,7 +479,7 @@ class TransactionDetailsScreen extends StatelessWidget {
                         Expanded(
                           child: Text(category, style: SpendWiseType.row),
                         ),
-                        const Icon(
+                        Icon(
                           Icons.expand_more_rounded,
                           size: 18,
                           color: SpendWiseColors.dim,
@@ -633,7 +639,7 @@ class _Quoted extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     margin: const EdgeInsets.only(top: 14),
     padding: const EdgeInsets.only(left: 11),
-    decoration: const BoxDecoration(
+    decoration: BoxDecoration(
       border: Border(left: BorderSide(color: SpendWiseColors.edge)),
     ),
     child: Text(text, style: SpendWiseType.body.copyWith(fontSize: 13.5)),
@@ -654,18 +660,15 @@ class _Flag extends StatelessWidget {
     decoration: BoxDecoration(
       border: Border(
         left: BorderSide(color: tone, width: 2),
-        top: const BorderSide(color: SpendWiseColors.line),
-        right: const BorderSide(color: SpendWiseColors.line),
-        bottom: const BorderSide(color: SpendWiseColors.line),
+        top: BorderSide(color: SpendWiseColors.line),
+        right: BorderSide(color: SpendWiseColors.line),
+        bottom: BorderSide(color: SpendWiseColors.line),
       ),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          heading,
-          style: SpendWiseType.rowStrong.copyWith(fontSize: 14),
-        ),
+        Text(heading, style: SpendWiseType.rowStrong.copyWith(fontSize: 14)),
         const SizedBox(height: 6),
         Text(body, style: SpendWiseType.body.copyWith(fontSize: 12.5)),
       ],
@@ -711,7 +714,7 @@ class _GhostButton extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            const Text('›', style: TextStyle(color: SpendWiseColors.dim)),
+            Text('›', style: TextStyle(color: SpendWiseColors.dim)),
           ],
         ),
       ),
@@ -755,9 +758,9 @@ class _DisclosureState extends State<_Disclosure> {
     return Container(
       decoration: BoxDecoration(
         border: Border(
-          top: const BorderSide(color: SpendWiseColors.line),
+          top: BorderSide(color: SpendWiseColors.line),
           bottom: widget.last
-              ? const BorderSide(color: SpendWiseColors.line)
+              ? BorderSide(color: SpendWiseColors.line)
               : BorderSide.none,
         ),
       ),
@@ -790,7 +793,7 @@ class _DisclosureState extends State<_Disclosure> {
                       turns: _open ? .5 : 0,
                       duration: duration,
                       curve: Curves.easeOutQuint,
-                      child: const Icon(
+                      child: Icon(
                         Icons.expand_more_rounded,
                         size: 18,
                         color: SpendWiseColors.dim,
@@ -918,9 +921,9 @@ class _BalanceTrail extends StatelessWidget {
   /// The month is still right even when the reconciliation check is missing.
   /// Two different truths, and only one of them is broken.
   String? get _stillCounted {
-    final month = DateFormat(
-      'MMMM',
-    ).format(transaction.occurredAt.toLocal()).toUpperCase();
+    final month = DateFormat('MMMM')
+        .format(transaction.occurredAt.toLocal())
+        .toUpperCase();
     return switch (transaction.kind) {
       TransactionKind.expense => "STILL COUNTED IN $month'S SPENDING",
       TransactionKind.income => "STILL COUNTED IN $month'S INCOME",
@@ -942,10 +945,10 @@ class _TrailBlock extends StatelessWidget {
     // lining up and the subtraction stops being checkable by eye — which is
     // the block's only job.
     final cents = [
-          change.beforeMinor,
-          change.deltaMinor,
-          change.afterMinor,
-        ].any((minor) => minor % 100 != 0);
+      change.beforeMinor,
+      change.deltaMinor,
+      change.afterMinor,
+    ].any((minor) => minor % 100 != 0);
     final moved = change.deltaMinor < 0
         ? SpendWiseColors.spend
         : SpendWiseColors.keep;
@@ -1014,7 +1017,7 @@ class _TrailStep extends StatelessWidget {
     margin: EdgeInsets.only(top: sum ? 4 : 0),
     padding: EdgeInsets.only(top: sum ? 9 : 5, bottom: 5),
     decoration: sum
-        ? const BoxDecoration(
+        ? BoxDecoration(
             border: Border(top: BorderSide(color: SpendWiseColors.edge)),
           )
         : null,
@@ -1180,7 +1183,9 @@ class _LoanSection extends StatelessWidget {
     }
     final noun = loan.kind == DebtKind.lent ? 'loan' : 'debt';
     if (!paidInto) return 'The $noun';
-    return loan.isSettled ? 'The $noun this closed' : 'The $noun this paid into';
+    return loan.isSettled
+        ? 'The $noun this closed'
+        : 'The $noun this paid into';
   }
 
   /// Money moving between the owner's own accounts is not somebody paying
@@ -1313,9 +1318,9 @@ List<_Instalment> _instalmentsOf({
       if (item.debtId == debt.id &&
           (item.kind == TransactionKind.income) == debt.lent)
         _Instalment(
-          label: DateFormat(
-            'd MMM',
-          ).format(item.occurredAt.toLocal()).toUpperCase(),
+          label: DateFormat('d MMM')
+              .format(item.occurredAt.toLocal())
+              .toUpperCase(),
           minor: item.amount.minorUnits.abs(),
           isThisEntry: item.id == thisEntryId,
           at: item.occurredAt,
@@ -1402,9 +1407,9 @@ class _LoanBlock extends StatelessWidget {
             color: _finished ? SpendWiseColors.dim : tone,
             width: 2,
           ),
-          top: const BorderSide(color: SpendWiseColors.line),
-          right: const BorderSide(color: SpendWiseColors.line),
-          bottom: const BorderSide(color: SpendWiseColors.line),
+          top: BorderSide(color: SpendWiseColors.line),
+          right: BorderSide(color: SpendWiseColors.line),
+          bottom: BorderSide(color: SpendWiseColors.line),
         ),
       ),
       child: Column(
@@ -1463,11 +1468,8 @@ class _LoanBlock extends StatelessWidget {
           const SizedBox(height: 12),
           _GhostButton(
             label: _openLabel,
-            onPressed: () => debt_sheets.openDebt(
-              context,
-              viewModel: viewModel,
-              debt: debt,
-            ),
+            onPressed: () =>
+                debt_sheets.openDebt(context, viewModel: viewModel, debt: debt),
           ),
         ],
       ),
@@ -1475,9 +1477,9 @@ class _LoanBlock extends StatelessWidget {
   }
 
   String get _when {
-    final opened = DateFormat(
-      'd MMM',
-    ).format(debt.openedAt.toLocal()).toUpperCase();
+    final opened = DateFormat('d MMM')
+        .format(debt.openedAt.toLocal())
+        .toUpperCase();
     final closed = debt.closedAt;
     if (closed == null) return 'OPEN SINCE $opened';
     final on = DateFormat('d MMM').format(closed.toLocal()).toUpperCase();
@@ -1535,7 +1537,7 @@ class _History extends StatelessWidget {
     if (!folded) {
       return Container(
         margin: const EdgeInsets.only(top: 11),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           border: Border(top: BorderSide(color: SpendWiseColors.line)),
         ),
         child: list,
@@ -1561,7 +1563,7 @@ class _HistoryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(vertical: 7),
-    decoration: const BoxDecoration(
+    decoration: BoxDecoration(
       border: Border(bottom: BorderSide(color: SpendWiseColors.line)),
     ),
     child: Row(
@@ -1621,9 +1623,9 @@ class _Suggestion extends StatelessWidget {
       decoration: BoxDecoration(
         border: Border(
           left: BorderSide(color: tone, width: 2),
-          top: const BorderSide(color: SpendWiseColors.line),
-          right: const BorderSide(color: SpendWiseColors.line),
-          bottom: const BorderSide(color: SpendWiseColors.line),
+          top: BorderSide(color: SpendWiseColors.line),
+          right: BorderSide(color: SpendWiseColors.line),
+          bottom: BorderSide(color: SpendWiseColors.line),
         ),
       ),
       child: Column(

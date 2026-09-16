@@ -1,6 +1,10 @@
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'app/brightness_choice.dart';
+import 'app/ground.dart';
 import 'app/spendwise_controller.dart';
 import 'data/local_ledger.dart';
 import 'app/palette.dart';
@@ -16,12 +20,21 @@ Future<void> main() async {
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
+  // The best guess available this early: the ledger is not open yet, so the
+  // stored choice cannot be read, and the stored choice defaults to following
+  // the platform anyway. `BrightnessScope` annotates the real answer from the
+  // first frame onwards.
+  final booting = Ground.of(PlatformDispatcher.instance.platformBrightness);
   SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
+    SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      systemNavigationBarColor: SpendWiseColors.background,
-      systemNavigationBarIconBrightness: Brightness.light,
-      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: booting.bg,
+      systemNavigationBarIconBrightness: booting.isLight
+          ? Brightness.dark
+          : Brightness.light,
+      statusBarIconBrightness: booting.isLight
+          ? Brightness.dark
+          : Brightness.light,
     ),
   );
   // Everything the app needs before it can draw anything is in here, and
@@ -32,9 +45,18 @@ Future<void> main() async {
   // Whatever went wrong, saying so beats showing nothing.
   try {
     final controller = await SpendWiseController.create();
-    // Before the first frame, so the app never flashes the default.
+    // Before the first frame, so the app never flashes the default -- which
+    // now means the ground as well as the palette. A launch that drew one
+    // graphite frame before switching to paper would be the most visible
+    // flash in the app, on every single launch.
+    brightnessChoice.value = BrightnessChoice.fromId(
+      controller.viewPreference(BrightnessChoice.preferenceKey),
+    );
     SpendWiseColors.apply(
       SpendWisePalette.byId(controller.viewPreference('palette')),
+      on: brightnessChoice.value.groundFor(
+        PlatformDispatcher.instance.platformBrightness,
+      ),
     );
     final lock = AppLockController(
       preferences: LedgerLockPreferences(controller),
@@ -167,15 +189,22 @@ class SpendWiseApp extends StatelessWidget {
     // Above MaterialApp, not inside its `home`: pushed routes are siblings of
     // home under the app's Navigator, so a scope down there is invisible to
     // every screen the user actually navigates to.
-    builder: (context, _, _) => AppLockScope(
-      lock: lock,
-      child: MaterialApp(
-        title: 'SpendWise',
-        debugShowCheckedModeBanner: false,
-        theme: SpendWiseTheme.dark,
-        home: AppLockGate(
-          lock: lock,
-          child: SpendWiseShell(viewModel: controller),
+    builder: (context, _, _) => BrightnessScope(
+      builder: (context, ground) => AppLockScope(
+        lock: lock,
+        child: MaterialApp(
+          title: 'SpendWise',
+          debugShowCheckedModeBanner: false,
+          // One theme, not a `theme`/`darkTheme` pair. Which ground the app
+          // is on is already decided above -- by a preference that has three
+          // answers, only one of which is "ask the platform" -- and handing
+          // MaterialApp both would hand that decision back to a widget that
+          // only knows about two.
+          theme: ground.isLight ? SpendWiseTheme.light : SpendWiseTheme.dark,
+          home: AppLockGate(
+            lock: lock,
+            child: SpendWiseShell(viewModel: controller),
+          ),
         ),
       ),
     ),

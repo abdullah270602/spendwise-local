@@ -138,7 +138,7 @@ class DashboardScreen extends StatelessWidget {
                       ),
                     ),
                     tooltip: 'Settings and privacy',
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.tune_rounded,
                       size: 19,
                       color: SpendWiseColors.dim,
@@ -594,7 +594,7 @@ class _PutAwayNote extends StatelessWidget {
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.only(top: 13),
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             border: Border(top: BorderSide(color: SpendWiseColors.line)),
           ),
           child: Row(
@@ -661,7 +661,7 @@ class _SavingsStrip extends StatelessWidget {
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.only(top: 13),
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             border: Border(top: BorderSide(color: SpendWiseColors.line)),
           ),
           child: Column(
@@ -786,7 +786,7 @@ class _AsideNotes extends StatelessWidget {
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.only(top: 13),
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             border: Border(top: BorderSide(color: SpendWiseColors.line)),
           ),
           child: Column(
@@ -1035,7 +1035,7 @@ class _TourOffer extends StatelessWidget {
         // two it is the one a thumb is likeliest to miss.
         InkWell(
           onTap: () => viewModel.uiSetViewPreference('tour_seen', 'true'),
-          child: const SizedBox(
+          child: SizedBox(
             width: kMinInteractiveDimension,
             height: kMinInteractiveDimension,
             child: Icon(

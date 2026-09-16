@@ -564,10 +564,16 @@ _FlowGeometry _buildFlowGeometry({
   final savedBotW = asBranch ? keptW * savedOfKept : 0.0;
   final gap = (asBranch && savedBotW > 0) ? siblingGapDp * reveal : 0.0;
 
+  // Every alpha here belongs to the ground rather than to the ribbon, because
+  // a translucent fill points at whatever is behind it. On graphite it walks
+  // the tone toward near-black, away from the text, and the branch gains
+  // presence; on paper the same number walks it toward the ground and the
+  // branch loses a fifth of its separation. See `Ground.keptBranchAlpha`.
+  final ground = SpendWiseColors.ground;
   final kept = <_FlowPiece>[
     _FlowPiece(
       ribbon(topX, topX + liveKeptW, keptBotX, keptBotX + liveKeptW),
-      SpendWiseColors.keep.withValues(alpha: .30),
+      SpendWiseColors.keep.withValues(alpha: ground.keptBranchAlpha),
     ),
   ];
   final savedPieces = <_FlowPiece>[];
@@ -580,14 +586,14 @@ _FlowGeometry _buildFlowGeometry({
           keptBotX + liveKeptW + gap,
           keptBotX + liveKeptW + gap + savedBotW,
         ),
-        SpendWiseColors.mine.withValues(alpha: .34),
+        SpendWiseColors.mine.withValues(alpha: ground.savedBranchAlpha),
       ),
     );
   }
   final spend = <_FlowPiece>[
     _FlowPiece(
       ribbon(splitX, topX + topW, spentBotX, spentBotX + spentW),
-      SpendWiseColors.spend.withValues(alpha: .48),
+      SpendWiseColors.spend.withValues(alpha: ground.spentBranchAlpha),
     ),
   ];
 
@@ -604,7 +610,7 @@ _FlowGeometry _buildFlowGeometry({
           keptBotX + keptW - seamW,
           keptBotX + keptW,
         ),
-        SpendWiseColors.mine.withValues(alpha: .30),
+        SpendWiseColors.mine.withValues(alpha: ground.seamAlpha),
       ),
     );
   }
@@ -674,7 +680,7 @@ _FlowGeometry _buildFlowGeometry({
   );
 }
 
-class _FlowShapePainter extends CustomPainter {
+class _FlowShapePainter extends CustomPainter with GroundAware {
   _FlowShapePainter({
     required this.keptFraction,
     required this.savedOfKept,
@@ -755,6 +761,7 @@ class _FlowShapePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_FlowShapePainter old) =>
+      groundMoved(old) ||
       old.keptFraction != keptFraction ||
       old.savedOfKept != savedOfKept ||
       old.saved != saved ||
@@ -792,7 +799,7 @@ class BalanceLine extends StatelessWidget {
   );
 }
 
-class _BalanceLinePainter extends CustomPainter {
+class _BalanceLinePainter extends CustomPainter with GroundAware {
   _BalanceLinePainter(this.points, this.color);
 
   final List<int> points;
@@ -861,7 +868,7 @@ class _BalanceLinePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_BalanceLinePainter old) =>
-      old.points != points || old.color != color;
+      groundMoved(old) || old.points != points || old.color != color;
 }
 
 /// Proportional stacked bar. Segments carry the category ramp in order, so the
@@ -1100,7 +1107,7 @@ class RegisterRow extends StatelessWidget {
         onTap: onTap,
         child: ExcludeSemantics(
           child: Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(bottom: BorderSide(color: SpendWiseColors.line)),
             ),
             padding: const EdgeInsets.symmetric(vertical: 9),
@@ -1319,7 +1326,7 @@ class PrimaryAction extends StatelessWidget {
                 ),
               ),
               if (busy)
-                const SizedBox(
+                SizedBox(
                   width: 14,
                   height: 14,
                   child: CircularProgressIndicator(
@@ -1328,7 +1335,7 @@ class PrimaryAction extends StatelessWidget {
                   ),
                 )
               else
-                const Text(
+                Text(
                   '→',
                   style: TextStyle(
                     fontSize: 16,

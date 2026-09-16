@@ -364,7 +364,7 @@ class _Preview extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.only(top: 14),
-    decoration: const BoxDecoration(
+    decoration: BoxDecoration(
       border: Border(top: BorderSide(color: SpendWiseColors.edge)),
     ),
     child: Column(
@@ -439,7 +439,7 @@ class _Stat extends StatelessWidget {
 
 /// Six markers on a rim, longest first, read clockwise from the top -- the
 /// dial's own rule, at the size of a thumbnail.
-class _DialThumb extends CustomPainter {
+class _DialThumb extends CustomPainter with GroundAware {
   static const _shares = [1.0, .78, .6, .46, .3, .2];
 
   @override
@@ -469,12 +469,12 @@ class _DialThumb extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_DialThumb oldDelegate) => false;
+  bool shouldRepaint(_DialThumb oldDelegate) => groundMoved(oldDelegate);
 }
 
 /// One continuous line leaving and returning to its centre, which is the
 /// whole of the trace's idea.
-class _TraceThumb extends CustomPainter {
+class _TraceThumb extends CustomPainter with GroundAware {
   static const _deflections = [.35, -.6, .15, -.2, .8, -.35];
 
   @override
@@ -521,5 +521,5 @@ class _TraceThumb extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_TraceThumb oldDelegate) => false;
+  bool shouldRepaint(_TraceThumb oldDelegate) => groundMoved(oldDelegate);
 }

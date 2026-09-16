@@ -118,13 +118,13 @@ class PinPad extends StatelessWidget {
           _PadKey(
             enabled: enabled,
             onTap: () => onDigit('0'),
-            child: const Text('0', style: _digitStyle),
+            child: Text('0', style: _digitStyle),
           ),
           _PadKey(
             enabled: enabled,
             onTap: onBackspace,
             semanticLabel: 'Delete',
-            child: const Icon(
+            child: Icon(
               Icons.backspace_outlined,
               size: 21,
               color: SpendWiseColors.dim,
@@ -135,7 +135,7 @@ class PinPad extends StatelessWidget {
     ],
   );
 
-  static const _digitStyle = TextStyle(
+  static TextStyle get _digitStyle => TextStyle(
     fontFamily: SpendWiseType.sans,
     fontSize: 25,
     fontWeight: FontWeight.w600,
@@ -152,7 +152,7 @@ class _PadRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DecoratedBox(
-    decoration: const BoxDecoration(
+    decoration: BoxDecoration(
       border: Border(top: BorderSide(color: SpendWiseColors.line)),
     ),
     child: IntrinsicHeight(

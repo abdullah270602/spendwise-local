@@ -178,8 +178,8 @@ class ClosedCircuit extends StatelessWidget {
 }
 
 /// Three lines converging into one, with an arrow at the bottom.
-class _FunnelPainter extends CustomPainter {
-  const _FunnelPainter({required this.lit});
+class _FunnelPainter extends CustomPainter with GroundAware {
+  _FunnelPainter({required this.lit});
 
   final bool lit;
 
@@ -214,11 +214,12 @@ class _FunnelPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_FunnelPainter old) => old.lit != lit;
+  bool shouldRepaint(_FunnelPainter old) =>
+      groundMoved(old) || old.lit != lit;
 }
 
 /// A line that runs into a wall.
-class _BlockedPainter extends CustomPainter {
+class _BlockedPainter extends CustomPainter with GroundAware {
   @override
   void paint(Canvas canvas, Size size) {
     final centre = size.width / 2;
@@ -242,7 +243,7 @@ class _BlockedPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_BlockedPainter old) => false;
+  bool shouldRepaint(_BlockedPainter old) => groundMoved(old);
 }
 
 /// The apps being watched, as their own icons.
@@ -307,7 +308,7 @@ class _SourceTile extends StatelessWidget {
             border: Border.all(color: SpendWiseColors.edge),
           ),
           child: icon == null
-              ? const Icon(
+              ? Icon(
                   Icons.apps_rounded,
                   size: 18,
                   color: SpendWiseColors.dim,
@@ -489,7 +490,7 @@ class _Chip extends StatelessWidget {
                 width: 18,
                 height: 18,
                 child: icon == null
-                    ? const Icon(
+                    ? Icon(
                         Icons.apps_rounded,
                         size: 14,
                         color: SpendWiseColors.dim,

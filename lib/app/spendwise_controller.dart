@@ -142,9 +142,17 @@ final class SpendWiseController extends ChangeNotifier
       homeFigures(this),
       HomeSavingsStyle.fromId(viewPreference('home_savings')),
     );
-    final keepColor = SpendWiseColors.keep.toARGB32();
-    final spendColor = SpendWiseColors.spend.toARGB32();
-    final mineColor = SpendWiseColors.mine.toARGB32();
+    // The chosen palette in its graphite form, not the one the app is
+    // currently drawing with. A widget sits on the user's wallpaper, not on
+    // either of SpendWise's grounds, and SpendWiseHomeWidgetRenderer.kt is
+    // built for that -- it outlines every shape with a two-tone keyline so
+    // the picture reads on anything behind it. Publishing paper-relit tones
+    // because the phone happens to be in light mode would darken that
+    // picture for a reason the widget cannot see and cannot answer.
+    final published = SpendWiseColors.palette;
+    final keepColor = published.keep.toARGB32();
+    final spendColor = published.spend.toARGB32();
+    final mineColor = published.mine.toARGB32();
     if (snapshot == _lastPublishedWidgetSnapshot &&
         keepColor == _lastPublishedKeepColor &&
         spendColor == _lastPublishedSpendColor &&

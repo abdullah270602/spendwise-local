@@ -174,9 +174,9 @@ class AlertDemo extends StatelessWidget {
           decoration: BoxDecoration(
             border: Border(
               left: BorderSide(color: example.tone, width: 2),
-              top: const BorderSide(color: SpendWiseColors.edge),
-              right: const BorderSide(color: SpendWiseColors.edge),
-              bottom: const BorderSide(color: SpendWiseColors.edge),
+              top: BorderSide(color: SpendWiseColors.edge),
+              right: BorderSide(color: SpendWiseColors.edge),
+              bottom: BorderSide(color: SpendWiseColors.edge),
             ),
           ),
           child: Column(
@@ -261,7 +261,7 @@ class _AlertCard extends StatelessWidget {
           const SizedBox(height: 7),
           Container(
             padding: const EdgeInsets.only(left: 11),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(
                 left: BorderSide(color: SpendWiseColors.edge, width: 2),
               ),
@@ -334,7 +334,7 @@ class _Arrow extends StatelessWidget {
   );
 }
 
-class _ArrowPainter extends CustomPainter {
+class _ArrowPainter extends CustomPainter with GroundAware {
   @override
   void paint(Canvas canvas, Size size) {
     final x = size.width / 2;
@@ -354,5 +354,5 @@ class _ArrowPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_ArrowPainter old) => false;
+  bool shouldRepaint(_ArrowPainter old) => groundMoved(old);
 }

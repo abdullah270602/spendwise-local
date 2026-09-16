@@ -204,7 +204,7 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
                           onPressed: widget.viewModel.uiDismissError,
                           tooltip: 'Dismiss',
                           visualDensity: VisualDensity.compact,
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.close_rounded,
                             size: 18,
                             color: SpendWiseColors.bg,
@@ -233,7 +233,7 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
             : null,
         bottomNavigationBar: DecoratedBox(
           key: _navKey,
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             border: Border(top: BorderSide(color: SpendWiseColors.line)),
           ),
           child: NavigationBar(
@@ -327,7 +327,7 @@ class _DecisionIcon extends StatelessWidget {
             color: SpendWiseColors.spend,
             child: Text(
               count > 9 ? '9+' : '$count',
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: SpendWiseType.sans,
                 fontSize: 9,
                 height: 1.3,

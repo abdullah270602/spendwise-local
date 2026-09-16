@@ -364,7 +364,7 @@ class _SectionsEntry extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         children: [
-          const Icon(Icons.tune_rounded, size: 15, color: SpendWiseColors.dim),
+          Icon(Icons.tune_rounded, size: 15, color: SpendWiseColors.dim),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -375,7 +375,7 @@ class _SectionsEntry extends StatelessWidget {
               ),
             ),
           ),
-          const Icon(
+          Icon(
             Icons.chevron_right_rounded,
             size: 16,
             color: SpendWiseColors.dim,
@@ -414,7 +414,7 @@ class _PeriodButton extends StatelessWidget {
             children: [
               Text(
                 label.toUpperCase(),
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: SpendWiseType.sans,
                   fontSize: 10,
                   letterSpacing: 1.2,
@@ -423,7 +423,7 @@ class _PeriodButton extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 5),
-              const Icon(
+              Icon(
                 Icons.expand_more_rounded,
                 size: 14,
                 color: SpendWiseColors.dim,
@@ -692,7 +692,7 @@ class _SummaryBand extends StatelessWidget {
     final cadence = 'per ${analytics.resolution.cadence}';
     return Container(
       padding: const EdgeInsets.only(top: 14),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(top: BorderSide(color: SpendWiseColors.edge)),
       ),
       child: Column(

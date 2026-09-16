@@ -173,7 +173,7 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
                   ),
                   child: Container(
                     padding: const EdgeInsets.only(top: 13),
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       border: Border(
                         top: BorderSide(color: SpendWiseColors.line),
                       ),
@@ -717,7 +717,7 @@ class _SwipeHint extends StatelessWidget {
     padding: const EdgeInsets.symmetric(horizontal: 16),
     child: Text(
       label,
-      style: const TextStyle(
+      style: TextStyle(
         fontFamily: SpendWiseType.sans,
         fontSize: 11,
         letterSpacing: 1.6,
@@ -745,7 +745,7 @@ class _AlertCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(top: 14),
       padding: const EdgeInsets.only(top: 12),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(top: BorderSide(color: SpendWiseColors.line)),
       ),
       child: Column(
@@ -846,7 +846,7 @@ class _RuleBlock extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     margin: const EdgeInsets.only(top: 20),
     padding: const EdgeInsets.only(top: 17),
-    decoration: const BoxDecoration(
+    decoration: BoxDecoration(
       border: Border(top: BorderSide(color: SpendWiseColors.edge)),
     ),
     child: Column(
@@ -879,7 +879,7 @@ class _RuleBlock extends StatelessWidget {
           const SizedBox(height: 11),
           Container(
             padding: const EdgeInsets.only(left: 11),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(
                 left: BorderSide(color: SpendWiseColors.edge, width: 2),
               ),

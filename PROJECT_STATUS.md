@@ -115,7 +115,9 @@ in `AGENTS.md`. In particular:
 
 ## Shipped functionality
 
-- Premium dark Material 3 shell: Home, Ledger, Review, Accounts, Settings.
+- Premium Material 3 shell: Home, Ledger, Review, Accounts, Settings, drawn on
+  either of two grounds — graphite, or the warm paper the PDF export already
+  prints on. Light / Dark / Follow the system, defaulting to the system.
 - Android `NotificationListenerService` ingestion with encrypted durable queue,
   configured global source selection/search, and notification-tray recovery.
 - Deterministic Pakistani banking/SMS parsing and evidence reconciliation,
@@ -183,9 +185,18 @@ in `AGENTS.md`. In particular:
 - Selecting a category no longer hides the breakdown. The totals behind it are
   computed across every category regardless of the filter, so the picture can
   stay on screen, dimmed, at the moment somebody is examining one part of it.
-- Appearance is one door in Settings covering Home, Insights and colour.
-  Colour is no longer filed under "Home": it repaints the whole app and only
-  lived there because that was the section that existed.
+- Appearance is one door in Settings covering Home, Insights, light-or-dark and
+  colour. Colour is no longer filed under "Home": it repaints the whole app and
+  only lived there because that was the section that existed.
+- Light mode is the ground the exporter already prints on — `#FAF9F6` paper with
+  `#17191A` ink — so the report a person shares and the screen they read it on
+  are one document. Each palette's paper twin is derived by the exporter's own
+  `paperTone` plus a 4.5:1 floor; Slate's is hand-built, because the relight's
+  0.40 lightness cap flattens the one palette whose identity is lightness spread.
+  Known limitation: the Android splash resolves from the *system* theme alone, so
+  somebody who overrides to Light on a dark phone still gets a dark splash. With
+  System as the default that is right for nearly everyone, and the preference
+  lives in an encrypted ledger that cannot be opened before that window is drawn.
 - Onboarding asks for the account holder's name on a fifth card, optional and
   visibly so — the button reads "Skip for now" until something is typed. Own
   names feed `OwnIdentity`, which is how the reconciler recognises a transfer

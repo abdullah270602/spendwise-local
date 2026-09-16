@@ -149,7 +149,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
                         onPressed: () => _addAccount(context),
                         tooltip: 'Add account',
                         visualDensity: VisualDensity.compact,
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.add_rounded,
                           size: 20,
                           color: SpendWiseColors.dim,
@@ -159,7 +159,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
                   ),
                   const SizedBox(height: 10),
                   Container(
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       border: Border(
                         bottom: BorderSide(color: SpendWiseColors.line),
                       ),
@@ -280,9 +280,9 @@ class _AccountsScreenState extends State<AccountsScreen> {
           decoration: BoxDecoration(
             border: Border(
               left: BorderSide(color: tone, width: 2),
-              top: const BorderSide(color: SpendWiseColors.line),
-              right: const BorderSide(color: SpendWiseColors.line),
-              bottom: const BorderSide(color: SpendWiseColors.line),
+              top: BorderSide(color: SpendWiseColors.line),
+              right: BorderSide(color: SpendWiseColors.line),
+              bottom: BorderSide(color: SpendWiseColors.line),
             ),
           ),
           child: Row(
@@ -420,7 +420,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
   Widget _plainRow(BuildContext context, AccountViewData account) => InkWell(
     onTap: () => _editAccount(context, account),
     child: Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: SpendWiseColors.line)),
       ),
       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1193,7 +1193,7 @@ class _SourceChoice extends StatelessWidget {
             margin: const EdgeInsets.only(left: 8),
             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
             color: SpendWiseColors.mine,
-            child: const Text(
+            child: Text(
               'SHARED',
               style: TextStyle(
                 fontFamily: SpendWiseType.sans,
@@ -1232,9 +1232,9 @@ class _SavingsExplanation extends StatelessWidget {
     decoration: BoxDecoration(
       border: Border(
         left: BorderSide(color: SpendWiseColors.accent, width: 2),
-        top: const BorderSide(color: SpendWiseColors.edge),
-        right: const BorderSide(color: SpendWiseColors.edge),
-        bottom: const BorderSide(color: SpendWiseColors.edge),
+        top: BorderSide(color: SpendWiseColors.edge),
+        right: BorderSide(color: SpendWiseColors.edge),
+        bottom: BorderSide(color: SpendWiseColors.edge),
       ),
     ),
     child: Row(

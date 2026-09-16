@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The splash, on a phone whose system theme is dark.
+         Only the splash: everything else in values/colors.xml is drawn
+         somewhere the system theme has no say over — the launcher icon and
+         the home-screen widget both sit on the user's wallpaper. -->
+    <color name="spendwise_splash">#0F1113</color>
+    <color name="spendwise_splash_kept">#E9E7E2</color>
+    <color name="spendwise_splash_spent">#C97A5A</color>
+</resources>
