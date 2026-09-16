@@ -911,8 +911,12 @@ class _Suggestion extends StatelessWidget {
           // The reason is on screen because a suggestion nobody can check is
           // just an assertion, and this one moves money out of the month.
           Text(
+            // Two sentences, because the reason is itself sometimes a
+            // conjunction: "the name matches and it is exactly what is still
+            // out" joined to a leading "and" produced a sentence with two of
+            // them in it.
             '${formatAmount(debt.outstanding, cents: false)} is still out on '
-            'this loan, and ${match.reason}.',
+            'this loan. Suggested because ${match.reason}.',
             style: SpendWiseType.body.copyWith(fontSize: 12.5),
           ),
           const SizedBox(height: 12),
