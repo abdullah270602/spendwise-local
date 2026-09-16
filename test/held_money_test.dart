@@ -7,7 +7,7 @@ import 'package:spendwise/features/shell/spendwise_view_model.dart' as view;
 
 /// Money that lands in your account and was never yours.
 ///
-/// A brother sends funds to pass to your father; a friend parks money with
+/// Somebody parks funds with you to pass on; a friend leaves money with
 /// you; someone asks you to forward it on. Until now the nearest available
 /// answer was "I borrowed it", which is wrong in the one way that matters:
 /// borrowed money is yours to spend until you give it back, and this never is.
@@ -18,7 +18,7 @@ void main() {
     return ledger;
   }
 
-  String arrive(LocalLedger ledger, int minor, {String from = 'My brother'}) =>
+  String arrive(LocalLedger ledger, int minor, {String from = 'A Sample Payer'}) =>
       ledger.addManualTransaction(
         kind: TransactionKind.income,
         amountMinor: minor,
@@ -141,7 +141,7 @@ void main() {
       ledger.openDebt(
         transactionId: id,
         kind: DebtKind.borrowed,
-        counterparty: 'My brother',
+        counterparty: 'A Sample Payer',
       );
 
       expect(ledger.heldOutstandingMinor(), 0);
@@ -257,7 +257,7 @@ void main() {
       final debt = ledger.openDebt(
         transactionId: id,
         kind: DebtKind.holding,
-        counterparty: 'My brother',
+        counterparty: 'A Sample Payer',
       );
 
       ledger.changeDebtKind(debt.id, DebtKind.borrowed);

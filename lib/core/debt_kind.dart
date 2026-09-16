@@ -4,11 +4,11 @@
 /// person knows the rest, and there turned out to be three stories, not two.
 ///
 /// The third is the one that has no name in ordinary accounting: money that
-/// lands in your account and was never yours. A brother sends funds to pass to
-/// your father; a friend parks money with you; someone asks you to forward it
-/// on. You are the courier. It is not income, and paying it onward is not
-/// spending -- but crucially it is also not *borrowing*, because borrowed
-/// money is yours to spend until you give it back and held money never is.
+/// lands in your account and was never yours. Someone parks funds with you,
+/// or asks you to forward them on. You are the courier. It is not income, and
+/// paying it onward is not spending -- but crucially it is also not
+/// *borrowing*, because borrowed money is yours to spend until you give it
+/// back and held money never is.
 ///
 /// That difference is the whole reason this exists rather than being filed
 /// under "I owe them": it decides whether the money shows up in what you can

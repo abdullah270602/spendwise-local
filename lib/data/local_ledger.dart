@@ -2043,7 +2043,7 @@ final class LocalLedger {
   /// How much of the money sitting in the accounts belongs to somebody else.
   ///
   /// Subtracted from what the user can spend. A balance is not a permission:
-  /// money you are holding for your brother shows in the bank the same as your
+  /// money you are holding for somebody else shows in the bank the same as your
   /// own, and the only thing that knows the difference is this.
   int heldOutstandingMinor() =>
       debts(includeSettled: false)
