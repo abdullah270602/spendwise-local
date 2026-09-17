@@ -162,6 +162,38 @@ final class SpendWisePalette {
     ],
   );
 
+  /// Eight hues a person can actually tell apart.
+  ///
+  /// The other four palettes are moods, and each picks its ramp out of a
+  /// narrow slice of the wheel -- which is right for a shape with two
+  /// branches in it and wrong the moment a category breakdown asks the eye
+  /// to hold eight tones at once and match each to a row. Here the ramp is
+  /// the point: warm red, amber, blue, violet, green, rose, teal, graphite,
+  /// spaced around the wheel rather than along one edge of it, so no two
+  /// neighbours collapse into each other at the width of a bar.
+  ///
+  /// `keep` and `spend` still carry the meaning they carry everywhere else,
+  /// and they still have to be the two most separable tones in the set,
+  /// because they are the only two that mean a direction rather than a name.
+  static const orchard = SpendWisePalette(
+    id: 'orchard',
+    name: 'Orchard',
+    blurb: 'The widest spread of colour. Built for telling categories apart.',
+    keep: Color(0xFF93B594),
+    spend: Color(0xFFCE6E63),
+    mine: Color(0xFF5F8CA6),
+    ramp: [
+      Color(0xFFCE6E63),
+      Color(0xFFD2A05C),
+      Color(0xFF5F8CA6),
+      Color(0xFF8C7BB0),
+      Color(0xFF93B594),
+      Color(0xFFC98CA6),
+      Color(0xFF6FA88F),
+      Color(0xFF565F63),
+    ],
+  );
+
   /// One hue, two ends: nothing but slate and the absence of it.
   static const slate = SpendWisePalette(
     id: 'slate',
@@ -219,7 +251,7 @@ final class SpendWisePalette {
     ],
   );
 
-  static const all = <SpendWisePalette>[sage, ink, brass, tide, slate];
+  static const all = <SpendWisePalette>[sage, ink, brass, tide, orchard, slate];
 
   static SpendWisePalette byId(String? id) =>
       all.firstWhere((item) => item.id == id, orElse: () => sage);
