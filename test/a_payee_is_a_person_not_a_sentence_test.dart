@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:spendwise/domain/models/raw_observation.dart';
-import 'package:spendwise/domain/parsing/notification_parser.dart';
+import 'package:spendwise/data/local_ledger.dart';
+import 'package:spendwise/domain/domain.dart';
 
 /// Entries named after the machinery instead of the person.
 ///
@@ -54,7 +54,7 @@ void main() {
     expect(entry.shown, 'S.KARIM');
   });
 
-  test('a masked account number still folds to a bank and four digits', () {
+  test('a masked account number is not part of the name either', () {
     for (final masked in [
       'PK68MFBLxxxx1234',
       r'PK68MFBL****1234',
@@ -63,7 +63,7 @@ void main() {
       final entry = read(sent('S.KARIM $masked'));
       expect(
         entry.shown,
-        'S.KARIM · MFBL ••1234',
+        'S.KARIM',
         reason: '$masked was left sitting in the name',
       );
       expect(
@@ -84,7 +84,51 @@ void main() {
 
   test('an unmasked account number reads as it always did', () {
     final entry = read(sent('A.IBRAHIM PK91NBPA0099887766550123'));
-    expect(entry.shown, 'A.IBRAHIM · NBPA ••0123');
+    expect(entry.shown, 'A.IBRAHIM');
+  });
+
+  test('a name already written down is repaired where it sits', () {
+    // Re-reading the alerts fixes what the parser does next and cannot fix
+    // these: an entry the owner has confirmed or filed is locked, and
+    // reconcile is right never to rewrite one. The rows are repaired in
+    // place instead.
+    final ledger = LocalLedger.openInMemoryForTests();
+    addTearDown(ledger.close);
+    ledger.addAccount(name: 'Everyday', type: AccountType.bank);
+    final account = ledger.snapshot().accounts.single;
+
+    final id = ledger.addManualTransaction(
+      kind: TransactionKind.expense,
+      amountMinor: 76000,
+      occurredAt: DateTime.utc(2026, 9, 17, 12),
+      accountId: account.id,
+      description: 'S.KARIM PK68TMFBxx226 as RAAST payment',
+      categoryId: 'groceries',
+    );
+    final typed = ledger.addManualTransaction(
+      kind: TransactionKind.expense,
+      amountMinor: 50000,
+      occurredAt: DateTime.utc(2026, 9, 17, 13),
+      accountId: account.id,
+      description: 'Waqas Shabbir',
+      categoryId: 'transport',
+    );
+
+    ledger.resetPayeeNameRepairForTests();
+    ledger.rerunMigrationsForTests();
+
+    String nameOf(String wanted) => ledger
+        .snapshot()
+        .transactions
+        .firstWhere((item) => item.id == wanted)
+        .description!;
+
+    expect(nameOf(id), 'S.KARIM');
+    expect(
+      nameOf(typed),
+      'Waqas Shabbir',
+      reason: 'a name somebody typed is not of that shape and is not touched',
+    );
   });
 
   test('a Raast ID is narration too', () {

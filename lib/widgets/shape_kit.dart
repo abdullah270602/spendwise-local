@@ -954,31 +954,40 @@ class RegisterDay extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(0, 15, 0, 7),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.baseline,
-      textBaseline: TextBaseline.alphabetic,
-      children: [
-        // The date carries the sage tone the rest of the register never uses,
-        // so the eye finds the day boundary without a heavier rule or a gap.
-        // Flexible because the label is not always "WED 16": out of the
-        // month scope it carries the month and the year as well, and at
-        // twice the text size that plus the day's net is wider than a phone.
-        Flexible(
-          child: Text(
-            label.toUpperCase(),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: SpendWiseType.metaTight.copyWith(
-              color: SpendWiseColors.keep,
-              fontWeight: FontWeight.w500,
+    child: LayoutBuilder(
+      builder: (context, space) => Row(
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          // The date carries the sage tone the rest of the register never
+          // uses, so the eye finds the day boundary without a heavier rule
+          // or a gap.
+          //
+          // Bounded rather than made flexible. The label is not always
+          // "WED 16" -- out of the month scope it carries the month and the
+          // year, which at twice the text size is wider than a phone -- but
+          // a Flexible here would share the free space with the rule beside
+          // it, and the half the label did not use collected at the end of
+          // the row and pushed the day's net into the middle, out of line
+          // with every other figure on the screen.
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: space.maxWidth * .45),
+            child: Text(
+              label.toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: SpendWiseType.metaTight.copyWith(
+                color: SpendWiseColors.keep,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(child: Container(height: 1, color: SpendWiseColors.line)),
-        const SizedBox(width: 10),
-        Text(total, style: SpendWiseType.metaTight),
-      ],
+          const SizedBox(width: 10),
+          Expanded(child: Container(height: 1, color: SpendWiseColors.line)),
+          const SizedBox(width: 10),
+          Text(total, style: SpendWiseType.metaTight),
+        ],
+      ),
     ),
   );
 }

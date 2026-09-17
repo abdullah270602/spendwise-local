@@ -577,6 +577,15 @@ final class NotificationParser {
   /// recognises a move between two accounts the user owns. This is the same
   /// counterparty with the machine-readable parts folded down to something a
   /// person would write on a receipt.
+  /// The readable name for a payee, from whatever the alert called them.
+  ///
+  /// Public because names written into the ledger before this read correctly
+  /// are still in it, and a locked entry -- one the owner has confirmed or
+  /// filed -- is never rebuilt by reconcile. Repairing those rows needs the
+  /// same answer this gives a fresh one.
+  static String? readableName(String? counterparty) =>
+      _displayName(_withoutNarration(counterparty));
+
   static String? _displayName(String? counterparty) {
     var name = counterparty?.trim();
     if (name == null || name.isEmpty) return null;
@@ -600,10 +609,17 @@ final class NotificationParser {
             '',
           )
           .trim();
-      // A truncated token says neither which bank nor which account. Naming
-      // the person and dropping it beats printing half an IBAN.
-      if (bank == null || tail == null) return label.isEmpty ? null : label;
-      return label.isEmpty ? '$bank ••$tail' : '$label · $bank ••$tail';
+      // When the sentence named a person, that is the name. The bank and
+      // the last four digits tell two same-named payees apart, which is a
+      // real problem for about nobody and cost every single entry a tail of
+      // machinery in the place a person's name goes. The account number is
+      // still on the entry -- stored, and on its evidence -- for anyone
+      // checking against a statement.
+      if (label.isNotEmpty) return label;
+      // Nothing but an IBAN: RAAST alerts often name the beneficiary this
+      // way and no other. The bank and last four is the readable form of it.
+      if (bank == null || tail == null) return null;
+      return '$bank ••$tail';
     }
     return name.isEmpty ? null : name;
   }

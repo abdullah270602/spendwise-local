@@ -1,7 +1,7 @@
 name: spendwise
 description: "Private, local-only personal finance ledger for Android."
 publish_to: 'none'
-version: 0.9.37+52
+version: 0.9.38+53
 
 environment:
   sdk: ^3.13.1

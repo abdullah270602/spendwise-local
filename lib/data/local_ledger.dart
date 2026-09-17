@@ -888,6 +888,7 @@ final class LocalLedger {
     _dedupeRankingVolatileNotificationDuplicates();
     _dropStoredBackgroundNotices();
     _refreshStoredEvidence();
+    _repairMachineryInPayeeNames();
     _db.execute('PRAGMA user_version = 3');
   }
 
@@ -1019,6 +1020,48 @@ final class LocalLedger {
   /// filtered. Without this the ones already on file keep asking their
   /// non-question, and the user has no way to make them stop -- dismissing
   /// them was exactly what did not work.
+  /// Takes the machinery back out of names already written down.
+  ///
+  /// Entries arrived called "S.Karim PK68TMFBxx226 as RAAST payment": the
+  /// payee, an account number and the name of the payment rail, in the place
+  /// a person's name goes. Re-reading the alerts fixes what the parser will
+  /// do next, but it cannot fix these, because an entry the owner has
+  /// confirmed or filed is locked and reconcile is right never to rewrite
+  /// it. So the rows are repaired directly, and only where the stored name
+  /// still carries an account number or a description of the rail -- a name
+  /// somebody typed themselves is not of that shape and is left alone.
+  void _repairMachineryInPayeeNames() {
+    const key = 'clean_payee_names_v1';
+    if (_db.select('SELECT 1 FROM app_settings WHERE key = ?', [
+      key,
+    ]).isNotEmpty) {
+      return;
+    }
+    var repaired = 0;
+    for (final row in _db.select(
+      "SELECT id, description FROM transactions WHERE description IS NOT NULL "
+      "AND TRIM(description) != ''",
+    )) {
+      final stored = row['description'] as String;
+      final clean = NotificationParser.readableName(stored);
+      if (clean == null || clean.isEmpty || clean == stored) continue;
+      _db.execute('UPDATE transactions SET description = ? WHERE id = ?', [
+        clean,
+        row['id'],
+      ]);
+      repaired++;
+    }
+    _db.execute('INSERT OR REPLACE INTO app_settings(key,value) VALUES (?,?)', [
+      key,
+      '$repaired',
+    ]);
+  }
+
+  @visibleForTesting
+  void resetPayeeNameRepairForTests() => _db.execute(
+    "DELETE FROM app_settings WHERE key = 'clean_payee_names_v1'",
+  );
+
   void _dropStoredBackgroundNotices() {
     const key = 'drop_background_notices_v1';
     if (_db.select('SELECT 1 FROM app_settings WHERE key = ?', [
