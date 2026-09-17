@@ -4,6 +4,7 @@ import '../../core/money.dart';
 import '../../app/failure_text.dart';
 import '../../app/theme.dart';
 import '../../widgets/category_picker.dart';
+import '../debts/debt_sheets.dart';
 import '../shell/spendwise_view_model.dart';
 
 class ManualTransactionSheet extends StatefulWidget {
@@ -33,6 +34,18 @@ class _ManualTransactionSheetState extends State<ManualTransactionSheet> {
   String? toAccountId;
   String category = 'Other';
   bool saving = false;
+
+  /// Whether this movement is somebody else's business, asked here rather
+  /// than only afterwards.
+  ///
+  /// A debt is a property of an entry, which is right -- money lent really
+  /// did leave an account -- but the only way to say so was to save the
+  /// entry, find it in the register, open it, scroll past the balance trail
+  /// and answer "Whose money was it". Ten steps, and the second half is
+  /// discoverable only by somebody who already knows. Cash lending is the
+  /// one money story in this app with no bank alert behind it, so it is
+  /// exactly the story the rest of the pipeline cannot help with.
+  bool lending = false;
   DateTime occurredAt = DateTime.now();
   @override
   void dispose() {
@@ -177,6 +190,22 @@ class _ManualTransactionSheetState extends State<ManualTransactionSheet> {
                     labelText: 'Note (optional)',
                   ),
                 ),
+                if (kind != TransactionKind.transfer) ...[
+                  const SizedBox(height: 4),
+                  CheckboxListTile(
+                    value: lending,
+                    onChanged: saving
+                        ? null
+                        : (value) => setState(() => lending = value ?? false),
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    dense: true,
+                    title: Text(
+                      'This is money lent, borrowed or held',
+                      style: SpendWiseType.row,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
@@ -213,7 +242,30 @@ class _ManualTransactionSheetState extends State<ManualTransactionSheet> {
           note: note.text.trim(),
         ),
       );
-      if (mounted) Navigator.pop(context);
+      if (!mounted) return;
+      if (lending) {
+        // The entry has just been written, so the reloaded ledger holds it.
+        // Matched on what was typed rather than on an id, because saving
+        // does not hand one back and widening that signature would reach
+        // every fake that implements the plain view model.
+        final saved = widget.viewModel.transactions
+            .where(
+              (item) =>
+                  item.amount.minorUnits.abs() == units.abs() &&
+                  item.occurredAt == occurredAt &&
+                  item.title == title.text.trim(),
+            )
+            .firstOrNull;
+        if (saved != null) {
+          await markAsLoan(
+            context,
+            viewModel: widget.viewModel,
+            transaction: saved,
+          );
+          if (!mounted) return;
+        }
+      }
+      Navigator.pop(context);
     } catch (error) {
       if (!mounted) return;
       setState(() => saving = false);

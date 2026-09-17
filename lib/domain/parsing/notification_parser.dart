@@ -474,13 +474,40 @@ final class NotificationParser {
     caseSensitive: false,
   );
 
-  /// A Pakistani IBAN: PK, two check digits, a four-letter bank code, then the
-  /// account. RAAST alerts name the beneficiary only by this, so the readable
-  /// part is the bank and the last four digits.
-  static final RegExp _ibanPattern = RegExp(
-    r'\bPK\d{2}([A-Z]{4})(\d[\dA-Z]{6,20})\b',
+  /// A Pakistani IBAN as an alert actually prints it, whole or masked.
+  ///
+  /// RAAST alerts name the beneficiary by this and nothing else, so the
+  /// readable part is the bank and the last four digits. Banks mask the
+  /// account in at least four ways -- `xxxx1234`, `****4433`, a run of
+  /// bullets, or by truncating the whole thing to `PK68MFB` -- and a pattern
+  /// that read only the unmasked form left every other one sitting in the
+  /// entry's name, where a person saw "S.Karim PK68MFB as RAAST payment"
+  /// instead of who they paid.
+  static final RegExp _ibanToken = RegExp(
+    r'(?<![A-Za-z0-9])PK\d{2}[A-Za-z0-9*x\u2022]{2,26}',
     caseSensitive: false,
   );
+
+  static final RegExp _ibanBankCode = RegExp(r'^[A-Za-z]{4}');
+  static final RegExp _ibanTailDigits = RegExp(r'\d+$');
+
+  /// Narration a bank adds after the name: "as RAAST payment", "via Raast ID
+  /// 0300...", "through IBFT". It describes the instrument, not the payee.
+  ///
+  /// The generic reader has always stopped at these words -- they are in its
+  /// stop list. Only the shaped rules carried them into the name, because
+  /// those capture whatever runs between two anchors ("sent to" and "from
+  /// your A/C") and the narration sits inside that run.
+  static final RegExp _instrumentTail = RegExp(
+    r'\s+(?:as|via|through|using)\s+.*$',
+    caseSensitive: false,
+    dotAll: true,
+  );
+
+  static String? _withoutNarration(String? value) {
+    final name = value?.replaceFirst(_instrumentTail, '').trim();
+    return name == null || name.isEmpty ? null : name;
+  }
 
   /// Whether a notification's title is the app talking rather than naming
   /// anybody.
@@ -555,11 +582,14 @@ final class NotificationParser {
     if (name == null || name.isEmpty) return null;
     name = name.replaceFirst(_beneficiaryTag, '').trim();
 
-    final iban = _ibanPattern.firstMatch(name);
+    final iban = _ibanToken.firstMatch(name);
     if (iban != null) {
-      final bank = iban.group(1)!.toUpperCase();
-      final digits = iban.group(2)!;
-      final tail = digits.length <= 4
+      // Everything after the account number is narration the sentence
+      // happened to put inside the name; everything before it is the person.
+      final body = iban[0]!.substring(4);
+      final bank = _ibanBankCode.firstMatch(body)?[0]?.toUpperCase();
+      final digits = _ibanTailDigits.firstMatch(body)?[0];
+      final tail = digits == null || digits.length <= 4
           ? digits
           : digits.substring(digits.length - 4);
       final prefix = name.substring(0, iban.start).trim();
@@ -570,6 +600,9 @@ final class NotificationParser {
             '',
           )
           .trim();
+      // A truncated token says neither which bank nor which account. Naming
+      // the person and dropping it beats printing half an IBAN.
+      if (bank == null || tail == null) return label.isEmpty ? null : label;
       return label.isEmpty ? '$bank ••$tail' : '$label · $bank ••$tail';
     }
     return name.isEmpty ? null : name;
@@ -603,8 +636,7 @@ final class NotificationParser {
         ? (_debitCounterpartyPattern.firstMatch(text) ??
               _merchantPattern.firstMatch(text))
         : _creditCounterpartyPattern.firstMatch(text);
-    final name = match?.group(1)?.trim();
-    return name == null || name.isEmpty ? null : name;
+    return _withoutNarration(match?.group(1));
   }
 
   ParserResult? _applyDefinition(
@@ -641,7 +673,7 @@ final class NotificationParser {
       // still carrying -- "Money sent Rs. 110 sent to A Shop" matched on the
       // word in the *title* and arrived nameless -- and an entry with no
       // name is an entry no correction can teach the app anything about.
-      final ruleParty = named(rule.counterpartyGroup)?.trim();
+      final ruleParty = _withoutNarration(named(rule.counterpartyGroup));
       final counterparty = ruleParty == null || ruleParty.isEmpty
           ? _counterparty(text, rule.direction)
           : ruleParty;

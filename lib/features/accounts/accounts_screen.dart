@@ -957,39 +957,28 @@ class _AccountsScreenState extends State<AccountsScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            initialValue: currency,
-                            readOnly: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Currency',
-                              helperText:
-                                  'PKR totals stay mathematically exact',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextFormField(
-                            controller: suffix,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Last digits',
-                              hintText: '4821',
-                            ),
-                            validator: (value) {
-                              final normalized = value?.trim() ?? '';
-                              if (normalized.isEmpty) return null;
-                              if (!RegExp(r'^\d{2,8}$').hasMatch(normalized)) {
-                                return 'Use 2–8 digits';
-                              }
-                              return null;
-                            },
-                          ),
-                        ),
-                      ],
+                    // The currency was a read-only field with a helper line
+                    // reading "PKR totals stay mathematically exact" -- an
+                    // implementation note, answering a question nobody asked,
+                    // under a control that could not be used, in the first
+                    // form anybody ever fills in. The fact it carried is on
+                    // the balance field's own label. It comes back as a real
+                    // control the day a second currency is supported.
+                    TextFormField(
+                      controller: suffix,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Last digits',
+                        hintText: '4821',
+                      ),
+                      validator: (value) {
+                        final normalized = value?.trim() ?? '';
+                        if (normalized.isEmpty) return null;
+                        if (!RegExp(r'^\d{2,8}$').hasMatch(normalized)) {
+                          return 'Use 2–8 digits';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 12),
                     TextFormField(

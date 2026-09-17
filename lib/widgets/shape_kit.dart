@@ -960,11 +960,18 @@ class RegisterDay extends StatelessWidget {
       children: [
         // The date carries the sage tone the rest of the register never uses,
         // so the eye finds the day boundary without a heavier rule or a gap.
-        Text(
-          label.toUpperCase(),
-          style: SpendWiseType.metaTight.copyWith(
-            color: SpendWiseColors.keep,
-            fontWeight: FontWeight.w500,
+        // Flexible because the label is not always "WED 16": out of the
+        // month scope it carries the month and the year as well, and at
+        // twice the text size that plus the day's net is wider than a phone.
+        Flexible(
+          child: Text(
+            label.toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: SpendWiseType.metaTight.copyWith(
+              color: SpendWiseColors.keep,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
         const SizedBox(width: 10),

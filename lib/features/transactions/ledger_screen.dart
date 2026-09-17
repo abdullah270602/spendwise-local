@@ -245,6 +245,35 @@ class _LedgerScreenState extends State<LedgerScreen> {
                 ),
               ),
             ),
+          // Which filters are on, and one tap to drop any of them.
+          //
+          // The count knew how many were set -- `_activeFilterCount` -- and
+          // the only thing that ever read it was a boolean that tinted an
+          // icon. The header said "Every match" and the only control was
+          // Clear, which drops all of them at once, so narrowing by account
+          // and then changing your mind about the kind meant clearing
+          // everything and setting the account again. Worse on return: the
+          // filter survives a tab switch, so you could come back to "Every
+          // match" with no idea what you had asked for.
+          if (_activeFilters.isNotEmpty)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  SpendWiseTheme.gutter,
+                  10,
+                  SpendWiseTheme.gutter,
+                  0,
+                ),
+                child: Wrap(
+                  spacing: 7,
+                  runSpacing: 7,
+                  children: [
+                    for (final filter in _activeFilters)
+                      _FilterChip(label: filter.label, onDrop: filter.drop),
+                  ],
+                ),
+              ),
+            ),
           if (visible.isEmpty)
             SliverToBoxAdapter(
               child: RestState(
@@ -309,7 +338,13 @@ class _LedgerScreenState extends State<LedgerScreen> {
                           ),
                         ),
                         child: RegisterDay(
-                          label: DateFormat('EEE dd').format(day),
+                          // Out of the month scope there is no month named
+                          // anywhere on the screen, so "WED 16" reads the
+                          // same for September, for July, and for last
+                          // July -- in the one mode that exists for finding
+                          // a payment from two years ago.
+                          label: DateFormat(scoped ? 'EEE dd' : 'EEE dd MMM yy')
+                              .format(day),
                           total: formatMinor(_net(rows), signed: true),
                         ),
                       ),
@@ -706,6 +741,42 @@ class _LedgerScreenState extends State<LedgerScreen> {
     return haystack.toLowerCase().contains(query.toLowerCase());
   }
 
+  /// What is narrowing the ledger right now, each with the way to undo it.
+  List<({String label, VoidCallback drop})> get _activeFilters {
+    final accountName = accountId == null
+        ? null
+        : widget.viewModel.accounts
+              .where((item) => item.id == accountId)
+              .map((item) => item.name)
+              .firstOrNull;
+    return [
+      if (kind != null)
+        (
+          label: switch (kind!) {
+            TransactionKind.expense => 'Money out',
+            TransactionKind.income => 'Money in',
+            TransactionKind.transfer => 'Transfers',
+          },
+          drop: () => setState(() => kind = null),
+        ),
+      if (accountId != null)
+        (
+          label: accountName ?? 'One account',
+          drop: () => setState(() => accountId = null),
+        ),
+      if (category != null)
+        (label: category!, drop: () => setState(() => category = null)),
+      if (query.isNotEmpty)
+        (
+          label: '“$query”',
+          drop: () => setState(() {
+            query = '';
+            searchController.clear();
+          }),
+        ),
+    ];
+  }
+
   int get _activeFilterCount =>
       [kind, accountId, category].where((value) => value != null).length;
 
@@ -916,4 +987,45 @@ enum _LedgerView {
     }
     return chart;
   }
+}
+
+/// One thing narrowing the ledger, and the way to stop it.
+///
+/// A hairline box in the same idiom as the Insights category filter, with
+/// the cross as part of the target rather than a second one inside it.
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({required this.label, required this.onDrop});
+
+  final String label;
+  final VoidCallback onDrop;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label: 'Filter: $label. Tap to remove',
+    child: InkWell(
+      onTap: onDrop,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border.all(color: SpendWiseColors.edge),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(9, 6, 6, 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: SpendWiseType.metaTight.copyWith(
+                  color: SpendWiseColors.fg,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.close_rounded, size: 13, color: SpendWiseColors.dim),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }

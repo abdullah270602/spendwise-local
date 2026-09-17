@@ -6,6 +6,7 @@ import '../../app/category_tones.dart';
 import '../../app/theme.dart';
 import '../../widgets/shape_kit.dart';
 import '../capture/capture_state.dart';
+import '../reports/report_screen.dart';
 import '../shell/spendwise_view_model.dart';
 import 'chronograph.dart';
 import 'gate.dart';
@@ -281,7 +282,30 @@ class _InsightsScreenState extends State<InsightsScreen> {
                               // differently is already looking. Settings has
                               // the same door for anyone who went there first.
                               const SizedBox(height: 20),
+                              // The report is this screen's output: it picks
+                              // its own default template by reading the
+                              // Insights preference -- the dial for the
+                              // chronograph, the desk for the mixing desk --
+                              // and its only door was in Settings under "Your
+                              // data", beside Export. Nothing here mentioned
+                              // that a PDF existed. It stays in Settings too,
+                              // where it groups with the things that leave
+                              // the device.
                               _SectionsEntry(
+                                icon: Icons.picture_as_pdf_outlined,
+                                label: 'Save this as a report',
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => ReportScreen(
+                                      viewModel: widget.viewModel,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              _SectionsEntry(
+                                icon: Icons.tune_rounded,
+                                label: 'Change what Insights shows',
                                 onTap: () async {
                                   await Navigator.push(
                                     context,
@@ -353,8 +377,14 @@ class _CategoryFilter extends StatelessWidget {
 /// sideways and you walk back through every period you have records for.
 /// The way to change what this screen is made of, from the screen itself.
 class _SectionsEntry extends StatelessWidget {
-  const _SectionsEntry({required this.onTap});
+  const _SectionsEntry({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
+  final IconData icon;
+  final String label;
   final VoidCallback onTap;
 
   @override
@@ -364,11 +394,11 @@ class _SectionsEntry extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         children: [
-          Icon(Icons.tune_rounded, size: 15, color: SpendWiseColors.dim),
+          Icon(icon, size: 15, color: SpendWiseColors.dim),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Change what Insights shows',
+              label,
               style: SpendWiseType.body.copyWith(
                 fontSize: 12.5,
                 color: SpendWiseColors.dim,

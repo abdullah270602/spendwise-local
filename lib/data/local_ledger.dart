@@ -436,7 +436,7 @@ final class LocalLedger {
 
   @visibleForTesting
   void resetEvidenceRefreshForTests() => _db.execute(
-    "DELETE FROM app_settings WHERE key = 'refresh_stored_evidence_v13'",
+    "DELETE FROM app_settings WHERE key = 'refresh_stored_evidence_v14'",
   );
 
   @visibleForTesting
@@ -906,7 +906,7 @@ final class LocalLedger {
 
   void _refreshStoredEvidenceInner() {
     final done = _db.select(
-      "SELECT 1 FROM app_settings WHERE key = 'refresh_stored_evidence_v13'",
+      "SELECT 1 FROM app_settings WHERE key = 'refresh_stored_evidence_v14'",
     );
     if (done.isNotEmpty) return;
     var refreshed = 0;
@@ -1010,7 +1010,7 @@ final class LocalLedger {
     }
     debugPrint('SpendWisePerf: rerouted $rerouted observation(s) by content');
     _db.execute(
-      "INSERT OR REPLACE INTO app_settings(key,value) VALUES ('refresh_stored_evidence_v13','done')",
+      "INSERT OR REPLACE INTO app_settings(key,value) VALUES ('refresh_stored_evidence_v14','done')",
     );
     if (refreshed > 0) _reconcile();
   }

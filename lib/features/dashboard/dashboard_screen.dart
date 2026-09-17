@@ -5,6 +5,7 @@ import '../../app/theme.dart';
 import '../../main.dart';
 import '../../widgets/shape_kit.dart';
 import '../capture/capture_state.dart';
+import '../settings/home_period_screen.dart';
 import '../settings/settings_screen.dart';
 import '../tour/spotlight.dart';
 import '../transactions/ledger_screen.dart';
@@ -124,9 +125,52 @@ class DashboardScreen extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  // The month alone. "What happened to it" was a caption on a
-                  // picture that already says so.
-                  Expanded(child: Eyebrow(month)),
+                  // The month alone -- "what happened to it" was a caption on
+                  // a picture that already says so -- but tappable, because
+                  // it is the denominator of the only proportion on the
+                  // screen and it was the one figure here nobody could
+                  // change. `home_period.dart` says why it matters: a
+                  // calendar month is near zero on the 1st and full after
+                  // payday, "so for the first days of every month the ratio
+                  // is either meaningless or a lie". Which window is right
+                  // depends on when a person is paid, and the answer lived
+                  // four taps away in Settings.
+                  //
+                  // Not a second button: Home holds one object and one
+                  // control, and this is the label becoming the control it
+                  // already looked like.
+                  Expanded(
+                    child: Semantics(
+                      button: true,
+                      label: 'Period: $month. Choose how much time Home shows',
+                      child: InkWell(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) =>
+                                HomePeriodScreen(viewModel: viewModel),
+                          ),
+                        ),
+                        // Sized to the target rather than padded to it: the
+                        // row is already this tall, because the settings
+                        // button beside it is.
+                        child: SizedBox(
+                          height: kMinInteractiveDimension,
+                          child: Row(
+                            children: [
+                              Flexible(child: Eyebrow(month)),
+                              const SizedBox(width: 5),
+                              Icon(
+                                Icons.expand_more_rounded,
+                                size: 14,
+                                color: SpendWiseColors.dim,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                   // Full size rather than compact: the icon stays where it
                   // always sat -- the gutter beside it is trimmed by the four
                   // pixels the button grew -- and the box behind it is now big
