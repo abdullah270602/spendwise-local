@@ -1,6 +1,6 @@
 # SpendWise project handoff
 
-Last updated: 2026-09-13
+Last updated: 2026-09-17
 
 ## Current release
 
@@ -314,9 +314,33 @@ Measured on the connected Pixel 9:
 Do not publish debug APKs as releases. Preserve the lazy page isolation and cache
 invalidation behavior when changing the shell/controller.
 
+**Writes no longer rebuild the ledger (2026-09-17).** Reconcile re-derives every
+automatic entry from the evidence on file, and it used to delete all of them and
+write them back on every ingest, every correction and every filed review —
+classifying, inserting and re-linking hundreds of rows that had not changed, on
+the isolate the screen waits on. Measured in a test ledger of 500 entries:
+
+| | before | after |
+|---|---|---|
+| one write | 466 ms | 51 ms |
+| building the ledger from 500 alerts | 212 s | 9.9 s |
+
+Three changes, in order of what they were worth:
+
+1. Reconcile writes only entries that actually differ from the row on file
+   (`_sameEntry`). A learned rule now re-files what it applies to explicitly,
+   because the old full rebuild was doing that by accident.
+2. `category_rules` is read once per pass and cached (`_categoryRuleCache`),
+   not once per transaction. Every write to the table clears it.
+3. `CategoryClassifier` normalises each rule term once instead of building and
+   running two regular expressions per term per transaction.
+
+`test/a_write_leaves_settled_entries_alone_test.dart` is the guard: an entry
+nothing has changed about keeps its `updated_at`.
+
 ## Verification baseline
 
-At `0.9.35`, the analyzer is clean and all 893 tests pass. Before shipping:
+At `0.9.35`, the analyzer is clean and all 1052 tests pass. Before shipping:
 
 1. Run `dart format` on changed Dart files.
 2. Run `flutter analyze --no-pub`.
@@ -467,12 +491,10 @@ current configured paths rather than assume another user's home directory.
   which was the defect; closing it properly means widening
   `applyReviewDecision` to `Future<int>` across the view model, the
   controller and every test fake.
-- **Every write re-reads the whole ledger on the UI isolate.**
-  `SpendWiseController.transactions` runs a three-way SQLite join per
-  transaction, and the shell rebuilds every review rule inside an
-  `AnimatedBuilder` for a badge count. Filing one review costs roughly a
-  thousand queries. This is the 500-transaction question and it is not yet
-  answered.
+- **The shell still rebuilds every review rule for a badge count** inside an
+  `AnimatedBuilder`, and `SpendWiseController.transactions` runs a three-way
+  join per transaction. Both are now small next to what a write used to cost
+  (see *Performance state*), and neither has been measured since.
 - **Two widget contracts are narrower than their designs.** The Chronograph's
   hub cannot name the period because the period is not passed to it, and the
   Mixing Desk cannot draw dead channels — a channel that exists with nothing
@@ -490,6 +512,80 @@ current configured paths rather than assume another user's home directory.
   the selected window, and Accounts legitimately differs from it by whatever
   was carried in from before that window. The agreed fix is to show both
   figures on Home rather than to reword one of them; not yet built.
+
+## Backlog before this ships
+
+Ordered by what would most change whether the app is worth having. Everything
+here is either measured or reproduced; nothing is speculative.
+
+### 1. Parser accuracy — the whole product
+
+The app is a ledger built from notifications, so a missed alert is a missing
+transaction and a misread one is a wrong balance. Where it stands:
+
+- 96.3% of money-looking alerts read without asking, across a corpus of 25
+  Pakistani and Indian banks the parser had never seen. 99.97% direction
+  accuracy on the 5,863 messages where the direction is checkable.
+- Settings → Parser health already names, per source, what was read, what was
+  held, the parser's own words for why, and how much of a source is being
+  carried by a rule of last resort. That screen is the work queue; it is not
+  yet being worked.
+
+What to do, in order:
+
+1. **Rank rules by how much they say, not by registration order.** A rule that
+   supplies only a direction (`pk.generic.debit` is a verb and an amount)
+   answered before the generic reader that would have named the payee, because
+   it was asked first. Fixed for the counterparty on 2026-09-17 by having a
+   rule that names nobody defer to the reader that does — but the ordering
+   problem is general, and the same shape can still lose a reference or a date.
+2. **Work the last-resort column.** Any source whose alerts are read mostly by
+   `pk.generic.*` is one reworded message away from silence. Write shaped
+   definitions for those sources first; the table takes rows, not code
+   (`parser_definitions`, already wired and tested).
+3. **A merchant that leads the sentence is still not recognised.**
+   `template_skeleton_test.dart` records this deliberately: "CORNER BAKERY
+   Rs141 with Everyday" has no preposition to anchor on, so two such alerts
+   stay two templates and the shop is never named.
+4. **Balance-label coverage is corpus-derived and will keep needing widening.**
+   Every bank writes "available balance" differently, and reading one as the
+   transaction amount is the failure that silently invents money.
+
+### 2. Money that is wrong on screen
+
+- **`accountRunningBalances` ignores currency.** A USD charge moves a PKR
+  account by that many rupees. Known, reproduced, and not yet fixed. Whatever
+  the fix is, it must never silently convert.
+- **Account balances drifted against the banks** (reported 2026-09-17: about
+  35k on one account, 10k on another). The likely cause is a re-parse
+  (`refresh_stored_evidence_v13`) rebuilding automatic entries under newer
+  parser rules, while the locked "Balance adjustment" entries the owner had
+  created against the *old* numbers survived unchanged — they are manual and
+  reconcile is right not to touch them. Not confirmed: confirming it needs the
+  device. Setting the balance again writes a fresh adjustment for the new
+  difference, so it is recoverable, but the adjustments stack and nothing on
+  screen explains why one is there.
+- **A debt's counterparty cannot be renamed.** The name comes from the alert
+  and nothing in the app edits it, which is why a name the owner wants gone
+  stays on screen.
+
+### 3. Before it can be given to anyone else
+
+- **Release signing.** The release build still uses the local debug key. See
+  *Important known risk* below; this is the one item that cannot be rushed.
+- **Privacy policy needs a public URL** (GitHub Pages over `PRIVACY.md`).
+- **Screenshots are stale** — see *Open work*. Retake from the sandbox install
+  with demo data, never from the real app.
+- **CSV/XLS import is slated for removal**, along with `csv_mappings` and
+  `csv.user-mapping`.
+
+### 4. Smaller, already understood
+
+- The review receipt understates when alerts merge (*Open work*).
+- Home's "Available" reads as a balance when it is a change over a window
+  (*Open work*).
+- The Chronograph hub and the Mixing Desk are narrower than their designs
+  (*Open work*).
 
 ## Important known risk
 
