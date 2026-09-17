@@ -56,8 +56,9 @@ final class CategoryClassifier {
       );
     }
 
+    final padded = ' $normalized ';
     for (final rule in _rules) {
-      if (rule.terms.any((term) => _containsPhrase(normalized, term))) {
+      if (rule.terms.any((term) => _containsPhrase(padded, term))) {
         return CategoryClassification(
           categoryId: rule.categoryId,
           ruleId: rule.id,
@@ -65,7 +66,7 @@ final class CategoryClassifier {
         );
       }
     }
-    if (_cardPurchaseTerms.any((term) => _containsPhrase(normalized, term))) {
+    if (_cardPurchaseTerms.any((term) => _containsPhrase(padded, term))) {
       return const CategoryClassification(
         categoryId: 'shopping',
         ruleId: 'fallback.card_purchase',
@@ -79,15 +80,26 @@ final class CategoryClassifier {
     );
   }
 
+  static final _notWord = RegExp(r'[^a-z0-9]+');
+  static final _runsOfSpace = RegExp(r'\s+');
+
   static String normalize(String value) => value
       .toLowerCase()
       .replaceAll('&', ' and ')
-      .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
-      .replaceAll(RegExp(r'\s+'), ' ')
+      .replaceAll(_notWord, ' ')
+      .replaceAll(_runsOfSpace, ' ')
       .trim();
 
-  static bool _containsPhrase(String normalized, String phrase) =>
-      ' $normalized '.contains(' ${normalize(phrase)} ');
+  /// The rule terms are fixed text, so normalising them is the same work
+  /// every time. Doing it per term per transaction was most of what it cost
+  /// to classify one -- two regular expressions built and run for each of a
+  /// few hundred phrases, on the isolate a write is waiting on.
+  static final _normalizedPhrases = <String, String>{};
+
+  /// [padded] is the text with a space at each end, so a term matches on
+  /// word boundaries.
+  static bool _containsPhrase(String padded, String phrase) =>
+      padded.contains(' ${_normalizedPhrases[phrase] ??= normalize(phrase)} ');
 }
 
 const _cardPurchaseTerms = <String>['online purchase', 'pos transaction'];

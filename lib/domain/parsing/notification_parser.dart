@@ -635,6 +635,16 @@ final class NotificationParser {
       final ruleAmount = _money.findOnly(named(rule.amountGroup) ?? '')?.money;
       final amount = transactionAmount.isZero ? ruleAmount : transactionAmount;
       if (amount == null || amount.isZero) continue;
+      // A rule can settle which way the money went without naming anybody:
+      // the generic debit and credit rules are a verb, an amount, and
+      // nothing else. Stopping at that threw away the payee the sentence was
+      // still carrying -- "Money sent Rs. 110 sent to A Shop" matched on the
+      // word in the *title* and arrived nameless -- and an entry with no
+      // name is an entry no correction can teach the app anything about.
+      final ruleParty = named(rule.counterpartyGroup)?.trim();
+      final counterparty = ruleParty == null || ruleParty.isEmpty
+          ? _counterparty(text, rule.direction)
+          : ruleParty;
       final candidate = EventCandidate(
         id: 'candidate:${observation.id}',
         observation: observation,
@@ -642,16 +652,13 @@ final class NotificationParser {
         amount: amount.absolute,
         direction: rule.direction,
         occurredAt: observation.observedAt,
-        counterparty: named(rule.counterpartyGroup)?.trim(),
+        counterparty: counterparty,
         reference:
             (named(rule.referenceGroup) ??
                     _referencePattern.firstMatch(text)?.group(1))
                 ?.trim()
                 .toUpperCase(),
-        description: _describe(
-          observation.title,
-          named(rule.counterpartyGroup)?.trim(),
-        ),
+        description: _describe(observation.title, counterparty),
         confidence: rule.confidence,
         type: rule.type,
         parserId: definition.id,

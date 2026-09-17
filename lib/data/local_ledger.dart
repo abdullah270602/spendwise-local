@@ -386,6 +386,17 @@ final class LocalLedger {
   @visibleForTesting
   void rerunMigrationsForTests() => _migrate();
 
+  /// When a transaction row was last written, so a test can tell a row that
+  /// was left alone from one that was rebuilt to say the same thing.
+  @visibleForTesting
+  int? updatedAtForTest(String id) {
+    final rows = _db.select(
+      'SELECT updated_at FROM transactions WHERE id = ? LIMIT 1',
+      [id],
+    );
+    return rows.isEmpty ? null : rows.first['updated_at'] as int?;
+  }
+
   @visibleForTesting
   void resetDedupMigrationForTests() => _db.execute(
     "DELETE FROM app_settings WHERE key = 'dedup_ranking_volatile_v1'",
@@ -1843,6 +1854,7 @@ final class LocalLedger {
       [id],
     );
     _db.execute('DELETE FROM category_rules WHERE category_id = ?', [id]);
+    _categoryRulesChanged();
     _db.execute('DELETE FROM categories WHERE id = ?', [id]);
   }
 
@@ -2100,20 +2112,42 @@ final class LocalLedger {
     ];
   }
 
+  /// Every standing rule, read once.
+  ///
+  /// Reconcile classifies each transaction it rebuilds, and reading this
+  /// table per transaction is most of what a write costs: at 200 entries it
+  /// was 1.2ms a row, so one filed review spent a third of a second before
+  /// anything was drawn. Cleared by [_categoryRulesChanged] wherever the
+  /// table is written.
+  List<({String match, String categoryId, String id})>? _categoryRuleCache;
+
+  List<({String match, String categoryId, String id})> _categoryRules() =>
+      _categoryRuleCache ??= [
+        for (final row in _db.select(
+          'SELECT normalized_match,category_id,id FROM category_rules '
+          'ORDER BY priority DESC,updated_at DESC',
+        ))
+          (
+            match: row['normalized_match'] as String,
+            categoryId: row['category_id'] as String,
+            id: row['id'] as String,
+          ),
+      ];
+
+  void _categoryRulesChanged() => _categoryRuleCache = null;
+
   CategoryClassification classifyDescription({
     required String text,
     required TransactionKind kind,
     Iterable<CandidateType> candidateTypes = const [],
   }) {
     final normalized = CategoryClassifier.normalize(text);
-    for (final row in _db.select(
-      'SELECT normalized_match,category_id,id FROM category_rules ORDER BY priority DESC,updated_at DESC',
-    )) {
-      final matcher = row['normalized_match'] as String;
-      if (matcher.isNotEmpty && ' $normalized '.contains(' $matcher ')) {
+    for (final rule in _categoryRules()) {
+      if (rule.match.isNotEmpty &&
+          ' $normalized '.contains(' ${rule.match} ')) {
         return CategoryClassification(
-          categoryId: row['category_id'] as String,
-          ruleId: row['id'] as String,
+          categoryId: rule.categoryId,
+          ruleId: rule.id,
           confidence: 1,
         );
       }
@@ -3957,6 +3991,7 @@ final class LocalLedger {
       _db.execute('DELETE FROM category_rules WHERE normalized_match = ?', [
         normalized,
       ]);
+      _categoryRulesChanged();
       _db.execute(
         'DELETE FROM category_confirmations WHERE normalized_match = ?',
         [normalized],
@@ -3996,6 +4031,11 @@ final class LocalLedger {
       ''',
       [id, normalized, categoryId, _now, _now],
     );
+    _categoryRulesChanged();
+    // Reconcile now leaves unchanged entries alone, so a new rule has to go
+    // looking for what it should have filed rather than waiting for the next
+    // write to rebuild everything.
+    _recategorizeAutomaticTransactions();
     return id;
   }
 
@@ -4185,6 +4225,9 @@ final class LocalLedger {
           );
         })
         .toList();
+    final byObservation = {
+      for (final candidate in candidates) candidate.observation.id: candidate,
+    };
     final lockedEvidence = _evidenceByTransaction();
     final existingLocked = _db
         .select(
@@ -4211,15 +4254,32 @@ final class LocalLedger {
       'SELECT id, fingerprint FROM deleted_transactions',
     );
     final tombstonedIds = {for (final row in tombstones) row['id'] as String};
+    final lockedIds = {
+      for (final row in _db.select(
+        'SELECT id FROM transactions WHERE locked = 1',
+      ))
+        row['id'] as String,
+    };
     final tombstonedMoney = {
       for (final row in tombstones)
         if (row['fingerprint'] != null) row['fingerprint'] as String,
     };
+    // What is already on file, so the pass can write only what moved.
+    //
+    // Reconcile re-derives every automatic entry from the evidence, and used
+    // to delete and re-insert all of them on every write -- so one filed
+    // review classified, inserted and re-linked hundreds of rows that had
+    // not changed, and the screen waited for all of it. At 500 entries that
+    // was most of half a second.
+    final standing = {
+      for (final row in _db.select(
+        "SELECT * FROM transactions WHERE origin = 'automatic' AND locked = 0",
+      ))
+        row['id'] as String: _transactionFromRow(row, evidence: lockedEvidence),
+    };
     if (manageTransaction) _db.execute('BEGIN IMMEDIATE');
     try {
-      _db.execute(
-        "DELETE FROM transactions WHERE origin = 'automatic' AND locked = 0",
-      );
+      final rebuilt = <String>{};
       for (final item in result.transactions.where(
         (item) => item.origin == TransactionOrigin.automatic,
       )) {
@@ -4236,11 +4296,10 @@ final class LocalLedger {
         )) {
           continue;
         }
-        final locked = _db.select(
-          'SELECT 1 FROM transactions WHERE id = ? AND locked = 1 LIMIT 1',
-          [item.id],
-        );
-        if (locked.isNotEmpty) {
+        rebuilt.add(item.id);
+        final before = standing[item.id];
+        if (before != null && _sameEntry(before, item)) continue;
+        if (lockedIds.contains(item.id)) {
           // The owner's answer is not to be rewritten -- but the evidence
           // behind it is not the answer. A leg that arrives after somebody
           // has already said what a transfer was is still the bank's own
@@ -4249,7 +4308,15 @@ final class LocalLedger {
           _linkEvidence(item);
           continue;
         }
-        _insertTransaction(item);
+        _insertTransaction(item, evidence: byObservation);
+      }
+      final gone = standing.keys.where((id) => !rebuilt.contains(id)).toList();
+      if (gone.isNotEmpty) {
+        _db.execute(
+          'DELETE FROM transactions WHERE id IN '
+          '(${List.filled(gone.length, '?').join(',')})',
+          gone,
+        );
       }
       for (final decision in result.decisions) {
         _db.execute(
@@ -4278,8 +4345,41 @@ final class LocalLedger {
     }
   }
 
-  void _insertTransaction(CanonicalTransaction item) {
-    final classification = _automaticCategory(item);
+  /// Whether a rebuilt entry says the same thing as the one on file.
+  ///
+  /// Covers every column reconcile writes except the ones derived from the
+  /// evidence and the standing rules -- the category, which is why learning
+  /// a rule re-files what it should apply to rather than waiting for the
+  /// next write to happen to rebuild everything.
+  static bool _sameEntry(
+    CanonicalTransaction before,
+    CanonicalTransaction now,
+  ) =>
+      before.kind == now.kind &&
+      before.amount.minorUnits == now.amount.minorUnits &&
+      before.amount.currency == now.amount.currency &&
+      before.occurredAt.isAtSameMomentAs(now.occurredAt) &&
+      before.accountId == now.accountId &&
+      before.fromAccountId == now.fromAccountId &&
+      before.toAccountId == now.toAccountId &&
+      before.description == now.description &&
+      before.needsReview == now.needsReview &&
+      before.locked == now.locked &&
+      before.effectiveReconciliationState == now.effectiveReconciliationState &&
+      _sameSet(before.evidenceIds, now.evidenceIds) &&
+      _sameSet(before.decisionIds, now.decisionIds);
+
+  static bool _sameSet(Iterable<String> a, Iterable<String> b) {
+    final left = a.toSet();
+    final right = b.toSet();
+    return left.length == right.length && left.containsAll(right);
+  }
+
+  void _insertTransaction(
+    CanonicalTransaction item, {
+    Map<String, EventCandidate>? evidence,
+  }) {
+    final classification = _automaticCategory(item, evidence: evidence);
     _db.execute(
       'INSERT OR REPLACE INTO transactions(id,kind,amount_minor,currency,occurred_at,account_id,from_account_id,to_account_id,description,needs_review,locked,origin,category_id,category,category_rule_id,reconcile_state,confidence,match_reasons_json,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       [
@@ -4320,11 +4420,31 @@ final class LocalLedger {
     }
   }
 
-  CategoryClassification _automaticCategory(CanonicalTransaction item) {
+  /// [evidence] is the alerts behind [item], already in hand. Reconcile has
+  /// just read every one of them, so looking them up again -- once per
+  /// transaction, on the isolate the screen is waiting on -- was the other
+  /// half of what a write cost.
+  CategoryClassification _automaticCategory(
+    CanonicalTransaction item, {
+    Map<String, EventCandidate>? evidence,
+  }) {
     final ids = item.evidenceIds.toList(growable: false);
     final text = <String>[item.description ?? ''];
     final types = <CandidateType>[];
-    if (ids.isNotEmpty) {
+    final known = evidence == null
+        ? null
+        : [for (final id in ids) evidence[id]];
+    if (known != null && !known.contains(null)) {
+      for (final candidate in known.cast<EventCandidate>()) {
+        text.addAll([
+          candidate.observation.title ?? '',
+          candidate.observation.body,
+          candidate.counterparty ?? '',
+          candidate.description ?? '',
+        ]);
+        types.add(candidate.type);
+      }
+    } else if (ids.isNotEmpty) {
       final placeholders = List.filled(ids.length, '?').join(',');
       for (final row in _db.select('''
         SELECT r.title,r.body,c.counterparty,c.description,c.candidate_type
