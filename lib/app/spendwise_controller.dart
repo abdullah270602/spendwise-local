@@ -22,7 +22,7 @@ import 'theme.dart';
 
 final class SpendWiseController extends ChangeNotifier
     with WidgetsBindingObserver
-    implements SpendWiseAdvancedViewModel {
+    implements SpendWiseAdvancedViewModel, CategoryLessonSource {
   SpendWiseController._(this._ledger, this._bridge, this._snapshot);
 
   @visibleForTesting
@@ -1146,6 +1146,9 @@ final class SpendWiseController extends ChangeNotifier
 
   @override
   ParserHealth parserHealth() => _ledger.parserHealth();
+
+  @override
+  CategoryLesson? takeCategoryLesson() => _ledger.takeCategoryLesson();
 
   /// Not static: naming an app needs the live Android labels, and an alert
   /// that skips that step reaches Review as "com.google.android.apps.messaging",

@@ -209,6 +209,38 @@ final class StoredAlert {
   bool get reachedLedger => status == 'parsed';
 }
 
+/// What a correction taught the app, so the app can say so.
+///
+/// Filing the same payee under the same category three times writes a
+/// standing rule and every filing after that is automatic. That has been
+/// true since the feature shipped and nothing on screen has ever mentioned
+/// it: the counter was read by no view model and no widget, so a person
+/// correcting the same shop for months had no way to tell whether it was
+/// landing. It was not — a parser bug was dropping the payee — and the
+/// silence is why that went unnoticed for months.
+final class CategoryLesson {
+  const CategoryLesson({
+    required this.merchant,
+    required this.categoryName,
+    required this.seen,
+    required this.needed,
+  });
+
+  /// Who the rule is about, or null when the alert named nobody and there is
+  /// therefore nothing to key a rule on. Worth saying out loud rather than
+  /// failing quietly, which is the shape the original fault took.
+  final String? merchant;
+
+  final String categoryName;
+
+  /// Corrections recorded against this payee and category, including this
+  /// one, and how many it takes.
+  final int seen;
+  final int needed;
+
+  bool get learned => merchant != null && seen >= needed;
+}
+
 final class LedgerSnapshot {
   const LedgerSnapshot({
     required this.accounts,
@@ -3795,6 +3827,16 @@ final class LocalLedger {
   /// category before SpendWise starts doing it unasked.
   static const categoryRuleThreshold = 3;
 
+  CategoryLesson? _lastLesson;
+
+  /// What the last correction taught, once. Cleared on read so a screen
+  /// cannot report the same lesson twice.
+  CategoryLesson? takeCategoryLesson() {
+    final lesson = _lastLesson;
+    _lastLesson = null;
+    return lesson;
+  }
+
   void categorizeTransactions(Iterable<String> ids, String? categoryId) {
     final list = ids.toList(growable: false);
     if (list.isEmpty) return;
@@ -3976,7 +4018,18 @@ final class LocalLedger {
           : candidates.first['counterparty'] as String?;
     }
     final normalized = CategoryClassifier.normalize(merchant ?? '');
-    if (normalized.length < 2 || normalized.length > 80) return null;
+    if (normalized.length < 2 || normalized.length > 80) {
+      // Nothing to key a rule on. Said out loud rather than dropped: a
+      // correction that can teach nothing looks exactly like one that can,
+      // and that is the whole reason the original fault ran for months.
+      _lastLesson = CategoryLesson(
+        merchant: null,
+        categoryName: categoryName(categoryId),
+        seen: 0,
+        needed: categoryRuleThreshold,
+      );
+      return null;
+    }
     final id = 'user-category:${sha256.convert(utf8.encode(normalized))}';
 
     // Disagreeing with a standing rule retires it at once. Being wrong is the
@@ -4014,6 +4067,12 @@ final class LocalLedger {
       [normalized, categoryId],
     );
     final seen = counted.isEmpty ? 0 : counted.first['seen'] as int;
+    _lastLesson = CategoryLesson(
+      merchant: merchant?.trim(),
+      categoryName: categoryName(categoryId),
+      seen: seen,
+      needed: categoryRuleThreshold,
+    );
     // One filing is a decision about one payment; a habit is what justifies
     // acting on the next one unasked. Below the threshold the answer is still
     // recorded -- it just does not yet speak for transactions the user has

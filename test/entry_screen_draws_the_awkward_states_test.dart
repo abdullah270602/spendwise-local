@@ -159,9 +159,16 @@ void main() {
 
     expect(find.text('Posted, but only 62% sure'), findsOneWidget);
     expect(
-      find.textContaining('counted in the month'),
+      find.textContaining('Counted in the month'),
       findsOneWidget,
       reason: 'flagged is not the same as missing: the entry is in the ledger',
+    );
+    expect(
+      find.text('Confirm'),
+      findsOneWidget,
+      reason:
+          'the flag used to name the verb and send you to another tab '
+          'to find the entry you were already looking at',
     );
   });
 

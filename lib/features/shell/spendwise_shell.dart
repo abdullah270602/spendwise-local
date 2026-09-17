@@ -174,12 +174,19 @@ class _SpendWiseShellState extends State<SpendWiseShell> {
               physics: const NeverScrollableScrollPhysics(),
               children: _pages,
             ),
+            // Inset by hand, because there is nothing above it to do the
+            // insetting. The shell has no app bar, so the Scaffold does not
+            // push its body down, and the status bar is transparent -- a bar
+            // at zero is drawn behind the clock. Every page below carries its
+            // own SafeArea; this sits outside all of them, so it needs its
+            // own. It was invisible on every path except the tray scan, which
+            // happens to have a spinner of its own.
             if (widget.viewModel.uiBusy)
-              const Positioned(
-                top: 0,
+              Positioned(
+                top: MediaQuery.viewPaddingOf(context).top,
                 left: 0,
                 right: 0,
-                child: LinearProgressIndicator(minHeight: 2),
+                child: const LinearProgressIndicator(minHeight: 2),
               ),
             if (widget.viewModel.uiErrorMessage case final message?)
               Positioned(

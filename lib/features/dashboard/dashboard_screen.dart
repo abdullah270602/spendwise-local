@@ -7,6 +7,7 @@ import '../../widgets/shape_kit.dart';
 import '../capture/capture_state.dart';
 import '../settings/settings_screen.dart';
 import '../tour/spotlight.dart';
+import '../transactions/ledger_screen.dart';
 import '../shell/spendwise_view_model.dart';
 import 'home_categories.dart';
 import 'home_savings.dart';
@@ -314,7 +315,14 @@ class DashboardScreen extends StatelessWidget {
                   key: ValueKey(categories[index].category),
                   item: categories[index],
                   color: categoryColor(categories[index], tones),
-                  onTap: onSeeLedger,
+                  // The row says what a category cost; the tap says what was
+                  // in it. Every one of them used to open the same unfiltered
+                  // ledger, which made the most available tap in the app the
+                  // one that answered nothing.
+                  onTap: () {
+                    ledgerCategoryRequest.value = categories[index].category;
+                    onSeeLedger();
+                  },
                 ),
               ),
             ),

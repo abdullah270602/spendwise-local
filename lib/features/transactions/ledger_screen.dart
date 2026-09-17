@@ -14,6 +14,18 @@ import 'transaction_details_screen.dart';
 /// rows underneath are deliberately tight, with no per-row ornament, so twice
 /// as many fit on screen. `Chart / Plain` takes the graph away and the choice
 /// sticks.
+/// A category the Ledger should open filtered to, raised from elsewhere.
+///
+/// Home's breakdown names what a category cost and had no way to show what
+/// was in it: every row tapped through to the unfiltered ledger, so
+/// "Groceries" and "Everything else" landed on the same screen. The Ledger
+/// sits in a sibling tab with its own State, which is what makes it worth
+/// keeping, so the filter is raised the way the walkthrough is rather than
+/// threaded through the shell's page list.
+///
+/// Set it, then switch tabs; the Ledger applies it and clears it.
+final ledgerCategoryRequest = ValueNotifier<String?>(null);
+
 class LedgerScreen extends StatefulWidget {
   const LedgerScreen({super.key, required this.viewModel});
 
@@ -48,18 +60,43 @@ class _LedgerScreenState extends State<LedgerScreen> {
   @override
   void initState() {
     super.initState();
+    ledgerCategoryRequest.addListener(_takeCategoryRequest);
     final now = DateTime.now();
     month = DateTime(now.year, now.month);
     view = _LedgerView.fromId(
       widget.viewModel.uiViewPreference(_preferenceKey),
     );
     allMonths = widget.viewModel.uiViewPreference(_spanKey) == 'all';
+    // Tabs are built when they are first shown, so a request raised from
+    // Home usually arrives before this State exists to hear it.
+    final wanted = ledgerCategoryRequest.value;
+    if (wanted != null) {
+      ledgerCategoryRequest.value = null;
+      category = wanted;
+    }
   }
 
   @override
   void dispose() {
+    ledgerCategoryRequest.removeListener(_takeCategoryRequest);
     searchController.dispose();
     super.dispose();
+  }
+
+  void _takeCategoryRequest() {
+    final wanted = ledgerCategoryRequest.value;
+    if (wanted == null || !mounted) return;
+    ledgerCategoryRequest.value = null;
+    setState(() {
+      category = wanted;
+      // A category is a question about the whole ledger; scoping it to this
+      // month would answer a different one than the row that was tapped.
+      kind = null;
+      accountId = null;
+      query = '';
+      searchController.clear();
+      searching = false;
+    });
   }
 
   /// A search or a filter is a question about the whole ledger, not about one

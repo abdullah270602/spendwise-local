@@ -144,7 +144,7 @@ class TransactionDetailsScreen extends StatelessWidget {
           Text(_factLine(live, debt), style: SpendWiseType.meta),
           if (live.note.isNotEmpty) _Quoted(live.note),
           if (_settlementNote(live, debt) case final String said) _Quoted(said),
-          ..._flags(live, accounts, cash: cash),
+          ..._flags(context, live, accounts, cash: cash),
           const SizedBox(height: 24),
           _BalanceTrail(
             transaction: live,
@@ -236,6 +236,7 @@ class TransactionDetailsScreen extends StatelessWidget {
   ///
   /// One bordered block each, hue on the left edge only, never a fill.
   List<Widget> _flags(
+    BuildContext context,
     TransactionViewData entry,
     List<AccountViewData> accounts, {
     required bool cash,
@@ -259,16 +260,24 @@ class TransactionDetailsScreen extends StatelessWidget {
           : entry.evidence
                 .map((item) => item.confidence)
                 .reduce((a, b) => a > b ? a : b);
+      // The two verbs this used to name in a sentence are the two controls
+      // beside it now. It read: "Review is where it gets confirmed; Edit is
+      // where it gets corrected" -- forty-two words sending you to another
+      // tab to find the entry you were already looking at. The one fact in
+      // it nobody could guess, that an unconfirmed entry is counted anyway,
+      // is the half-sentence that stayed.
       flags.add(
         _Flag(
           tone: SpendWiseColors.spend,
           heading: read != null && read < .8
               ? 'Posted, but only ${(read * 100).round()}% sure'
               : 'Posted, but not confirmed yet',
-          body:
-              'It is in your ledger and counted in the month. Below 80% '
-              'SpendWise marks the entry rather than trusting it. Review is '
-              'where it gets confirmed; Edit is where it gets corrected.',
+          body: 'Counted in the month already.',
+          action: _ConfirmOrCorrect(
+            viewModel: viewModel,
+            transaction: entry,
+            onCorrect: () => _showCorrection(context),
+          ),
         ),
       );
     }
@@ -604,8 +613,37 @@ class TransactionDetailsScreen extends StatelessWidget {
         ),
       ),
     );
-    if (saved == true && context.mounted) Navigator.pop(context);
+    if (saved != true || !context.mounted) return;
+    // Said on the way out, from the ledger's messenger rather than this
+    // screen's, because this screen is about to stop existing.
+    final lesson = viewModel.uiTakeCategoryLesson();
+    Navigator.pop(context);
+    if (lesson != null && context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(categoryLessonSentence(lesson))));
+    }
   }
+}
+
+/// What to say after a correction, in one line.
+///
+/// Three filings of the same payee under the same category write a standing
+/// rule and everything after that files itself. The app has always done it
+/// and has never said so, so somebody correcting the same shop every week
+/// had no way to tell whether it was landing -- and when a parser bug meant
+/// it was not, the silence hid that for months.
+String categoryLessonSentence(CategoryLesson lesson) {
+  final merchant = lesson.merchant;
+  if (merchant == null) {
+    return 'Filed. Nothing to learn from: the alert names no payee.';
+  }
+  if (lesson.learned) {
+    return '$merchant now files itself under ${lesson.categoryName}.';
+  }
+  final left = lesson.needed - lesson.seen;
+  return '$merchant, ${lesson.seen} of ${lesson.needed}. '
+      '${left == 1 ? 'Once more' : '$left more'} and it files itself.';
 }
 
 extension<T> on Iterable<T> {
@@ -636,10 +674,18 @@ class _Quoted extends StatelessWidget {
 /// A state the entry is in: one bordered block with the hue on its left edge
 /// and nowhere else. State is never a fill on this screen.
 class _Flag extends StatelessWidget {
-  const _Flag({required this.tone, required this.heading, required this.body});
+  const _Flag({
+    required this.tone,
+    required this.heading,
+    required this.body,
+    this.action,
+  });
 
   final Color tone;
   final String heading, body;
+
+  /// What to do about it, when there is something to do about it.
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -658,8 +704,81 @@ class _Flag extends StatelessWidget {
         Text(heading, style: SpendWiseType.rowStrong.copyWith(fontSize: 14)),
         const SizedBox(height: 6),
         Text(body, style: SpendWiseType.body.copyWith(fontSize: 12.5)),
+        if (action case final control?) ...[
+          const SizedBox(height: 11),
+          control,
+        ],
       ],
     ),
+  );
+}
+
+/// The answer to "Posted, but not confirmed", on the entry itself.
+///
+/// Confirming one entry at a time does not replace Review, which groups
+/// alerts into decisions and answers them in a batch. It covers the case
+/// Review cannot: you are already looking at the entry, because the pending
+/// mark in the register is the thing that drew your eye to it.
+class _ConfirmOrCorrect extends StatefulWidget {
+  const _ConfirmOrCorrect({
+    required this.viewModel,
+    required this.transaction,
+    required this.onCorrect,
+  });
+
+  final SpendWiseViewModel viewModel;
+  final TransactionViewData transaction;
+  final VoidCallback onCorrect;
+
+  @override
+  State<_ConfirmOrCorrect> createState() => _ConfirmOrCorrectState();
+}
+
+class _ConfirmOrCorrectState extends State<_ConfirmOrCorrect> {
+  bool confirming = false;
+
+  Future<void> _confirm() async {
+    setState(() => confirming = true);
+    try {
+      await widget.viewModel.uiApplyReviewDecision(
+        ReviewDecision(
+          kind: ReviewDecisionKind.confirm,
+          transactionIds: [widget.transaction.id],
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => confirming = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failureText('Could not confirm that', error))),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+    spacing: 8,
+    runSpacing: 6,
+    crossAxisAlignment: WrapCrossAlignment.center,
+    children: [
+      OutlinedButton(
+        onPressed: confirming ? null : _confirm,
+        style: OutlinedButton.styleFrom(
+          visualDensity: VisualDensity.compact,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+        ),
+        child: Text(confirming ? 'Confirming…' : 'Confirm'),
+      ),
+      TextButton(
+        onPressed: confirming ? null : widget.onCorrect,
+        style: TextButton.styleFrom(
+          foregroundColor: SpendWiseColors.dim,
+          visualDensity: VisualDensity.compact,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+        ),
+        child: const Text('Correct'),
+      ),
+    ],
   );
 }
 

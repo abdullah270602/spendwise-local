@@ -50,6 +50,10 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
   int settledCount = 0;
   int settledOf = 0;
 
+  /// What filing that answer taught the app, if anything. Read once, next to
+  /// the receipt for the answer that taught it.
+  CategoryLesson? settledLesson;
+
   /// What "drop" hid, so it can be put back. Null for answers that are not
   /// destructive: filing and attaching are undone by editing the entry they
   /// created, which the ledger already offers.
@@ -104,11 +108,6 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
                           '${rules.length} ${rules.length == 1 ? 'decision' : 'decisions'}.',
                           style: SpendWiseType.statement,
                         ),
-                        const SizedBox(height: 7),
-                        Text(
-                          'Answer once and SpendWise applies it to the rest.',
-                          style: SpendWiseType.body.copyWith(fontSize: 13.5),
-                        ),
                       ],
                     ),
             ),
@@ -148,6 +147,7 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
                     return _SettledBlock(
                       count: settledCount,
                       of: settledOf,
+                      lesson: settledLesson,
                       onUndo: undoStatuses == null ? null : _undo,
                       onDone: _clearSettled,
                     );
@@ -171,20 +171,11 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
                     SpendWiseTheme.gutter,
                     96 + MediaQuery.viewPaddingOf(context).bottom,
                   ),
-                  child: Container(
-                    padding: const EdgeInsets.only(top: 13),
-                    decoration: BoxDecoration(
-                      border: Border(
-                        top: BorderSide(color: SpendWiseColors.line),
-                      ),
-                    ),
-                    child: Text(
-                      rules.length == 1
-                          ? 'Answering it clears the inbox.'
-                          : 'Answering all ${rules.length} clears the inbox.',
-                      style: SpendWiseType.body.copyWith(fontSize: 12.5),
-                    ),
-                  ),
+                  // A hairline, and nothing said. It used to restate the
+                  // header -- "Answering all 3 clears the inbox" -- under a
+                  // line that already reads "9 alerts, 3 decisions". Marking
+                  // the end of the list is the only job left.
+                  child: Container(height: 1, color: SpendWiseColors.line),
                 ),
               ),
           ],
@@ -244,6 +235,7 @@ class _ReviewInboxScreenState extends State<ReviewInboxScreen> {
         settledId = rule.id;
         settledCount = _settledBetween(decision, before, _read(decision));
         settledOf = before.waiting;
+        settledLesson = widget.viewModel.uiTakeCategoryLesson();
         undoStatuses = undo != null && undo.isNotEmpty ? undo : null;
       });
     } catch (error) {
@@ -953,7 +945,6 @@ class _RuleBlock extends StatelessWidget {
                       ),
                     ),
                   ),
-                  Text('${rule.count}', style: SpendWiseType.metaTight),
                 ],
               ),
             ),
@@ -980,9 +971,15 @@ class _SettledBlock extends StatefulWidget {
   const _SettledBlock({
     required this.count,
     required this.of,
+    required this.lesson,
     required this.onUndo,
     required this.onDone,
   });
+
+  /// What the answer taught, when it taught anything. Reported here because
+  /// a correction that changes what the app will do next is the only kind
+  /// worth making, and until now it changed it silently.
+  final CategoryLesson? lesson;
 
   /// What the ledger settled, counted rather than assumed.
   final int count;
@@ -1038,9 +1035,13 @@ class _SettledBlockState extends State<_SettledBlock> {
     if (widget.count < widget.of) {
       return '${widget.count} of ${widget.of} alerts settled.';
     }
-    return widget.count == 1
+    final settled = widget.count == 1
         ? '1 alert settled.'
         : '${widget.count} alerts settled.';
+    final lesson = widget.lesson;
+    return lesson == null || lesson.merchant == null
+        ? settled
+        : '$settled ${categoryLessonSentence(lesson)}';
   }
 
   @override

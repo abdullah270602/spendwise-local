@@ -145,6 +145,63 @@ void main() {
     expect(model.completed, isTrue);
   });
 
+  testWidgets('the filled button adds the account it is sitting under', (
+    tester,
+  ) async {
+    // The card is headed "Where should it all land?", the name arrives
+    // pre-filled, and the way out is a full-bleed filled button while saving
+    // is an outlined one a third of its width. Tapping the obvious one used
+    // to leave with the whole form still in it and say nothing -- and the
+    // state it left behind, an account-less ledger, is the one Review then
+    // complains about.
+    // Tall enough that the whole card is on screen at once: the open form
+    // pushes the finishing button past the fold on a 640 view.
+    final model = await pump(
+      tester,
+      size: const Size(390, 1400),
+      model: _Recorder(accounts: const []),
+    );
+    for (final label in ['Set it up', 'Next', 'Next', 'Skip for now']) {
+      await tapOn(tester, label);
+    }
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Last digits'),
+      '7314',
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('Open SpendWise'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(model.added, [
+      'Everyday',
+    ], reason: 'the account in the form was typed in to be kept');
+    expect(model.completed, isTrue);
+  });
+
+  testWidgets('and leaves without one when nothing was typed', (tester) async {
+    // The other half: an empty form is not an account, and clearing the name
+    // is how somebody says they will do this later.
+    final model = await pump(
+      tester,
+      size: const Size(390, 1400),
+      model: _Recorder(accounts: const []),
+    );
+    for (final label in ['Set it up', 'Next', 'Next', 'Skip for now']) {
+      await tapOn(tester, label);
+    }
+    await tester.enterText(find.widgetWithText(TextField, 'Name'), '');
+    await tester.pump();
+
+    await tester.tap(find.text('Open SpendWise'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(model.added, isEmpty);
+    expect(model.completed, isTrue);
+  });
+
   testWidgets('nothing off the golden path is asked for', (tester) async {
     await pump(tester);
     for (final label in ['Set it up', 'Next', 'Next', 'Skip for now']) {
@@ -360,8 +417,13 @@ class _Recorder extends ChangeNotifier implements SpendWiseViewModel {
     monthlyChangePercent: 0,
   );
 
+  /// Accounts the screen asked for, in order. A list rather than a flag so
+  /// a test can tell "added once" from "added twice".
+  final added = <String>[];
+
   @override
-  Future<void> addAccount(String n, String t, MoneyViewData b) async {}
+  Future<void> addAccount(String n, String t, MoneyViewData b) async =>
+      added.add(n);
   @override
   Future<void> deleteTransaction(String id) async {}
   @override

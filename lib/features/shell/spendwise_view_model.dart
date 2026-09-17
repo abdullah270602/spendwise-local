@@ -2,9 +2,11 @@ import 'package:flutter/foundation.dart';
 
 import '../../app/home_period.dart';
 import '../../core/debt_kind.dart';
+import '../../data/local_ledger.dart' show CategoryLesson;
 import '../../data/parser_health.dart';
 export '../../app/home_period.dart';
 export '../../core/debt_kind.dart';
+export '../../data/local_ledger.dart' show CategoryLesson;
 
 enum TransactionKind { expense, income, transfer }
 
@@ -572,6 +574,17 @@ abstract class SpendWiseViewModel implements Listenable {
   Future<void> eraseAllData();
 }
 
+/// A view model that remembers what the last correction taught.
+///
+/// Deliberately its own interface rather than another member on
+/// [SpendWiseAdvancedViewModel]: that one has thirty-odd implementations,
+/// almost all of them test fakes, and none of them has an opinion about
+/// this. Asking every one of them to answer a question they do not care
+/// about is how a small feature turns into a thirty-file diff.
+abstract class CategoryLessonSource {
+  CategoryLesson? takeCategoryLesson();
+}
+
 abstract class SpendWiseAdvancedViewModel implements SpendWiseViewModel {
   bool get busy;
   String? get errorMessage;
@@ -759,6 +772,15 @@ extension SpendWiseAdvancedAccess on SpendWiseViewModel {
       _advanced?.isSharedSource(packageName) ?? false;
   ParserHealth uiParserHealth() =>
       _advanced?.parserHealth() ?? const ParserHealth(sources: []);
+
+  /// What the last correction taught, once. Null when nothing was filed, the
+  /// lesson has already been reported, or this view model does not keep one.
+  CategoryLesson? uiTakeCategoryLesson() {
+    final model = _advanced;
+    if (model is! CategoryLessonSource) return null;
+    return (model as CategoryLessonSource).takeCategoryLesson();
+  }
+
   Future<List<String>> uiDeclaredPermissions() =>
       _advanced?.declaredPermissions() ?? Future.value(const []);
   HomePeriod get uiHomePeriod =>

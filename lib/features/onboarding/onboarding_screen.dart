@@ -485,8 +485,21 @@ class _LandingState extends State<_Landing> {
     super.dispose();
   }
 
-  Future<void> _add() async {
-    if (!formKey.currentState!.validate()) return;
+  /// Whether the form is holding something a person typed.
+  ///
+  /// Mirrors `open` in [build]: the form stands open by itself when there is
+  /// no account yet, and the name field arrives pre-filled, so on first run
+  /// this is true before anything has been touched -- which is right, since
+  /// adding the account is the whole job of the card.
+  bool get _hasDraft =>
+      (adding || viewModel.accounts.isEmpty) &&
+      (name.text.trim().isNotEmpty ||
+          suffix.text.trim().isNotEmpty ||
+          balance.text.trim().isNotEmpty ||
+          attached.isNotEmpty);
+
+  Future<bool> _add() async {
+    if (!formKey.currentState!.validate()) return false;
     // Onboarding has no account yet, so the ledger's own currency stands
     // in. It is PKR today; it is a setting the moment a second country is
     // supported, and this reads it rather than assuming it.
@@ -505,7 +518,7 @@ class _LandingState extends State<_Landing> {
           sourcePackages: {...attached},
         ),
       );
-      if (!mounted) return;
+      if (!mounted) return true;
       FocusScope.of(context).unfocus();
       setState(() {
         adding = false;
@@ -515,6 +528,7 @@ class _LandingState extends State<_Landing> {
         attached.clear();
         type = 'Bank';
       });
+      return true;
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -523,12 +537,21 @@ class _LandingState extends State<_Landing> {
           ),
         );
       }
+      return false;
     } finally {
       if (mounted) setState(() => saving = false);
     }
   }
 
   Future<void> _scanThenFinish() async {
+    // Anything typed into the form is added before leaving.
+    //
+    // This button is full-bleed and filled and sits under a card headed
+    // "Where should it all land?"; saving is an outlined button a third of
+    // its width. Tapping the obvious one used to walk away with the account
+    // in the form and say nothing, which is both a loss of work and the one
+    // way to finish setup with the empty ledger Review then complains about.
+    if (_hasDraft && !await _add()) return;
     setState(() => scanning = true);
     try {
       final scan = await viewModel.uiScanNotificationTray();

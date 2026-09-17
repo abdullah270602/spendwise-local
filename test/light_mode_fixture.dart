@@ -185,8 +185,12 @@ class LightModeFixture extends ChangeNotifier
     required DateTime to,
   }) => dashboard.categorySpending;
 
+  /// Settable so a test can put the shell into the state it draws its one
+  /// progress indicator in.
+  bool busyNow = false;
+
   @override
-  bool get busy => false;
+  bool get busy => busyNow;
 
   @override
   bool get demoDataEnabled => false;
