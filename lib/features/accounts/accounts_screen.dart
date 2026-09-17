@@ -206,7 +206,6 @@ class _AccountsScreenState extends State<AccountsScreen> {
               children: [
                 if (everyday.isNotEmpty) ...[
                   _zone('Available to spend', everydayTotal),
-                  if (heldTotal != 0) _heldNote(heldTotal),
                   ..._blocks(everyday),
                 ],
                 if (savings.isNotEmpty) ...[
@@ -222,17 +221,6 @@ class _AccountsScreenState extends State<AccountsScreen> {
       ),
     );
   }
-
-  /// A note under the spendable total explaining why it is lower than the
-  /// balances beneath it add up to. Without this the screen looks broken.
-  Widget _heldNote(int heldMinor) => Padding(
-    padding: const EdgeInsets.only(left: 13, bottom: 8),
-    child: Text(
-      '${formatMinor(heldMinor, cents: false)} of what is in these accounts '
-      'is being held for someone else, so it is not counted here.',
-      style: SpendWiseType.metaTight,
-    ),
-  );
 
   /// Lent money is still yours; borrowed money is not; held money never was.
   /// None of the three sits in an account of its own, so the map has to say so
