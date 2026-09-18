@@ -574,7 +574,9 @@ What to do, in order:
 - **Release signing is wired, and needs its keystore.** See *Release signing*
   below: the gradle side is done and falls back to the debug key until
   `android/key.properties` and its keystore exist.
-- **Privacy policy needs a public URL** (GitHub Pages over `PRIVACY.md`).
+- **Privacy policy is published** at
+  `https://abdullah270602.github.io/spendwise-local/privacy.html`, from
+  `site/`. It still needs a contact email filled in.
 - **Screenshots are stale** — see *Open work*. Retake from the sandbox install
   with demo data, never from the real app.
 - **CSV/XLS import is slated for removal**, along with `csv_mappings` and
@@ -637,8 +639,11 @@ where this repository stands on each:
 - **Data safety: nothing collected, nothing shared,** and provably so. The
   manifest declares `USE_BIOMETRIC`, `USE_FINGERPRINT` and a dynamic-receiver
   permission. There is no `INTERNET` permission and there must never be one.
-- **Privacy policy needs a public URL.** `docs/PRIVACY.md` is written; GitHub
-  Pages over `/docs` is the cheapest way to give the Console a link.
+- **Privacy policy** is served from `site/` by `.github/workflows/pages.yml`
+  at `/privacy.html`. It is deliberately not built from `docs/`, which this
+  repository gitignores as local notes -- pointing Pages there produced a
+  build of a folder that does not exist on GitHub. A contact email is still
+  to be filled in, in both `site/privacy.html` and the Console listing.
 - **Store listing** needs an icon, a feature graphic, and screenshots. Those
   must come from the sandbox install with demo data
   (`local/sandbox-flavour.patch`), never from a real ledger. The ones in

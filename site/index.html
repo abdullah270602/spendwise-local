@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SpendWise</title>
+<meta name="description" content="An offline personal-finance ledger for Android. It reads the notifications your bank already sends you. It cannot go online.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%230F1113'/><path d='M50 18 L50 46 M50 46 L28 82 M50 46 L72 82' stroke='%239FB2AC' stroke-width='9' fill='none' stroke-linecap='square'/></svg>">
+<style>
+  :root{
+    --bg:#0F1113; --fg:#E9E7E2; --dim:#7A8084; --line:#1C2023; --edge:#282D31;
+    --keep:#9FB2AC; --spend:#C97A5A;
+    --mono:ui-monospace,'JetBrains Mono','SF Mono',Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  }
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --bg:#FAF9F6; --fg:#17191A; --dim:#6B7176; --line:#E8E6DF; --edge:#D2CFC6;
+      --keep:#4C665E; --spend:#A9542F;
+    }
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--fg); font-family:var(--sans);
+    -webkit-font-smoothing:antialiased; line-height:1.6;
+  }
+  .wrap{max-width:720px; margin:0 auto; padding:0 16px 96px}
+  header{padding:72px 0 0}
+  .mark{display:block; width:42px; height:42px; margin-bottom:26px}
+  h1{
+    font-size:clamp(34px,7vw,56px); line-height:1.04; letter-spacing:-.028em;
+    margin:0 0 18px; font-weight:700; text-wrap:balance;
+  }
+  .tag{
+    font-family:var(--mono); font-size:11px; letter-spacing:.2em;
+    text-transform:uppercase; color:var(--keep); margin:0 0 34px;
+  }
+  .lede{font-size:clamp(17px,2.4vw,20px); color:var(--fg); margin:0 0 20px; text-wrap:pretty}
+  p{margin:0 0 18px; color:var(--dim); text-wrap:pretty}
+  p strong{color:var(--fg); font-weight:600}
+  .claim{
+    border-left:2px solid var(--keep); padding:2px 0 2px 18px; margin:34px 0;
+    color:var(--fg); font-size:17px;
+  }
+  h2{
+    font-size:13px; font-family:var(--mono); letter-spacing:.16em;
+    text-transform:uppercase; color:var(--dim); font-weight:500;
+    margin:56px 0 18px; padding-top:22px; border-top:1px solid var(--line);
+  }
+  ul{margin:0 0 18px; padding-left:20px; color:var(--dim)}
+  li{margin-bottom:9px}
+  li strong{color:var(--fg); font-weight:600}
+  a{color:var(--fg); text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--edge)}
+  a:hover{text-decoration-color:var(--keep)}
+  .links{display:flex; gap:26px; flex-wrap:wrap; margin-top:38px; font-size:15px}
+  footer{
+    margin-top:64px; padding-top:22px; border-top:1px solid var(--line);
+    color:var(--dim); font-size:13px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
+      <path d="M50 14 L50 44 M50 44 L26 86 M50 44 L74 86" stroke="currentColor"
+            stroke-width="8" fill="none" stroke-linecap="square" opacity=".9"/>
+    </svg>
+    <h1>Your bank already tells you everything.</h1>
+    <p class="tag">Private. Local. Yours.</p>
+  </header>
+
+  <p class="lede">SpendWise is an offline personal-finance ledger for Android. It reads the transaction alerts your bank already sends you and turns them into a record of your own money &mdash; without you typing a single one of them in.</p>
+
+  <div class="claim">
+    It does not request Android&rsquo;s <code>INTERNET</code> permission. SpendWise cannot send your data anywhere &mdash; not because we promise not to, but because Android will not let it.
+  </div>
+
+  <h2>How it works</h2>
+  <p>You choose which apps SpendWise may read &mdash; your bank, your wallet, your messaging app &mdash; one at a time. When one of them posts an alert about money, SpendWise reads the amount, which way it went and who it was, and files it.</p>
+  <p>When it is unsure, it asks instead of guessing. When you correct the same shop a few times, it learns and stops asking.</p>
+
+  <h2>What it does not have</h2>
+  <ul>
+    <li><strong>No server</strong>, and no network permission to reach one.</li>
+    <li><strong>No account</strong> to sign up for, and no profile of you.</li>
+    <li><strong>No analytics, advertising or crash reporting.</strong> No third-party SDKs at all.</li>
+    <li><strong>No bank credentials.</strong> It never asks for them and could not use them.</li>
+  </ul>
+
+  <h2>Your data</h2>
+  <p>The ledger lives in an encrypted database on your phone. The key is generated on the device and held in the Android Keystore. Android cloud backup is switched off, so it is not copied anywhere else. Export to CSV or JSON whenever you like, and erase everything from inside the app whenever you like.</p>
+
+  <div class="links">
+    <a href="privacy.html">Privacy policy</a>
+    <a href="https://github.com/abdullah270602/spendwise-local">Source code</a>
+  </div>
+
+  <footer>
+    The source is public, including the manifest that proves there is no network permission.
+  </footer>
+</div>
+</body>
+</html>

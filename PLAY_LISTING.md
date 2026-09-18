@@ -167,8 +167,11 @@ whether to use a personal address or a dedicated one before submitting.
 
 ### Privacy policy URL
 
-`https://abdullah270602.github.io/spendwise-local/PRIVACY` — live once GitHub
-Pages is enabled over `/docs`.
+`https://abdullah270602.github.io/spendwise-local/privacy.html`
+
+Published from `site/` by `.github/workflows/pages.yml`. Not from `docs/`:
+this repository gitignores that folder as local working notes, so a Pages
+source pointed at it builds nothing.
 
 ---
 
