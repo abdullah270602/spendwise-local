@@ -162,8 +162,12 @@ budget, expense tracker, personal finance, offline, privacy
 
 ### Contact email
 
-**TO FILL IN** — Play requires a public contact address on the listing. Decide
-whether to use a personal address or a dedicated one before submitting.
+`hello.spendwise.app@gmail.com`
+
+A dedicated address rather than a personal one, deliberately. Play shows the
+contact email publicly on the store listing, and this repository is public, so
+whatever goes here is permanent in both places. The Console login stays a
+separate, private account.
 
 ### Privacy policy URL
 
@@ -189,7 +193,7 @@ source pointed at it builds nothing.
 
 ## 5. Open questions for the owner
 
-1. **Contact email** for the listing and the privacy policy.
+1. ~~Contact email~~ — settled, see section 3.
 2. **Does the account need closed testing** before production? Confirm the
    current threshold in the Console. It is calendar time and cannot be
    compressed.
