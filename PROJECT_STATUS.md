@@ -571,8 +571,9 @@ What to do, in order:
 
 ### 3. Before it can be given to anyone else
 
-- **Release signing.** The release build still uses the local debug key. See
-  *Important known risk* below; this is the one item that cannot be rushed.
+- **Release signing is wired, and needs its keystore.** See *Release signing*
+  below: the gradle side is done and falls back to the debug key until
+  `android/key.properties` and its keystore exist.
 - **Privacy policy needs a public URL** (GitHub Pages over `PRIVACY.md`).
 - **Screenshots are stale** — see *Open work*. Retake from the sandbox install
   with demo data, never from the real app.
@@ -587,15 +588,65 @@ What to do, in order:
 - The Chronograph hub and the Mixing Desk are narrower than their designs
   (*Open work*).
 
-## Important known risk
+## Release signing
 
-The Android `release` build currently uses the local debug signing configuration
-in `android/app/build.gradle.kts`. That preserves upgrade compatibility with the
-APK already installed on the Pixel, but it is not suitable as a permanent public
-release-signing strategy. Do not silently replace or rotate this signing key:
-Android would reject the update and the local-only data could become stranded.
-A future signing migration must be explicitly designed, tested, backed up, and
-coordinated with the user before broader distribution.
+`android/app/build.gradle.kts` reads `android/key.properties` -- gitignored,
+and holding the keystore path and its two passwords. When that file and the
+keystore it names are both present, the release build is signed with the
+upload key. When either is missing, it falls back to the debug key, so CI and
+a fresh clone still build; what they produce simply cannot be published, which
+is the intended failure rather than a broken build.
+
+`android/key.properties.example` documents the shape. Keep the keystore
+**outside** the repository so no future `git add -A` can reach it.
+
+Generating it (the owner runs this; the password must not pass through an
+agent's transcript):
+
+```
+keytool -genkeypair -v -keystore <path-outside-the-repo>/spendwise-upload.jks   -keyalg RSA -keysize 4096 -validity 10000 -alias upload
+```
+
+**The signature change is one-way.** Every build installed by hand during
+development was signed with the debug key. An upload-key build has a different
+signature, so Android refuses to install it over the existing app: the Play
+lineage starts from an uninstall, and the local database does not survive it
+(`allowBackup="false"`, and the data is app-private). The owner has accepted a
+fresh start on the Play lineage -- decided 2026-09-18 -- so no export or
+restore path gates this.
+
+Enrol in Play App Signing when the first bundle is uploaded. With it, a lost
+upload key is recoverable through Play support; without it, a lost key ends
+the app's update lineage permanently.
+
+## Publishing to Google Play
+
+The Console account was approved on 2026-09-18. What the store needs, and
+where this repository stands on each:
+
+- **App Bundle, not APKs.** `flutter build appbundle --release` is verified
+  working. Play generates the per-ABI splits itself, so the `+2000` version
+  code offset that `--split-per-abi` applies is not used on this path:
+  `versionCode` is the plain number from `pubspec.yaml`.
+- **Notification access is the policy risk.** The app binds
+  `BIND_NOTIFICATION_LISTENER_SERVICE`, which Play reviews closely. It needs a
+  core-functionality justification and, commonly, a demo video. The app does
+  **not** request `READ_SMS` or any Call Log permission -- it reads bank
+  alerts as notifications, including the ones a messaging app posts -- which
+  keeps it clear of the declaration that most often blocks finance apps.
+- **Data safety: nothing collected, nothing shared,** and provably so. The
+  manifest declares `USE_BIOMETRIC`, `USE_FINGERPRINT` and a dynamic-receiver
+  permission. There is no `INTERNET` permission and there must never be one.
+- **Privacy policy needs a public URL.** `docs/PRIVACY.md` is written; GitHub
+  Pages over `/docs` is the cheapest way to give the Console a link.
+- **Store listing** needs an icon, a feature graphic, and screenshots. Those
+  must come from the sandbox install with demo data
+  (`local/sandbox-flavour.patch`), never from a real ledger. The ones in
+  `README.md` are stale from before `0.9.8`.
+- **Closed testing.** A personal developer account must run a closed test
+  with a minimum number of testers for a continuous period before it can
+  apply for production. Confirm the current threshold in the Console -- it is
+  pure calendar time and therefore the longest-lead item on this list.
 
 Owning a matching web domain is not required. The visible app name, website, and
 repository can change later without affecting data, provided the Android package

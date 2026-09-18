@@ -63,3 +63,10 @@ local/
 .codex/
 .codex-remote-attachments/
 .cursor/
+
+# Release signing. The keystore and its passwords never enter the repository:
+# a signing key in git is a signing key in everyone's clone, and Play cannot
+# accept an update signed by anything else.
+android/key.properties
+*.jks
+*.keystore

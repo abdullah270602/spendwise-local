@@ -1,0 +1,13 @@
+# Copy to `android/key.properties` and fill in. That file is gitignored and
+# must stay that way: a signing key in the repository is a signing key in
+# every clone of it.
+#
+# Generate the keystore first (see PROJECT_STATUS.md, "Release signing").
+# `storeFile` is read relative to the `android/` directory, so an absolute
+# path is the safer answer -- keep the keystore OUTSIDE the repository so no
+# future `git add -A` can reach it.
+
+storeFile=C:/Users/you/keys/spendwise-upload.jks
+storePassword=
+keyAlias=upload
+keyPassword=
