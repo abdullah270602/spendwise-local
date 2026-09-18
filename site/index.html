@@ -4,56 +4,79 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SpendWise</title>
-<meta name="description" content="An offline personal-finance ledger for Android. It reads the notifications your bank already sends you. It cannot go online.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%230F1113'/><path d='M50 18 L50 46 M50 46 L28 82 M50 46 L72 82' stroke='%239FB2AC' stroke-width='9' fill='none' stroke-linecap='square'/></svg>">
+<meta name="description" content="An offline personal finance ledger for Android. It reads the transaction alerts your bank already sends you, and it has no permission to go online.">
+<meta name="color-scheme" content="dark light">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 108 108'><rect width='108' height='108' fill='%230F1113'/><g transform='translate(14.32,13.04) scale(1.28)'><path fill='%23E9E7E2' d='M24,8 L24,20 C24,34 10,40 10,56 L22,56 C22,40 36,34 36,20 L36,8 Z'/><path fill='%23C97A5A' d='M36,8 L36,20 C36,34 49,40 49,56 L52,56 C52,40 39,34 39,20 L39,8 Z'/></g></svg>">
 <style>
+  /* Dark by default, light when the visitor's system asks for it. No
+     JavaScript, no toggle, no stored preference: the browser already knows. */
   :root{
     --bg:#0F1113; --fg:#E9E7E2; --dim:#7A8084; --line:#1C2023; --edge:#282D31;
-    --keep:#9FB2AC; --spend:#C97A5A;
-    --mono:ui-monospace,'JetBrains Mono','SF Mono',Menlo,Consolas,monospace;
-    --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    --keep:#9FB2AC; --spend:#C97A5A; --panel:#141719;
+    --mono:ui-monospace,"JetBrains Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
   @media (prefers-color-scheme: light){
-    :root:not([data-theme="dark"]){
+    :root{
       --bg:#FAF9F6; --fg:#17191A; --dim:#6B7176; --line:#E8E6DF; --edge:#D2CFC6;
-      --keep:#4C665E; --spend:#A9542F;
+      --keep:#4C665E; --spend:#A9542F; --panel:#FFFFFF;
     }
   }
   *{box-sizing:border-box}
   html{-webkit-text-size-adjust:100%}
   body{
     margin:0; background:var(--bg); color:var(--fg); font-family:var(--sans);
-    -webkit-font-smoothing:antialiased; line-height:1.6;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
+    font-size:16px;
   }
-  .wrap{max-width:720px; margin:0 auto; padding:0 16px 96px}
+  .wrap{max-width:760px; margin:0 auto; padding:0 20px 88px}
+  @media (max-width:520px){ .wrap{padding:0 16px 64px} }
+
   header{padding:72px 0 0}
-  .mark{display:block; width:42px; height:42px; margin-bottom:26px}
+  @media (max-width:520px){ header{padding-top:44px} }
+  .mark{display:block; width:48px; height:48px; margin-bottom:28px}
   h1{
-    font-size:clamp(34px,7vw,56px); line-height:1.04; letter-spacing:-.028em;
-    margin:0 0 18px; font-weight:700; text-wrap:balance;
+    font-size:clamp(32px,6.4vw,52px); line-height:1.06; letter-spacing:-.028em;
+    margin:0 0 16px; font-weight:700; text-wrap:balance;
   }
-  .tag{
+  .eyebrow{
     font-family:var(--mono); font-size:11px; letter-spacing:.2em;
-    text-transform:uppercase; color:var(--keep); margin:0 0 34px;
+    text-transform:uppercase; color:var(--keep); margin:0 0 36px;
   }
-  .lede{font-size:clamp(17px,2.4vw,20px); color:var(--fg); margin:0 0 20px; text-wrap:pretty}
+  .lede{font-size:clamp(17px,2.2vw,19px); color:var(--fg); margin:0 0 20px; text-wrap:pretty}
   p{margin:0 0 18px; color:var(--dim); text-wrap:pretty}
   p strong{color:var(--fg); font-weight:600}
   .claim{
-    border-left:2px solid var(--keep); padding:2px 0 2px 18px; margin:34px 0;
+    border-left:2px solid var(--keep); padding:4px 0 4px 18px; margin:32px 0;
     color:var(--fg); font-size:17px;
   }
   h2{
-    font-size:13px; font-family:var(--mono); letter-spacing:.16em;
+    font-size:12px; font-family:var(--mono); letter-spacing:.17em;
     text-transform:uppercase; color:var(--dim); font-weight:500;
     margin:56px 0 18px; padding-top:22px; border-top:1px solid var(--line);
   }
   ul{margin:0 0 18px; padding-left:20px; color:var(--dim)}
-  li{margin-bottom:9px}
+  li{margin-bottom:10px}
   li strong{color:var(--fg); font-weight:600}
-  a{color:var(--fg); text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--edge)}
+  a{color:var(--fg); text-decoration:underline; text-underline-offset:3px;
+    text-decoration-color:var(--edge); text-decoration-thickness:1px}
   a:hover{text-decoration-color:var(--keep)}
-  .links{display:flex; gap:26px; flex-wrap:wrap; margin-top:38px; font-size:15px}
+  code{font-family:var(--mono); font-size:.9em; color:var(--fg)}
+
+  figure{margin:28px 0 8px}
+  figure svg{display:block; width:100%; height:auto}
+  figcaption{
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--dim); margin-top:12px;
+  }
+  .wide{display:block}
+  .tall{display:none}
+  @media (max-width:640px){
+    .wide{display:none}
+    .tall{display:block}
+  }
+
+  .links{display:flex; gap:24px; flex-wrap:wrap; margin-top:40px; font-size:15.5px}
   footer{
     margin-top:64px; padding-top:22px; border-top:1px solid var(--line);
     color:var(--dim); font-size:13px;
@@ -63,34 +86,143 @@
 <body>
 <div class="wrap">
   <header>
-    <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
-      <path d="M50 14 L50 44 M50 44 L26 86 M50 44 L74 86" stroke="currentColor"
-            stroke-width="8" fill="none" stroke-linecap="square" opacity=".9"/>
+    <svg class="mark" viewBox="0 0 108 108" role="img" aria-label="SpendWise">
+      <g transform="translate(14.32,13.04) scale(1.28)">
+        <path fill="var(--fg)" d="M24,8 L24,20 C24,34 10,40 10,56 L22,56 C22,40 36,34 36,20 L36,8 Z"/>
+        <path fill="var(--spend)" d="M36,8 L36,20 C36,34 49,40 49,56 L52,56 C52,40 39,34 39,20 L39,8 Z"/>
+      </g>
     </svg>
     <h1>Your bank already tells you everything.</h1>
-    <p class="tag">Private. Local. Yours.</p>
+    <p class="eyebrow">Private. Local. Yours.</p>
   </header>
 
-  <p class="lede">SpendWise is an offline personal-finance ledger for Android. It reads the transaction alerts your bank already sends you and turns them into a record of your own money &mdash; without you typing a single one of them in.</p>
+  <p class="lede">SpendWise is an offline personal finance ledger for Android. It reads the transaction alerts your bank already sends you and turns them into a record of your own money, without you typing a single one of them in.</p>
 
   <div class="claim">
-    It does not request Android&rsquo;s <code>INTERNET</code> permission. SpendWise cannot send your data anywhere &mdash; not because we promise not to, but because Android will not let it.
+    It does not ask Android for the <code>INTERNET</code> permission. SpendWise cannot send your data anywhere. That is not a promise we are making, it is a thing Android will not let the app do.
   </div>
 
   <h2>How it works</h2>
-  <p>You choose which apps SpendWise may read &mdash; your bank, your wallet, your messaging app &mdash; one at a time. When one of them posts an alert about money, SpendWise reads the amount, which way it went and who it was, and files it.</p>
-  <p>When it is unsure, it asks instead of guessing. When you correct the same shop a few times, it learns and stops asking.</p>
+
+  <figure>
+    <!-- Wide: one row, for anything with room for it. -->
+    <svg class="wide" viewBox="0 0 720 316" role="img" aria-labelledby="flow-w-title flow-w-desc">
+      <title id="flow-w-title">How a bank alert becomes a ledger entry</title>
+      <desc id="flow-w-desc">A bank posts an alert. If you enabled that app as a source, SpendWise reads it on the phone and files it in an encrypted ledger. All four steps sit inside a boundary marked "your phone", and the one route out of that boundary ends at a wall labelled "no network permission".</desc>
+      <defs>
+        <marker id="aw" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="var(--dim)"/>
+        </marker>
+      </defs>
+
+      <!-- boundary -->
+      <rect x="32" y="64" width="656" height="124" rx="8"
+            fill="none" stroke="var(--keep)" stroke-width="1"
+            stroke-dasharray="4,4" opacity=".55"/>
+      <text x="48" y="56" fill="var(--keep)" font-size="9" font-family="ui-monospace,monospace"
+            letter-spacing=".18em">YOUR PHONE</text>
+
+      <!-- arrows, drawn before the boxes -->
+      <line x1="180" y1="128" x2="216" y2="128" stroke="var(--dim)" stroke-width="1" marker-end="url(#aw)"/>
+      <line x1="340" y1="128" x2="376" y2="128" stroke="var(--dim)" stroke-width="1" marker-end="url(#aw)"/>
+      <line x1="500" y1="128" x2="536" y2="128" stroke="var(--dim)" stroke-width="1" marker-end="url(#aw)"/>
+
+      <!-- steps -->
+      <g font-family="system-ui,sans-serif">
+        <rect x="60" y="96" width="120" height="64" rx="6" fill="var(--panel)" stroke="var(--edge)"/>
+        <text x="72" y="118" fill="var(--dim)" font-size="8" font-family="ui-monospace,monospace" letter-spacing=".12em">ALERT</text>
+        <text x="72" y="140" fill="var(--fg)" font-size="12" font-weight="600">Your bank</text>
+        <text x="72" y="154" fill="var(--fg)" font-size="12" font-weight="600">posts it</text>
+
+        <rect x="220" y="96" width="120" height="64" rx="6" fill="var(--panel)" stroke="var(--keep)"/>
+        <text x="232" y="118" fill="var(--keep)" font-size="8" font-family="ui-monospace,monospace" letter-spacing=".12em">YOUR CHOICE</text>
+        <text x="232" y="140" fill="var(--fg)" font-size="12" font-weight="600">You enabled</text>
+        <text x="232" y="154" fill="var(--fg)" font-size="12" font-weight="600">that app</text>
+
+        <rect x="380" y="96" width="120" height="64" rx="6" fill="var(--panel)" stroke="var(--edge)"/>
+        <text x="392" y="118" fill="var(--dim)" font-size="8" font-family="ui-monospace,monospace" letter-spacing=".12em">ON DEVICE</text>
+        <text x="392" y="140" fill="var(--fg)" font-size="12" font-weight="600">Read on</text>
+        <text x="392" y="154" fill="var(--fg)" font-size="12" font-weight="600">your phone</text>
+
+        <rect x="540" y="96" width="120" height="64" rx="6" fill="var(--panel)" stroke="var(--edge)"/>
+        <text x="552" y="118" fill="var(--dim)" font-size="8" font-family="ui-monospace,monospace" letter-spacing=".12em">STORED</text>
+        <text x="552" y="140" fill="var(--fg)" font-size="12" font-weight="600">Encrypted</text>
+        <text x="552" y="154" fill="var(--fg)" font-size="12" font-weight="600">ledger</text>
+      </g>
+
+      <!-- the one way out, and the wall it meets -->
+      <line x1="360" y1="188" x2="360" y2="232" stroke="var(--spend)" stroke-width="1" stroke-dasharray="4,4"/>
+      <line x1="288" y1="236" x2="432" y2="236" stroke="var(--spend)" stroke-width="2.5"/>
+      <rect x="440" y="216" width="180" height="14" rx="2" fill="var(--bg)"/>
+      <text x="440" y="227" fill="var(--spend)" font-size="9" font-family="ui-monospace,monospace"
+            letter-spacing=".14em">NO NETWORK PERMISSION</text>
+      <text x="360" y="268" fill="var(--dim)" font-size="12" font-family="system-ui,sans-serif"
+            text-anchor="middle">Nothing goes out. There is no route for it to take.</text>
+    </svg>
+
+    <!-- Tall: the same four steps stacked, for a phone. -->
+    <svg class="tall" viewBox="0 0 360 560" role="img" aria-labelledby="flow-t-title flow-t-desc">
+      <title id="flow-t-title">How a bank alert becomes a ledger entry</title>
+      <desc id="flow-t-desc">A bank posts an alert. If you enabled that app as a source, SpendWise reads it on the phone and files it in an encrypted ledger. All four steps sit inside a boundary marked "your phone", and the one route out of that boundary ends at a wall labelled "no network permission".</desc>
+      <defs>
+        <marker id="at" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="var(--dim)"/>
+        </marker>
+      </defs>
+
+      <rect x="16" y="40" width="328" height="380" rx="8"
+            fill="none" stroke="var(--keep)" stroke-width="1"
+            stroke-dasharray="4,4" opacity=".55"/>
+      <text x="32" y="32" fill="var(--keep)" font-size="9" font-family="ui-monospace,monospace"
+            letter-spacing=".18em">YOUR PHONE</text>
+
+      <line x1="180" y1="132" x2="180" y2="160" stroke="var(--dim)" stroke-width="1" marker-end="url(#at)"/>
+      <line x1="180" y1="228" x2="180" y2="256" stroke="var(--dim)" stroke-width="1" marker-end="url(#at)"/>
+      <line x1="180" y1="324" x2="180" y2="352" stroke="var(--dim)" stroke-width="1" marker-end="url(#at)"/>
+
+      <g font-family="system-ui,sans-serif">
+        <rect x="44" y="68" width="272" height="64" rx="6" fill="var(--panel)" stroke="var(--edge)"/>
+        <text x="60" y="90" fill="var(--dim)" font-size="8" font-family="ui-monospace,monospace" letter-spacing=".12em">ALERT</text>
+        <text x="60" y="114" fill="var(--fg)" font-size="13" font-weight="600">Your bank posts it</text>
+
+        <rect x="44" y="164" width="272" height="64" rx="6" fill="var(--panel)" stroke="var(--keep)"/>
+        <text x="60" y="186" fill="var(--keep)" font-size="8" font-family="ui-monospace,monospace" letter-spacing=".12em">YOUR CHOICE</text>
+        <text x="60" y="210" fill="var(--fg)" font-size="13" font-weight="600">You enabled that app</text>
+
+        <rect x="44" y="260" width="272" height="64" rx="6" fill="var(--panel)" stroke="var(--edge)"/>
+        <text x="60" y="282" fill="var(--dim)" font-size="8" font-family="ui-monospace,monospace" letter-spacing=".12em">ON DEVICE</text>
+        <text x="60" y="306" fill="var(--fg)" font-size="13" font-weight="600">Read on your phone</text>
+
+        <rect x="44" y="356" width="272" height="64" rx="6" fill="var(--panel)" stroke="var(--edge)"/>
+        <text x="60" y="378" fill="var(--dim)" font-size="8" font-family="ui-monospace,monospace" letter-spacing=".12em">STORED</text>
+        <text x="60" y="402" fill="var(--fg)" font-size="13" font-weight="600">Encrypted ledger</text>
+      </g>
+
+      <line x1="180" y1="420" x2="180" y2="464" stroke="var(--spend)" stroke-width="1" stroke-dasharray="4,4"/>
+      <line x1="96" y1="468" x2="264" y2="468" stroke="var(--spend)" stroke-width="2.5"/>
+      <text x="180" y="496" fill="var(--spend)" font-size="9" font-family="ui-monospace,monospace"
+            letter-spacing=".14em" text-anchor="middle">NO NETWORK PERMISSION</text>
+      <text x="180" y="524" fill="var(--dim)" font-size="12" font-family="system-ui,sans-serif"
+            text-anchor="middle">Nothing goes out.</text>
+      <text x="180" y="540" fill="var(--dim)" font-size="12" font-family="system-ui,sans-serif"
+            text-anchor="middle">There is no route for it to take.</text>
+    </svg>
+    <figcaption>One alert, four steps, and a wall at the end of the only way out.</figcaption>
+  </figure>
+
+  <p>You pick which apps SpendWise is allowed to read, one at a time. Your bank, your wallet, your messaging app. When one of them posts an alert about money, SpendWise reads the amount, which way it went and who it was, and files it.</p>
+  <p>When it is not sure, it asks you instead of guessing. When you correct the same shop a few times, it learns and stops asking.</p>
 
   <h2>What it does not have</h2>
   <ul>
     <li><strong>No server</strong>, and no network permission to reach one.</li>
     <li><strong>No account</strong> to sign up for, and no profile of you.</li>
-    <li><strong>No analytics, advertising or crash reporting.</strong> No third-party SDKs at all.</li>
-    <li><strong>No bank credentials.</strong> It never asks for them and could not use them.</li>
+    <li><strong>No analytics, advertising or crash reporting.</strong> No third party code of any kind.</li>
+    <li><strong>No bank credentials.</strong> It never asks for them, and it could not use them.</li>
   </ul>
 
   <h2>Your data</h2>
-  <p>The ledger lives in an encrypted database on your phone. The key is generated on the device and held in the Android Keystore. Android cloud backup is switched off, so it is not copied anywhere else. Export to CSV or JSON whenever you like, and erase everything from inside the app whenever you like.</p>
+  <p>The ledger lives in an encrypted database on your phone. The key is generated on the device and kept in the Android Keystore. Android cloud backup is switched off, so your ledger is not quietly copied into a Google backup either. Export to CSV or JSON whenever you like, and erase everything from inside the app whenever you like.</p>
 
   <div class="links">
     <a href="privacy.html">Privacy policy</a>
@@ -98,7 +230,7 @@
   </div>
 
   <footer>
-    The source is public, including the manifest that proves there is no network permission.
+    The source is public, including the manifest that shows there is no network permission. This page loads no fonts, scripts or trackers from anywhere.
   </footer>
 </div>
 </body>

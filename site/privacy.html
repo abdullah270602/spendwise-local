@@ -3,46 +3,51 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Privacy policy &mdash; SpendWise</title>
+<title>Privacy policy - SpendWise</title>
 <meta name="description" content="SpendWise collects no data and cannot transmit any. It does not request Android's INTERNET permission.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%230F1113'/><path d='M50 18 L50 46 M50 46 L28 82 M50 46 L72 82' stroke='%239FB2AC' stroke-width='9' fill='none' stroke-linecap='square'/></svg>">
+<meta name="color-scheme" content="dark light">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 108 108'><rect width='108' height='108' fill='%230F1113'/><g transform='translate(14.32,13.04) scale(1.28)'><path fill='%23E9E7E2' d='M24,8 L24,20 C24,34 10,40 10,56 L22,56 C22,40 36,34 36,20 L36,8 Z'/><path fill='%23C97A5A' d='M36,8 L36,20 C36,34 49,40 49,56 L52,56 C52,40 39,34 39,20 L39,8 Z'/></g></svg>">
 <style>
   :root{
     --bg:#0F1113; --fg:#E9E7E2; --dim:#7A8084; --line:#1C2023; --edge:#282D31;
-    --keep:#9FB2AC;
-    --mono:ui-monospace,'JetBrains Mono','SF Mono',Menlo,Consolas,monospace;
-    --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    --keep:#9FB2AC; --spend:#C97A5A; --panel:#141719;
+    --mono:ui-monospace,"JetBrains Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
   @media (prefers-color-scheme: light){
-    :root:not([data-theme="dark"]){
+    :root{
       --bg:#FAF9F6; --fg:#17191A; --dim:#6B7176; --line:#E8E6DF; --edge:#D2CFC6;
-      --keep:#4C665E;
+      --keep:#4C665E; --spend:#A9542F; --panel:#FFFFFF;
     }
   }
   *{box-sizing:border-box}
   html{-webkit-text-size-adjust:100%}
   body{
     margin:0; background:var(--bg); color:var(--fg); font-family:var(--sans);
-    -webkit-font-smoothing:antialiased; line-height:1.62;
+    line-height:1.64; -webkit-font-smoothing:antialiased; font-size:16px;
   }
-  .wrap{max-width:680px; margin:0 auto; padding:0 16px 96px}
-  header{padding:56px 0 0}
+  .wrap{max-width:700px; margin:0 auto; padding:0 20px 88px}
+  @media (max-width:520px){ .wrap{padding:0 16px 64px} }
+
+  header{padding:52px 0 0}
+  @media (max-width:520px){ header{padding-top:36px} }
   .back{
     font-family:var(--mono); font-size:11px; letter-spacing:.16em;
     text-transform:uppercase; color:var(--dim); text-decoration:none;
-    display:inline-block; margin-bottom:30px;
+    display:inline-flex; align-items:center; gap:9px; margin-bottom:30px;
   }
   .back:hover{color:var(--fg)}
+  .back svg{width:20px; height:20px; flex:0 0 auto}
   h1{
-    font-size:clamp(28px,5vw,40px); line-height:1.1; letter-spacing:-.024em;
+    font-size:clamp(28px,5.2vw,38px); line-height:1.12; letter-spacing:-.024em;
     margin:0 0 10px; font-weight:700;
   }
   .date{
     font-family:var(--mono); font-size:11px; letter-spacing:.14em;
-    text-transform:uppercase; color:var(--dim); margin:0 0 34px;
+    text-transform:uppercase; color:var(--dim); margin:0 0 32px;
   }
   h2{
-    font-size:13px; font-family:var(--mono); letter-spacing:.16em;
+    font-size:12px; font-family:var(--mono); letter-spacing:.17em;
     text-transform:uppercase; color:var(--dim); font-weight:500;
     margin:46px 0 16px; padding-top:20px; border-top:1px solid var(--line);
   }
@@ -50,18 +55,22 @@
   p strong{color:var(--fg); font-weight:600}
   .lede{font-size:17.5px; color:var(--fg); margin-bottom:20px}
   .claim{
-    border-left:2px solid var(--keep); padding:2px 0 2px 18px; margin:28px 0;
+    border-left:2px solid var(--keep); padding:4px 0 4px 18px; margin:28px 0;
     color:var(--fg);
   }
   ul{margin:0 0 17px; padding-left:20px; color:var(--dim)}
-  li{margin-bottom:9px}
+  li{margin-bottom:10px}
   li strong{color:var(--fg); font-weight:600}
   code{font-family:var(--mono); font-size:.9em; color:var(--fg)}
-  a{color:var(--fg); text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--edge)}
+  a{color:var(--fg); text-decoration:underline; text-underline-offset:3px;
+    text-decoration-color:var(--edge); text-decoration-thickness:1px}
   a:hover{text-decoration-color:var(--keep)}
   .contact{
-    border:1px solid var(--edge); padding:14px 16px; margin:24px 0; color:var(--fg);
+    border:1px solid var(--edge); border-left-width:2px; border-left-color:var(--keep);
+    padding:14px 16px; margin:22px 0; color:var(--fg); background:var(--panel);
   }
+  .contact span{display:block; font-family:var(--mono); font-size:11px;
+    letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-bottom:6px}
   footer{
     margin-top:56px; padding-top:20px; border-top:1px solid var(--line);
     color:var(--dim); font-size:13px;
@@ -71,66 +80,74 @@
 <body>
 <div class="wrap">
   <header>
-    <a class="back" href="index.html">&larr; SpendWise</a>
+    <a class="back" href="index.html">
+      <svg viewBox="0 0 108 108" aria-hidden="true">
+        <g transform="translate(14.32,13.04) scale(1.28)">
+          <path fill="currentColor" d="M24,8 L24,20 C24,34 10,40 10,56 L22,56 C22,40 36,34 36,20 L36,8 Z"/>
+          <path fill="var(--spend)" d="M36,8 L36,20 C36,34 49,40 49,56 L52,56 C52,40 39,34 39,20 L39,8 Z"/>
+        </g>
+      </svg>
+      SpendWise
+    </a>
     <h1>Privacy policy</h1>
     <p class="date">Last updated 18 September 2026</p>
   </header>
 
-  <p class="lede">SpendWise is an offline personal-finance ledger for Android. It reads the notifications your bank already sends you and turns them into a record of your own money.</p>
+  <p class="lede">SpendWise is an offline personal finance ledger for Android. It reads the notifications your bank already sends you and turns them into a record of your own money.</p>
 
   <div class="claim">
-    SpendWise works without a network connection and <strong>does not request Android&rsquo;s <code>INTERNET</code> permission</strong>. It is not capable of sending your data anywhere, and that is enforced by Android rather than promised by us.
+    SpendWise works with no network connection and <strong>does not ask Android for the <code>INTERNET</code> permission</strong>. It is not capable of sending your data anywhere. Android enforces that, we do not just promise it.
   </div>
 
   <h2>Who is responsible</h2>
   <p>SpendWise is published by Abdullah Naseem.</p>
   <div class="contact">
-    Questions about this policy, or about data:<br>
-    <strong>[CONTACT EMAIL &mdash; fill in before publishing]</strong>
+    <span>Questions about this policy, or about data</span>
+    <strong>[CONTACT EMAIL, to fill in before publishing]</strong>
   </div>
 
   <h2>What the app reads, and why</h2>
-  <p>SpendWise asks for <strong>notification access</strong> (Android&rsquo;s <code>BIND_NOTIFICATION_LISTENER_SERVICE</code>). This is the app&rsquo;s core function: a transaction is recorded only because a notification described it.</p>
+  <p>SpendWise asks for <strong>notification access</strong>, which Android calls <code>BIND_NOTIFICATION_LISTENER_SERVICE</code>. This is what the app is for. A transaction gets recorded only because a notification described it.</p>
   <ul>
-    <li>You choose which apps SpendWise may read, one at a time, in Settings &rarr; Notification sources. <strong>Nothing is read from an app you have not enabled.</strong></li>
-    <li>Notifications from enabled apps are read on the device to extract an amount, a direction, a date, a counterparty and a reference.</li>
-    <li>Notifications that do not describe money &mdash; one-time passcodes, delivery notices, marketing &mdash; are discarded rather than stored.</li>
-    <li>SpendWise never posts, dismisses or acts on a notification. It only reads.</li>
-    <li>Notification access can be revoked at any time in Android settings, and individual sources can be switched off inside the app.</li>
+    <li>You choose which apps SpendWise may read, one at a time, in Settings, then Notification sources. <strong>Nothing is read from an app you have not enabled.</strong></li>
+    <li>Notifications from the apps you enabled are read on the device, to pull out an amount, a direction, a date, who was paid and a reference number.</li>
+    <li>Notifications that are not about money, such as one time passcodes, delivery updates and marketing, are thrown away rather than stored.</li>
+    <li>SpendWise only reads. It never posts a notification, dismisses one, or acts on one.</li>
+    <li>You can revoke notification access at any time in Android settings, and switch off individual sources inside the app.</li>
   </ul>
-  <p>SpendWise does <strong>not</strong> request <code>READ_SMS</code>, <code>RECEIVE_SMS</code> or any call-log permission. Where your bank sends an SMS, SpendWise sees only the notification your messaging app posts about it, and only if you have enabled that app.</p>
+  <p>SpendWise does <strong>not</strong> ask for <code>READ_SMS</code>, <code>RECEIVE_SMS</code> or any call log permission. Where your bank sends an SMS, SpendWise sees only the notification your messaging app posts about it, and only if you enabled that app.</p>
 
   <h2>What is stored on your device</h2>
   <ul>
-    <li>Account names and the apps mapped to them</li>
-    <li>The raw notification text kept as evidence for each entry</li>
-    <li>Parsed candidates and the resulting transactions</li>
-    <li>Non-secret local preferences</li>
+    <li>Account names, and which apps are mapped to them</li>
+    <li>The raw notification text, kept as evidence for each entry</li>
+    <li>What the app read out of those alerts, and the transactions it made from them</li>
+    <li>Local preferences, none of them secret</li>
   </ul>
-  <p>The main database is encrypted with SQLCipher. A random 256-bit key is generated on the device and held in Android&rsquo;s secure storage, backed by the Android Keystore. Notification evidence captured while the app&rsquo;s Flutter engine is stopped is encrypted field by field with AES-GCM under a separate, non-exportable Keystore key.</p>
+  <p>The main database is encrypted with SQLCipher. A random 256 bit key is generated on the device and held in Android secure storage, backed by the Android Keystore. Alerts captured while the app is not running are encrypted field by field with AES-GCM, under a separate key that cannot be exported.</p>
 
   <h2>What leaves your device</h2>
-  <p><strong>Nothing.</strong> SpendWise contains no backend client, no telemetry, no analytics, no advertising, no remote crash reporting and no AI provider. There are no third-party SDKs in the app.</p>
-  <p>The single exception is one you perform deliberately: an export you start yourself writes a CSV or JSON file to a location you choose through Android&rsquo;s own document picker. SpendWise does not upload it and cannot see where it goes.</p>
+  <p><strong>Nothing.</strong> There is no backend, no telemetry, no analytics, no advertising, no remote crash reporting and no AI provider. The app contains no third party code that collects anything.</p>
+  <p>The one exception is something you do on purpose. An export you start yourself writes a CSV or JSON file to a place you pick, through Android's own document picker. SpendWise does not upload it and cannot see where it went.</p>
 
   <h2>Data collection and sharing</h2>
-  <p>SpendWise collects no data, shares no data with third parties, and sells no data.</p>
+  <p>SpendWise collects no data, shares no data with anyone, and sells no data.</p>
 
   <h2>Deleting your data</h2>
-  <p>Settings &rarr; <strong>Erase all local data</strong> removes the ledger, the journals, the secure database key, the native capture queue and your source configuration. Uninstalling the app removes everything it stored. Because nothing is ever transmitted, there is no server-side copy to request the deletion of.</p>
-  <p>Android cloud backup and device-transfer extraction are switched off (<code>allowBackup="false"</code>), so your ledger is not copied into a Google backup.</p>
+  <p>In Settings, <strong>Erase all local data</strong> removes the ledger, the journals, the database key, the capture queue and your source configuration. Uninstalling the app removes everything it stored. Since nothing is ever transmitted, there is no copy on a server for you to ask us to delete.</p>
+  <p>Android cloud backup and device transfer are switched off, using <code>allowBackup="false"</code>, so your ledger is not copied into a Google backup.</p>
 
   <h2>Children</h2>
-  <p>SpendWise is not directed at children and does not knowingly process any data from children. It has no accounts, no sign-up and no profiles of any kind.</p>
+  <p>SpendWise is not aimed at children and does not knowingly process any data from children. There are no accounts, no sign up and no profiles of any kind.</p>
 
-  <h2>Security limits, stated honestly</h2>
-  <p>At-rest encryption and Android&rsquo;s app sandbox reduce exposure from offline extraction or a lost, locked device. They do not defend against malware with sufficient privileges, or against a person using an already-unlocked device.</p>
+  <h2>What this does not protect against</h2>
+  <p>Encryption at rest and the Android app sandbox reduce what someone could get from a lost or stolen phone that is locked, or from pulling the storage off it. They do not protect you from malware that already has high privileges on your phone, or from someone using it while it is unlocked.</p>
 
   <h2>Changes to this policy</h2>
-  <p>Any change will be published on this page with a new date above. The full history of this document is public in the app&rsquo;s <a href="https://github.com/abdullah270602/spendwise-local">repository</a>.</p>
+  <p>Any change gets published on this page with a new date at the top. The full history of this document is public in the app's <a href="https://github.com/abdullah270602/spendwise-local">repository</a>.</p>
 
   <footer>
-    SpendWise &mdash; Private. Local. Yours.
+    SpendWise. Private. Local. Yours. This page loads no fonts, scripts or trackers from anywhere.
   </footer>
 </div>
 </body>
